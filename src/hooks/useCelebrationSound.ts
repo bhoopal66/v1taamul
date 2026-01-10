@@ -1,6 +1,8 @@
 // Celebration sound effects using Web Audio API
 // Different sounds for different milestone rarities
 
+import { isSoundEnabled } from './useSoundSettings';
+
 type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 // Audio context singleton
@@ -116,6 +118,11 @@ const playLegendarySound = () => {
 };
 
 export const playCelebrationSound = (rarity: Rarity) => {
+  // Check if sounds are enabled
+  if (!isSoundEnabled()) {
+    return;
+  }
+  
   try {
     // Resume audio context if suspended (browser autoplay policy)
     const ctx = getAudioContext();

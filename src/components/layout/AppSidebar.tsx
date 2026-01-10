@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { CompactLevelBadge } from '@/components/profile/CompactLevelBadge';
+import { SoundToggle } from '@/components/ui/SoundToggle';
 
 interface NavItemProps {
   to: string;
@@ -147,6 +148,10 @@ export const AppSidebar: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <SoundToggle 
+            variant="compact" 
+            className="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50" 
+          />
           <Button
             variant="ghost"
             size="sm"

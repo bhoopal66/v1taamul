@@ -48,7 +48,11 @@ import {
   PhoneForwarded,
   Star,
   FileText,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { exportContactsToCSV, exportContactsToExcel, ContactExportData } from '@/utils/contactsExport';
 import { format } from 'date-fns';
 import { useCallList, CallListContact, FeedbackStatus } from '@/hooks/useCallList';
 import { cn } from '@/lib/utils';
@@ -137,6 +141,34 @@ export const CallListPage: React.FC = () => {
     skipContact(contact.callListId);
   };
 
+  const handleExport = (format: 'csv' | 'excel') => {
+    const exportData: ContactExportData[] = filteredList.map(contact => ({
+      callOrder: contact.callOrder,
+      companyName: contact.companyName,
+      contactPersonName: contact.contactPersonName,
+      phoneNumber: contact.phoneNumber,
+      tradeLicenseNumber: contact.tradeLicenseNumber,
+      city: contact.city,
+      industry: contact.industry,
+      callStatus: contact.callStatus,
+      lastFeedback: contact.lastFeedback,
+      lastNotes: contact.lastNotes,
+      calledAt: contact.calledAt,
+    }));
+
+    try {
+      if (format === 'csv') {
+        exportContactsToCSV(exportData);
+        toast.success('Contacts exported to CSV');
+      } else {
+        exportContactsToExcel(exportData);
+        toast.success('Contacts exported to Excel');
+      }
+    } catch (error) {
+      toast.error('Failed to export contacts');
+    }
+  };
+
   const filteredList = callList.filter(contact => {
     const matchesSearch = 
       contact.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -190,10 +222,30 @@ export const CallListPage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="gap-2">
-          <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" disabled={callList.length === 0}>
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-background">
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                <FileText className="w-4 h-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('excel')}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="gap-2">
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

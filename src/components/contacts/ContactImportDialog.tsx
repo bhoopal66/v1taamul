@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useCallSheetUpload, ParsedContact } from '@/hooks/useCallSheetUpload';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +22,15 @@ import {
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 
+// Only admin and super_admin can import contacts
+const ALLOWED_IMPORT_ROLES = ['admin', 'super_admin'];
+
 interface ContactImportDialogProps {
   onImportComplete?: () => void;
 }
 
 export const ContactImportDialog = ({ onImportComplete }: ContactImportDialogProps) => {
+  const { userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +43,13 @@ export const ContactImportDialog = ({ onImportComplete }: ContactImportDialogPro
     isSubmitting,
     clearParsedData,
   } = useCallSheetUpload();
+
+  // Only render for admin/super_admin
+  const canImport = userRole && ALLOWED_IMPORT_ROLES.includes(userRole);
+  
+  if (!canImport) {
+    return null;
+  }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

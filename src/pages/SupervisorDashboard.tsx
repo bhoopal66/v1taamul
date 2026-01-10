@@ -9,11 +9,13 @@ import { TeamPerformanceChart } from '@/components/supervisor/TeamPerformanceCha
 import { TeamTrendsLineChart } from '@/components/supervisor/TeamTrendsLineChart';
 import { TeamConversionAreaChart } from '@/components/supervisor/TeamConversionAreaChart';
 import { TeamTrendsSummaryCards } from '@/components/supervisor/TeamTrendsSummaryCards';
+import { PerformanceComparisonView } from '@/components/supervisor/PerformanceComparisonView';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 export const SupervisorDashboard: React.FC = () => {
   const { profile, userRole } = useAuth();
   const [trendDays, setTrendDays] = useState<number>(14);
@@ -101,6 +103,7 @@ export const SupervisorDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList>
             <TabsTrigger value="trends">Performance Trends</TabsTrigger>
+            <TabsTrigger value="comparison">Compare Periods</TabsTrigger>
             <TabsTrigger value="today">Today's Activity</TabsTrigger>
           </TabsList>
           
@@ -130,6 +133,10 @@ export const SupervisorDashboard: React.FC = () => {
             />
             <TeamConversionAreaChart data={dailyTrends} isLoading={trendsLoading} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="comparison" className="space-y-6">
+          <PerformanceComparisonView />
         </TabsContent>
 
         <TabsContent value="today" className="space-y-6">

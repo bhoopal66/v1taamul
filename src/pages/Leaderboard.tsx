@@ -243,15 +243,17 @@ export const Leaderboard: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[180px]">
               <Calendar className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Time period" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
               <SelectItem value="this_week">This Week</SelectItem>
               <SelectItem value="last_week">Last Week</SelectItem>
               <SelectItem value="this_month">This Month</SelectItem>
               <SelectItem value="last_month">Last Month</SelectItem>
+              <SelectItem value="six_months">6 Months</SelectItem>
               <SelectItem value="all_time">All Time</SelectItem>
             </SelectContent>
           </Select>

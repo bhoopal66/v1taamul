@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths, format } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths, format } from 'date-fns';
 
-export type TimePeriod = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'all_time';
+export type TimePeriod = 'today' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'six_months' | 'all_time';
 
 export interface LeaderboardAgent {
   id: string;
@@ -40,6 +40,11 @@ const getDateRange = (period: TimePeriod): { start: Date | null; end: Date | nul
   const today = new Date();
   
   switch (period) {
+    case 'today':
+      return {
+        start: startOfDay(today),
+        end: endOfDay(today),
+      };
     case 'this_week':
       return {
         start: startOfWeek(today, { weekStartsOn: 1 }),
@@ -61,6 +66,11 @@ const getDateRange = (period: TimePeriod): { start: Date | null; end: Date | nul
       return {
         start: startOfMonth(lastMonth),
         end: endOfMonth(lastMonth),
+      };
+    case 'six_months':
+      return {
+        start: subMonths(today, 6),
+        end: today,
       };
     case 'all_time':
     default:
@@ -272,6 +282,13 @@ const getPreviousDateRange = (period: TimePeriod): { start: Date | null; end: Da
   const today = new Date();
   
   switch (period) {
+    case 'today':
+      const yesterday = subWeeks(today, 0);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return {
+        start: startOfDay(yesterday),
+        end: endOfDay(yesterday),
+      };
     case 'this_week':
       const prevWeek = subWeeks(today, 1);
       return {
@@ -296,6 +313,11 @@ const getPreviousDateRange = (period: TimePeriod): { start: Date | null; end: Da
         start: startOfMonth(twoMonthsAgo),
         end: endOfMonth(twoMonthsAgo),
       };
+    case 'six_months':
+      return {
+        start: subMonths(today, 12),
+        end: subMonths(today, 6),
+      };
     default:
       return { start: null, end: null };
   }
@@ -305,6 +327,8 @@ const getPeriodLabel = (period: TimePeriod): string => {
   const today = new Date();
   
   switch (period) {
+    case 'today':
+      return format(today, 'EEEE, MMMM d, yyyy');
     case 'this_week':
       const weekStart = startOfWeek(today, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
@@ -318,6 +342,8 @@ const getPeriodLabel = (period: TimePeriod): string => {
       return format(today, 'MMMM yyyy');
     case 'last_month':
       return format(subMonths(today, 1), 'MMMM yyyy');
+    case 'six_months':
+      return `${format(subMonths(today, 6), 'MMM yyyy')} - ${format(today, 'MMM yyyy')}`;
     case 'all_time':
       return 'All Time';
     default:

@@ -204,9 +204,34 @@ const TeamComparisonCard: React.FC<{ teams: TeamStats[] }> = ({ teams }) => {
 };
 
 export const Leaderboard: React.FC = () => {
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('this_week');
-  const [teamFilter, setTeamFilter] = useState<string>('all');
-  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>('all');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => {
+    const saved = localStorage.getItem('leaderboard-time-period');
+    return (saved as TimePeriod) || 'this_week';
+  });
+  
+  const [teamFilter, setTeamFilter] = useState<string>(() => {
+    return localStorage.getItem('leaderboard-team-filter') || 'all';
+  });
+  
+  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>(() => {
+    const saved = localStorage.getItem('leaderboard-lead-filter');
+    return (saved as LeadStatusFilter) || 'all';
+  });
+
+  const handleTimePeriodChange = (value: TimePeriod) => {
+    setTimePeriod(value);
+    localStorage.setItem('leaderboard-time-period', value);
+  };
+
+  const handleTeamFilterChange = (value: string) => {
+    setTeamFilter(value);
+    localStorage.setItem('leaderboard-team-filter', value);
+  };
+
+  const handleLeadStatusChange = (value: LeadStatusFilter) => {
+    setLeadStatusFilter(value);
+    localStorage.setItem('leaderboard-lead-filter', value);
+  };
   
   const { agents, teamStats, totalAgents, periodLabel, isLoading } = useLeaderboard({
     timePeriod,
@@ -245,7 +270,7 @@ export const Leaderboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
+          <Select value={timePeriod} onValueChange={handleTimePeriodChange}>
             <SelectTrigger className="w-[180px]">
               <Calendar className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Time period" />
@@ -261,7 +286,7 @@ export const Leaderboard: React.FC = () => {
             </SelectContent>
           </Select>
           
-          <Select value={leadStatusFilter} onValueChange={(v) => setLeadStatusFilter(v as LeadStatusFilter)}>
+          <Select value={leadStatusFilter} onValueChange={handleLeadStatusChange}>
             <SelectTrigger className="w-[160px]">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Lead status" />
@@ -274,7 +299,7 @@ export const Leaderboard: React.FC = () => {
           </Select>
           
           {teamStats.length > 0 && (
-            <Select value={teamFilter} onValueChange={setTeamFilter}>
+            <Select value={teamFilter} onValueChange={handleTeamFilterChange}>
               <SelectTrigger className="w-[160px]">
                 <Users className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Filter by team" />

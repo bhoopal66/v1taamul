@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 export interface CustomPreset {
   id: string;
@@ -14,6 +14,30 @@ export interface ExportedPresets {
   presets: CustomPreset[];
 }
 
+// URL-safe base64 encoding/decoding
+const encodePresets = (presets: CustomPreset[]): string => {
+  const data = JSON.stringify(presets.map(p => ({
+    n: p.name,
+    t: p.timePeriod,
+    l: p.leadStatus,
+  })));
+  return btoa(encodeURIComponent(data));
+};
+
+const decodePresets = (encoded: string): Partial<CustomPreset>[] | null => {
+  try {
+    const data = JSON.parse(decodeURIComponent(atob(encoded)));
+    if (!Array.isArray(data)) return null;
+    return data.map((p: any) => ({
+      name: p.n,
+      timePeriod: p.t,
+      leadStatus: p.l,
+    }));
+  } catch {
+    return null;
+  }
+};
+
 export function useCustomFilterPresets(storageKey: string) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
@@ -25,6 +49,24 @@ export function useCustomFilterPresets(storageKey: string) {
       return [];
     }
   });
+
+  // Check for shared presets in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedPresets = urlParams.get('presets');
+    
+    if (sharedPresets) {
+      const decoded = decodePresets(sharedPresets);
+      if (decoded && decoded.length > 0) {
+        // Store in sessionStorage to be handled by the component
+        sessionStorage.setItem('pending-shared-presets', JSON.stringify(decoded));
+      }
+      
+      // Clean up URL without reload
+      const newUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   const savePreset = useCallback((name: string, timePeriod: string, leadStatus: string) => {
     const newPreset: CustomPreset = {
@@ -131,10 +173,62 @@ export function useCustomFilterPresets(storageKey: string) {
     });
   }, [storageKey]);
 
+  const importFromData = useCallback((presetData: Partial<CustomPreset>[]): { imported: number; skipped: number } => {
+    let imported = 0;
+    let skipped = 0;
+    
+    const validPresets: CustomPreset[] = presetData.filter((preset) => {
+      if (!preset.name || !preset.timePeriod || !preset.leadStatus) {
+        skipped++;
+        return false;
+      }
+      return true;
+    }).map((preset) => ({
+      id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: preset.name!,
+      timePeriod: preset.timePeriod!,
+      leadStatus: preset.leadStatus!,
+      createdAt: Date.now(),
+    }));
+    
+    imported = validPresets.length;
+    
+    if (validPresets.length > 0) {
+      setCustomPresets(prev => {
+        const updated = [...prev, ...validPresets];
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      });
+    }
+    
+    return { imported, skipped };
+  }, [storageKey]);
+
+  const generateShareLink = useCallback((basePath: string): string => {
+    if (customPresets.length === 0) return '';
+    
+    const encoded = encodePresets(customPresets);
+    const baseUrl = window.location.origin;
+    return `${baseUrl}${basePath}?presets=${encoded}`;
+  }, [customPresets]);
+
   const clearAllPresets = useCallback(() => {
     setCustomPresets([]);
     localStorage.setItem(storageKey, JSON.stringify([]));
   }, [storageKey]);
+
+  const getPendingSharedPresets = useCallback((): Partial<CustomPreset>[] | null => {
+    const pending = sessionStorage.getItem('pending-shared-presets');
+    if (pending) {
+      sessionStorage.removeItem('pending-shared-presets');
+      try {
+        return JSON.parse(pending);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, []);
 
   return {
     customPresets,
@@ -143,6 +237,9 @@ export function useCustomFilterPresets(storageKey: string) {
     updatePreset,
     exportPresets,
     importPresets,
+    importFromData,
+    generateShareLink,
+    getPendingSharedPresets,
     clearAllPresets,
     fileInputRef,
   };

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { CallsChart } from '@/components/dashboard/CallsChart';
 import { ConversionChart } from '@/components/dashboard/ConversionChart';
@@ -20,13 +22,14 @@ import { DailyGoalProgress } from '@/components/dashboard/DailyGoalProgress';
 import { WeeklyTrendChart } from '@/components/dashboard/WeeklyTrendChart';
 import { RecentActivityFeed } from '@/components/dashboard/RecentActivityFeed';
 import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights';
+import { AllAgentsStatsGrid } from '@/components/dashboard/AllAgentsStatsGrid';
+import { AgentPerformanceList } from '@/components/dashboard/AgentPerformanceList';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
+import { useAllAgentsPerformance } from '@/hooks/useAllAgentsPerformance';
 import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES, CUSTOM_CATEGORY_COLORS } from '@/hooks/useCustomFilterPresets';
 import { CategoryColorPicker } from '@/components/ui/CategoryColorPicker';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
-
 interface FilterPreset {
   name: string;
   description: string;
@@ -46,7 +49,18 @@ const filterPresets: FilterPreset[] = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, userRole } = useAuth();
+  
+  // View mode: 'personal' or 'team'
+  const [viewMode, setViewMode] = useState<'personal' | 'team'>(() => {
+    const saved = localStorage.getItem('dashboard-view-mode');
+    return (saved as 'personal' | 'team') || 'team';
+  });
+  
+  // Team view filters
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date>(() => endOfMonth(new Date()));
   
   const [timePeriod, setTimePeriod] = useState<DashboardTimePeriod>(() => {
     const saved = localStorage.getItem('dashboard-time-period');
@@ -71,6 +85,30 @@ export const Dashboard: React.FC = () => {
   const { customPresets, savePreset, deletePreset, duplicatePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, updateCategoryColor, deleteCategory, isDefaultCategory, getCategoryColor, customCategories } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
+  
+  // All agents performance hook
+  const { 
+    agents, 
+    agentStats, 
+    summary: allAgentsSummary, 
+    isLoading: allAgentsLoading, 
+    refetch: refetchAllAgents 
+  } = useAllAgentsPerformance({
+    selectedAgentId,
+    dateFrom,
+    dateTo,
+  });
+
+  const handleViewModeChange = (mode: 'personal' | 'team') => {
+    setViewMode(mode);
+    localStorage.setItem('dashboard-view-mode', mode);
+  };
+
+  const handleAgentChange = (value: string) => {
+    setSelectedAgentId(value === 'all' ? null : value);
+  };
+
+  const dateRangeLabel = `${format(dateFrom, 'MMM d')} - ${format(dateTo, 'MMM d, yyyy')}`;
 
   // Handle shared presets from URL
   useEffect(() => {
@@ -285,11 +323,94 @@ export const Dashboard: React.FC = () => {
               <span>{format(new Date(), 'EEEE, MMMM d, yyyy')}</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-              {greeting()}, {profile?.full_name?.split(' ')[0] || 'Agent'}!
+              {viewMode === 'team' ? 'Team Dashboard' : `${greeting()}, ${profile?.full_name?.split(' ')[0] || 'Agent'}!`}
             </h1>
             <p className="text-muted-foreground mt-2 max-w-lg">
-              Here's your real-time performance dashboard. Track your calls, monitor your goals, and stay ahead of the competition.
+              {viewMode === 'team' 
+                ? 'Overview of all agents performance. Filter by agent and date range.'
+                : 'Here\'s your real-time performance dashboard. Track your calls, monitor your goals, and stay ahead of the competition.'}
             </p>
+            
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 mt-4">
+              <Button
+                variant={viewMode === 'team' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('team')}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Team View
+              </Button>
+              <Button
+                variant={viewMode === 'personal' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('personal')}
+                className="gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                My Performance
+              </Button>
+            </div>
+            
+            {/* Team View Filters */}
+            {viewMode === 'team' && (
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                <Select value={selectedAgentId || 'all'} onValueChange={handleAgentChange}>
+                  <SelectTrigger className="w-[200px] bg-background/80">
+                    <Users className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agents.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2 bg-background/80">
+                      <Calendar className="w-4 h-4" />
+                      {dateRangeLabel}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <div className="flex">
+                      <div className="p-3 border-r">
+                        <p className="text-sm font-medium mb-2">From</p>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateFrom}
+                          onSelect={(date) => date && setDateFrom(date)}
+                          initialFocus
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="text-sm font-medium mb-2">To</p>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateTo}
+                          onSelect={(date) => date && setDateTo(date)}
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                
+                {selectedAgentId && (
+                  <Badge variant="secondary" className="gap-1">
+                    Agent: {agents.find(a => a.id === selectedAgentId)?.name}
+                    <button onClick={() => setSelectedAgentId(null)} className="ml-1 hover:text-destructive">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            )}
             {/* Active Filter Badges */}
             {hasActiveFilters && (
               <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -770,41 +891,62 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <StatsGrid stats={myStats} isLoading={isLoading} onRefresh={refetch} />
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Charts */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Hourly Calls & Conversion */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <CallsChart data={hourlyData} isLoading={isLoading} />
-            <ConversionChart stats={myStats} isLoading={isLoading} />
-          </div>
+      {/* Content based on view mode */}
+      {viewMode === 'team' ? (
+        <>
+          {/* Team Stats Grid */}
+          <AllAgentsStatsGrid 
+            summary={allAgentsSummary} 
+            isLoading={allAgentsLoading} 
+            onRefresh={refetchAllAgents}
+            dateRangeLabel={dateRangeLabel}
+          />
           
-          {/* Weekly Trend */}
-          <WeeklyTrendChart data={weeklyData} isLoading={isLoading} />
-        </div>
-
-        {/* Right Column - Goals & Activity */}
-        <div className="space-y-6">
-          <DailyGoalProgress stats={myStats} isLoading={isLoading} />
-          <RecentActivityFeed activities={recentActivity} isLoading={isLoading} />
-        </div>
-      </div>
-
-      {/* Bottom Row - Insights & Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <PerformanceInsights 
-          stats={myStats} 
-          hourlyData={hourlyData} 
-          isLoading={isLoading} 
-        />
-        <div className="lg:col-span-2">
+          {/* Agent Performance List */}
+          <AgentPerformanceList agents={agentStats} isLoading={allAgentsLoading} />
+          
+          {/* Team Leaderboard */}
           <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
-        </div>
-      </div>
+        </>
+      ) : (
+        <>
+          {/* Stats Grid */}
+          <StatsGrid stats={myStats} isLoading={isLoading} onRefresh={refetch} />
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Charts */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Hourly Calls & Conversion */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <CallsChart data={hourlyData} isLoading={isLoading} />
+                <ConversionChart stats={myStats} isLoading={isLoading} />
+              </div>
+              
+              {/* Weekly Trend */}
+              <WeeklyTrendChart data={weeklyData} isLoading={isLoading} />
+            </div>
+
+            {/* Right Column - Goals & Activity */}
+            <div className="space-y-6">
+              <DailyGoalProgress stats={myStats} isLoading={isLoading} />
+              <RecentActivityFeed activities={recentActivity} isLoading={isLoading} />
+            </div>
+          </div>
+
+          {/* Bottom Row - Insights & Leaderboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <PerformanceInsights 
+              stats={myStats} 
+              hourlyData={hourlyData} 
+              isLoading={isLoading} 
+            />
+            <div className="lg:col-span-2">
+              <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Quick Actions Card */}
       <Card className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20">

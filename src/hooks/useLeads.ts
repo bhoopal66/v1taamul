@@ -4,18 +4,64 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
-export type LeadSource = 'cold_call' | 'referral' | 'website' | 'social_media' | 'event' | 'inbound_call' | 'email_campaign' | 'partner';
+export type ProductType = 'account' | 'loan';
+export type BankName = 'RAK' | 'NBF' | 'UBL' | 'RUYA' | 'MASHREQ' | 'WIO';
+export type LeadSource = `${ProductType}_${BankName}`;
 
-export const LEAD_SOURCES: { value: LeadSource; label: string; icon: string }[] = [
-  { value: 'cold_call', label: 'Cold Call', icon: '📞' },
-  { value: 'referral', label: 'Referral', icon: '🤝' },
-  { value: 'website', label: 'Website', icon: '🌐' },
-  { value: 'social_media', label: 'Social Media', icon: '📱' },
-  { value: 'event', label: 'Event', icon: '🎪' },
-  { value: 'inbound_call', label: 'Inbound Call', icon: '📲' },
-  { value: 'email_campaign', label: 'Email Campaign', icon: '📧' },
-  { value: 'partner', label: 'Partner', icon: '🏢' },
+// Banks available for Account products (all banks)
+export const ACCOUNT_BANKS: { value: BankName; label: string }[] = [
+  { value: 'RAK', label: 'RAK Bank' },
+  { value: 'NBF', label: 'NBF' },
+  { value: 'UBL', label: 'UBL' },
+  { value: 'RUYA', label: 'Ruya' },
+  { value: 'MASHREQ', label: 'Mashreq' },
+  { value: 'WIO', label: 'WIO' },
 ];
+
+// Banks available for Loan products (limited selection)
+export const LOAN_BANKS: { value: BankName; label: string }[] = [
+  { value: 'WIO', label: 'WIO' },
+  { value: 'NBF', label: 'NBF' },
+  { value: 'RAK', label: 'RAK Bank' },
+];
+
+export const PRODUCT_TYPES: { value: ProductType; label: string; icon: string }[] = [
+  { value: 'account', label: 'Account', icon: '🏦' },
+  { value: 'loan', label: 'Loan', icon: '💰' },
+];
+
+// Generate all lead sources for analytics
+export const LEAD_SOURCES: { value: LeadSource; label: string; icon: string; product: ProductType; bank: BankName }[] = [
+  ...ACCOUNT_BANKS.map(bank => ({
+    value: `account_${bank.value}` as LeadSource,
+    label: `Account - ${bank.label}`,
+    icon: '🏦',
+    product: 'account' as ProductType,
+    bank: bank.value,
+  })),
+  ...LOAN_BANKS.map(bank => ({
+    value: `loan_${bank.value}` as LeadSource,
+    label: `Loan - ${bank.label}`,
+    icon: '💰',
+    product: 'loan' as ProductType,
+    bank: bank.value,
+  })),
+];
+
+// Helper to parse lead source
+export const parseLeadSource = (source: string | null): { product: ProductType; bank: BankName } | null => {
+  if (!source) return null;
+  const [product, bank] = source.split('_') as [ProductType, BankName];
+  if (product && bank) {
+    return { product, bank };
+  }
+  return null;
+};
+
+// Helper to create lead source string
+export const createLeadSource = (product: ProductType, bank: BankName): LeadSource => {
+  return `${product}_${bank}` as LeadSource;
+};
 
 export interface Lead {
   id: string;
@@ -86,7 +132,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         industry: item.master_contacts?.industry || null,
         leadStatus: (item.lead_status || 'new') as LeadStatus,
         leadScore: item.lead_score || 0,
-        leadSource: ((item as any).lead_source || 'cold_call') as LeadSource,
+        leadSource: ((item as any).lead_source || 'account_RAK') as LeadSource,
         dealValue: item.deal_value,
         expectedCloseDate: item.expected_close_date,
         qualifiedDate: item.qualified_date,

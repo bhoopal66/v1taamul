@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Lead, LeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
+import { Lead, LeadSource, LEAD_SOURCES, PRODUCT_TYPES, ACCOUNT_BANKS, parseLeadSource, ProductType, BankName } from '@/hooks/useLeads';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -16,24 +16,65 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { TrendingUp, Target, DollarSign, Percent } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Percent, Building2, CreditCard } from 'lucide-react';
 
 interface LeadSourceAnalyticsProps {
   leads: Lead[];
 }
 
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(142, 76%, 36%)',
-  'hsl(221, 83%, 53%)',
-  'hsl(262, 83%, 58%)',
-  'hsl(25, 95%, 53%)',
-  'hsl(47, 96%, 53%)',
-  'hsl(346, 77%, 49%)',
-  'hsl(199, 89%, 48%)',
-];
+const PRODUCT_COLORS = {
+  account: 'hsl(221, 83%, 53%)',
+  loan: 'hsl(142, 76%, 36%)',
+};
+
+const BANK_COLORS: Record<string, string> = {
+  RAK: 'hsl(var(--primary))',
+  NBF: 'hsl(142, 76%, 36%)',
+  UBL: 'hsl(221, 83%, 53%)',
+  RUYA: 'hsl(262, 83%, 58%)',
+  MASHREQ: 'hsl(25, 95%, 53%)',
+  WIO: 'hsl(47, 96%, 53%)',
+};
 
 export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
+  // Stats by product type
+  const productStats = useMemo(() => {
+    const stats: Record<ProductType, { total: number; converted: number; dealValue: number }> = {
+      account: { total: 0, converted: 0, dealValue: 0 },
+      loan: { total: 0, converted: 0, dealValue: 0 },
+    };
+
+    leads.forEach(lead => {
+      const parsed = parseLeadSource(lead.leadSource);
+      if (parsed) {
+        stats[parsed.product].total++;
+        if (lead.leadStatus === 'converted') stats[parsed.product].converted++;
+        stats[parsed.product].dealValue += lead.dealValue || 0;
+      }
+    });
+
+    return stats;
+  }, [leads]);
+
+  // Stats by bank
+  const bankStats = useMemo(() => {
+    const stats = new Map<BankName, { total: number; converted: number; dealValue: number; avgScore: number }>();
+
+    leads.forEach(lead => {
+      const parsed = parseLeadSource(lead.leadSource);
+      if (parsed) {
+        const current = stats.get(parsed.bank) || { total: 0, converted: 0, dealValue: 0, avgScore: 0 };
+        current.total++;
+        if (lead.leadStatus === 'converted') current.converted++;
+        current.dealValue += lead.dealValue || 0;
+        current.avgScore = ((current.avgScore * (current.total - 1)) + lead.leadScore) / current.total;
+        stats.set(parsed.bank, current);
+      }
+    });
+
+    return stats;
+  }, [leads]);
+
   const sourceStats = useMemo(() => {
     const stats = new Map<LeadSource, {
       total: number;
@@ -81,7 +122,7 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
   }, [leads]);
 
   const chartData = useMemo(() => {
-    return LEAD_SOURCES.map((source, index) => {
+    return LEAD_SOURCES.map((source) => {
       const data = sourceStats.get(source.value);
       const conversionRate = data && data.total > 0 
         ? Math.round((data.converted / data.total) * 100) 
@@ -89,7 +130,10 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
 
       return {
         name: source.label,
+        shortName: source.bank,
         icon: source.icon,
+        product: source.product,
+        bank: source.bank,
         total: data?.total || 0,
         converted: data?.converted || 0,
         qualified: data?.qualified || 0,
@@ -97,7 +141,7 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
         dealValue: data?.totalDealValue || 0,
         avgScore: Math.round(data?.avgScore || 0),
         conversionRate,
-        color: COLORS[index % COLORS.length],
+        color: BANK_COLORS[source.bank] || 'hsl(var(--primary))',
       };
     }).filter(d => d.total > 0);
   }, [sourceStats]);
@@ -108,13 +152,21 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
       .slice(0, 5);
   }, [chartData]);
 
-  const pieData = useMemo(() => {
-    return chartData.map(d => ({
-      name: d.name,
-      value: d.total,
-      color: d.color,
-    }));
-  }, [chartData]);
+  const productPieData = useMemo(() => {
+    return Object.entries(productStats).map(([product, data]) => ({
+      name: PRODUCT_TYPES.find(p => p.value === product)?.label || product,
+      value: data.total,
+      color: PRODUCT_COLORS[product as ProductType],
+    })).filter(d => d.value > 0);
+  }, [productStats]);
+
+  const bankPieData = useMemo(() => {
+    return Array.from(bankStats.entries()).map(([bank, data]) => ({
+      name: ACCOUNT_BANKS.find(b => b.value === bank)?.label || bank,
+      value: data.total,
+      color: BANK_COLORS[bank] || 'hsl(var(--primary))',
+    })).filter(d => d.value > 0);
+  }, [bankStats]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-AE', {
@@ -180,18 +232,64 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
         </CardContent>
       </Card>
 
+      {/* Product Type Summary */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-blue-500/20">
+                <Building2 className="w-5 h-5 text-blue-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Account Leads</p>
+                <p className="text-2xl font-bold">{productStats.account.total}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-green-600 font-medium">
+                  {productStats.account.total > 0 
+                    ? Math.round((productStats.account.converted / productStats.account.total) * 100)
+                    : 0}% conv.
+                </p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(productStats.account.dealValue)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-green-500/20">
+                <CreditCard className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Loan Leads</p>
+                <p className="text-2xl font-bold">{productStats.loan.total}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-green-600 font-medium">
+                  {productStats.loan.total > 0 
+                    ? Math.round((productStats.loan.converted / productStats.loan.total) * 100)
+                    : 0}% conv.
+                </p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(productStats.loan.dealValue)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Lead Distribution by Source */}
+        {/* Lead Distribution by Product */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Lead Distribution</CardTitle>
+            <CardTitle className="text-sm font-medium">By Product Type</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={pieData}
+                    data={productPieData}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -201,7 +299,7 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {pieData.map((entry, index) => (
+                    {productPieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -212,37 +310,72 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
           </CardContent>
         </Card>
 
-        {/* Conversion Rate by Source */}
+        {/* Lead Distribution by Bank */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Conversion Rate by Source</CardTitle>
+            <CardTitle className="text-sm font-medium">By Bank</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    width={100}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value}%`, 'Conversion Rate']}
-                  />
-                  <Bar 
-                    dataKey="conversionRate" 
-                    fill="hsl(var(--primary))"
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
+                <PieChart>
+                  <Pie
+                    data={bankPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {bankPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Conversion Rate by Bank */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Conversion Rate by Product & Bank</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  width={120}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${value}%`, 'Conversion Rate']}
+                />
+                <Bar 
+                  dataKey="conversionRate" 
+                  fill="hsl(var(--primary))"
+                  radius={[0, 4, 4, 0]}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Deal Value by Source */}
       <Card>
@@ -276,14 +409,15 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
       {/* Source Performance Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Detailed Source Performance</CardTitle>
+          <CardTitle className="text-sm font-medium">Detailed Product & Bank Performance</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 font-medium">Source</th>
+                  <th className="text-left py-2 font-medium">Product</th>
+                  <th className="text-left py-2 font-medium">Bank</th>
                   <th className="text-center py-2 font-medium">Total</th>
                   <th className="text-center py-2 font-medium">Qualified</th>
                   <th className="text-center py-2 font-medium">Converted</th>
@@ -297,9 +431,11 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
                 {chartData.map(source => (
                   <tr key={source.name} className="border-b last:border-0">
                     <td className="py-2">
-                      <span className="mr-2">{LEAD_SOURCES.find(s => s.label === source.name)?.icon}</span>
-                      {source.name}
+                      <Badge variant={source.product === 'account' ? 'default' : 'secondary'}>
+                        {source.product === 'account' ? '🏦 Account' : '💰 Loan'}
+                      </Badge>
                     </td>
+                    <td className="py-2 font-medium">{source.bank}</td>
                     <td className="text-center py-2">{source.total}</td>
                     <td className="text-center py-2 text-purple-600">{source.qualified}</td>
                     <td className="text-center py-2 text-green-600">{source.converted}</td>

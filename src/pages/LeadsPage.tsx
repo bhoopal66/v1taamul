@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLeads, Lead, LeadStatus, LeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
+import { useLeads, Lead, LeadStatus, LeadSource, ProductType, BankName, PRODUCT_TYPES, ACCOUNT_BANKS, LOAN_BANKS, createLeadSource, parseLeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
 import { useLeadScoring, getScoreLabel } from '@/hooks/useLeadScoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,8 @@ export const LeadsPage = () => {
     expectedCloseDate: '',
     notes: '',
     leadScore: '',
-    leadSource: 'cold_call' as LeadSource,
+    productType: 'account' as ProductType,
+    bankName: 'RAK' as BankName,
   });
 
   const { leads, stats, isLoading, updateLeadStatus, updateLeadDetails, isUpdating } = useLeads(statusFilter);
@@ -85,12 +86,14 @@ export const LeadsPage = () => {
 
   const handleEditLead = (lead: Lead) => {
     setSelectedLead(lead);
+    const parsed = parseLeadSource(lead.leadSource);
     setEditForm({
       dealValue: lead.dealValue?.toString() || '',
       expectedCloseDate: lead.expectedCloseDate || '',
       notes: lead.notes || '',
       leadScore: lead.leadScore?.toString() || '0',
-      leadSource: lead.leadSource || 'cold_call',
+      productType: parsed?.product || 'account',
+      bankName: parsed?.bank || 'RAK',
     });
     setEditDialogOpen(true);
   };
@@ -102,10 +105,26 @@ export const LeadsPage = () => {
       expected_close_date: editForm.expectedCloseDate || null,
       notes: editForm.notes || null,
       lead_score: parseInt(editForm.leadScore) || 0,
-      lead_source: editForm.leadSource,
+      lead_source: createLeadSource(editForm.productType, editForm.bankName),
     });
     setEditDialogOpen(false);
     setSelectedLead(null);
+  };
+
+  // Get available banks based on selected product type
+  const getAvailableBanks = () => {
+    return editForm.productType === 'loan' ? LOAN_BANKS : ACCOUNT_BANKS;
+  };
+
+  // Handle product type change - reset bank if not available for new product
+  const handleProductTypeChange = (product: ProductType) => {
+    const availableBanks = product === 'loan' ? LOAN_BANKS : ACCOUNT_BANKS;
+    const currentBankAvailable = availableBanks.some(b => b.value === editForm.bankName);
+    setEditForm(f => ({
+      ...f,
+      productType: product,
+      bankName: currentBankAvailable ? f.bankName : availableBanks[0].value,
+    }));
   };
 
   const handleMoveToStage = (leadId: string, status: LeadStatus) => {
@@ -569,26 +588,44 @@ export const LeadsPage = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="leadSource">Lead Source</Label>
+                    <Label htmlFor="productType">Product Type</Label>
                     <Select 
-                      value={editForm.leadSource} 
-                      onValueChange={(v) => setEditForm(f => ({ ...f, leadSource: v as LeadSource }))}
+                      value={editForm.productType} 
+                      onValueChange={(v) => handleProductTypeChange(v as ProductType)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select source" />
+                        <SelectValue placeholder="Select product" />
                       </SelectTrigger>
                       <SelectContent>
-                        {LEAD_SOURCES.map(source => (
-                          <SelectItem key={source.value} value={source.value}>
+                        {PRODUCT_TYPES.map(product => (
+                          <SelectItem key={product.value} value={product.value}>
                             <span className="flex items-center gap-2">
-                              <span>{source.icon}</span>
-                              <span>{source.label}</span>
+                              <span>{product.icon}</span>
+                              <span>{product.label}</span>
                             </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Bank</Label>
+                  <Select 
+                    value={editForm.bankName} 
+                    onValueChange={(v) => setEditForm(f => ({ ...f, bankName: v as BankName }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select bank" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableBanks().map(bank => (
+                        <SelectItem key={bank.value} value={bank.value}>
+                          {bank.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>

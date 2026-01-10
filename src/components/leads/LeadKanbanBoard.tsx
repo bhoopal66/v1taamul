@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Target, 
   Phone, 
@@ -18,8 +19,10 @@ import {
   XCircle,
   Sparkles,
   GripVertical,
+  Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { getScoreLabel } from '@/hooks/useLeadScoring';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; bgColor: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'text-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-950/30', icon: Sparkles },
@@ -159,12 +162,22 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, isUpdating 
                             {/* Company & Score */}
                             <div className="flex items-center justify-between gap-2">
                               <h4 className="font-medium text-sm truncate">{lead.companyName}</h4>
-                              {lead.leadScore > 0 && (
-                                <Badge variant="outline" className="text-xs gap-0.5 flex-shrink-0">
-                                  <Star className="w-2.5 h-2.5 text-yellow-500 fill-yellow-500" />
-                                  {lead.leadScore}
-                                </Badge>
-                              )}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs gap-0.5 flex-shrink-0 ${getScoreLabel(lead.leadScore).color}`}
+                                    >
+                                      <Zap className="w-2.5 h-2.5" />
+                                      {lead.leadScore}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{getScoreLabel(lead.leadScore).label} Lead</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
 
                             {/* Contact */}

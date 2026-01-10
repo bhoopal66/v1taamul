@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLeads, Lead, LeadStatus } from '@/hooks/useLeads';
+import { useLeadScoring, getScoreLabel } from '@/hooks/useLeadScoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { 
@@ -32,6 +34,8 @@ import {
   LayoutGrid,
   List,
   BarChart3,
+  RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -59,6 +63,7 @@ export const LeadsPage = () => {
   });
 
   const { leads, stats, isLoading, updateLeadStatus, updateLeadDetails, isUpdating } = useLeads(statusFilter);
+  const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
     if (!searchQuery) return true;
@@ -181,6 +186,25 @@ export const LeadsPage = () => {
               Analytics
             </Button>
           </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => recalculateScores()}
+                  disabled={isRecalculating}
+                  className="h-10"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
+                  {isRecalculating ? 'Scoring...' : 'Recalculate Scores'}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Update all lead scores based on interaction history</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-green-500" />
@@ -306,12 +330,25 @@ export const LeadsPage = () => {
                             <Badge variant={getStatusBadgeVariant(lead.leadStatus)}>
                               {PIPELINE_STAGES.find(s => s.status === lead.leadStatus)?.label}
                             </Badge>
-                            {lead.leadScore > 0 && (
-                              <Badge variant="outline" className="gap-1">
-                                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                {lead.leadScore}
-                              </Badge>
-                            )}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`gap-1 ${getScoreLabel(lead.leadScore).color}`}
+                                  >
+                                    <Zap className="w-3 h-3" />
+                                    {lead.leadScore}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-48">
+                                  <p className="font-medium">{getScoreLabel(lead.leadScore).label} Lead</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Based on call outcomes & interactions
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
                             <span className="flex items-center gap-1">

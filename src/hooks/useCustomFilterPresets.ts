@@ -27,6 +27,27 @@ export interface ExportedPresets {
 
 export const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Reports', 'Team'] as const;
 
+export const CATEGORY_COLORS = {
+  Work: { bg: 'bg-blue-500/20', text: 'text-blue-600', border: 'border-blue-500/30', dot: 'bg-blue-500' },
+  Personal: { bg: 'bg-purple-500/20', text: 'text-purple-600', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+  Reports: { bg: 'bg-amber-500/20', text: 'text-amber-600', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+  Team: { bg: 'bg-green-500/20', text: 'text-green-600', border: 'border-green-500/30', dot: 'bg-green-500' },
+  Uncategorized: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted', dot: 'bg-muted-foreground' },
+} as const;
+
+export const CUSTOM_CATEGORY_COLORS = [
+  { bg: 'bg-rose-500/20', text: 'text-rose-600', border: 'border-rose-500/30', dot: 'bg-rose-500' },
+  { bg: 'bg-cyan-500/20', text: 'text-cyan-600', border: 'border-cyan-500/30', dot: 'bg-cyan-500' },
+  { bg: 'bg-orange-500/20', text: 'text-orange-600', border: 'border-orange-500/30', dot: 'bg-orange-500' },
+  { bg: 'bg-indigo-500/20', text: 'text-indigo-600', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
+  { bg: 'bg-teal-500/20', text: 'text-teal-600', border: 'border-teal-500/30', dot: 'bg-teal-500' },
+  { bg: 'bg-pink-500/20', text: 'text-pink-600', border: 'border-pink-500/30', dot: 'bg-pink-500' },
+  { bg: 'bg-lime-500/20', text: 'text-lime-600', border: 'border-lime-500/30', dot: 'bg-lime-500' },
+  { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-600', border: 'border-fuchsia-500/30', dot: 'bg-fuchsia-500' },
+] as const;
+
+export type CategoryColor = { bg: string; text: string; border: string; dot: string };
+
 const getCustomCategoriesFromStorage = (storageKey: string): string[] => {
   try {
     const saved = localStorage.getItem(`${storageKey}-categories`);
@@ -203,6 +224,22 @@ export function useCustomFilterPresets(storageKey: string) {
   const isDefaultCategory = useCallback((category: string): boolean => {
     return DEFAULT_CATEGORIES.includes(category as any);
   }, []);
+
+  const getCategoryColor = useCallback((category: string): CategoryColor => {
+    // Check if it's a default category
+    if (category in CATEGORY_COLORS) {
+      return CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS];
+    }
+    
+    // For custom categories, assign a color based on index
+    const customIndex = customCategories.indexOf(category);
+    if (customIndex >= 0) {
+      return CUSTOM_CATEGORY_COLORS[customIndex % CUSTOM_CATEGORY_COLORS.length];
+    }
+    
+    // Fallback to uncategorized color
+    return CATEGORY_COLORS.Uncategorized;
+  }, [customCategories]);
 
   const getPresetsByCategory = useMemo(() => {
     const grouped: Record<string, CustomPreset[]> = { 'Uncategorized': [] };
@@ -441,5 +478,6 @@ export function useCustomFilterPresets(storageKey: string) {
     deleteCategory,
     renameCategory,
     isDefaultCategory,
+    getCategoryColor,
   };
 }

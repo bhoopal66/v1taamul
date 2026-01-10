@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 interface GamificationLevelProps {
   completedCount: number;
   streaks: GoalStreak[];
+  loginStreak?: number;
 }
 
 const levelColorClasses: Record<string, { bg: string; text: string; border: string; gradient: string }> = {
@@ -203,8 +204,8 @@ const LevelRoadmap: React.FC<{ levelData: AgentLevelData }> = ({ levelData }) =>
   );
 };
 
-export const GamificationLevel: React.FC<GamificationLevelProps> = ({ completedCount, streaks }) => {
-  const levelData = useAgentLevel({ completedCount, streaks });
+export const GamificationLevel: React.FC<GamificationLevelProps> = ({ completedCount, streaks, loginStreak = 0 }) => {
+  const levelData = useAgentLevel({ completedCount, streaks, loginStreak });
 
   return (
     <Card className="overflow-hidden">

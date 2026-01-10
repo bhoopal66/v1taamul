@@ -24,8 +24,10 @@ import {
 } from 'lucide-react';
 import { useAgentGoals, GoalType, GoalMetric, GoalWithProgress, GoalStreak, CreateGoalInput } from '@/hooks/useAgentGoals';
 import { useStreakReminders } from '@/hooks/useStreakReminders';
+import { useLoginStreak } from '@/hooks/useLoginStreak';
 import { StreakReminderBanner } from './StreakReminderBanner';
 import { GamificationLevel } from './GamificationLevel';
+import { LoginStreakBadge } from './LoginStreakBadge';
 import { cn } from '@/lib/utils';
 
 const metricConfig: Record<GoalMetric, { label: string; icon: React.ReactNode; unit: string; color: string }> = {
@@ -375,6 +377,7 @@ const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSubmit, isLoading
 
 export const GoalTracker: React.FC = () => {
   const { goals, streaks, completedCount, isLoading, createGoal, deleteGoal, isCreating } = useAgentGoals();
+  const { streakData } = useLoginStreak();
   
   // Initialize streak reminders - will show toast notifications
   useStreakReminders({ goals, streaks });
@@ -449,8 +452,23 @@ export const GoalTracker: React.FC = () => {
       <CardContent>
         {/* Gamification Level */}
         <div className="mb-6">
-          <GamificationLevel completedCount={completedCount} streaks={streaks} />
+          <GamificationLevel 
+            completedCount={completedCount} 
+            streaks={streaks} 
+            loginStreak={streakData?.currentStreak || 0}
+          />
         </div>
+        
+        {/* Login Streak */}
+        {streakData && streakData.currentStreak > 0 && (
+          <div className="mb-6">
+            <LoginStreakBadge
+              currentStreak={streakData.currentStreak}
+              longestStreak={streakData.longestStreak}
+              variant="full"
+            />
+          </div>
+        )}
         
         {/* Streak Reminder Banner */}
         <StreakReminderBanner goals={goals} streaks={streaks} />

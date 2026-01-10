@@ -430,6 +430,9 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_login: string | null
+          last_login_date: string | null
+          login_streak_current: number | null
+          login_streak_longest: number | null
           phone_number: string | null
           supervisor_id: string | null
           updated_at: string | null
@@ -444,6 +447,9 @@ export type Database = {
           id: string
           is_active?: boolean | null
           last_login?: string | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
           updated_at?: string | null
@@ -458,6 +464,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_login?: string | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
           updated_at?: string | null
@@ -632,6 +641,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      update_login_streak: {
+        Args: { user_id: string }
+        Returns: {
+          current_streak: number
+          is_new_day: boolean
+          longest_streak: number
+          streak_bonus_xp: number
+        }[]
       }
     }
     Enums: {

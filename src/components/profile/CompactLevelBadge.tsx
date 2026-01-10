@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAgentLevel, LEVEL_TIERS } from '@/hooks/useAgentLevel';
 import { useAgentGoals } from '@/hooks/useAgentGoals';
+import { useLoginStreak } from '@/hooks/useLoginStreak';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
 import { Zap } from 'lucide-react';
@@ -21,7 +22,12 @@ const levelColorClasses: Record<string, { bg: string; text: string; border: stri
 
 export const CompactLevelBadge: React.FC = () => {
   const { completedCount, streaks, isLoading } = useAgentGoals();
-  const levelData = useAgentLevel({ completedCount, streaks });
+  const { streakData } = useLoginStreak();
+  const levelData = useAgentLevel({ 
+    completedCount, 
+    streaks, 
+    loginStreak: streakData?.currentStreak || 0 
+  });
 
   if (isLoading) {
     return (

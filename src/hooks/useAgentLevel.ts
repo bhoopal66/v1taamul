@@ -136,9 +136,10 @@ export const LEVEL_TIERS: LevelTier[] = [
 interface UseAgentLevelProps {
   completedCount: number;
   streaks: GoalStreak[];
+  loginStreak?: number;
 }
 
-export const useAgentLevel = ({ completedCount, streaks }: UseAgentLevelProps): AgentLevelData => {
+export const useAgentLevel = ({ completedCount, streaks, loginStreak = 0 }: UseAgentLevelProps): AgentLevelData => {
   return useMemo(() => {
     // Calculate total XP
     let totalXP = 0;
@@ -146,7 +147,7 @@ export const useAgentLevel = ({ completedCount, streaks }: UseAgentLevelProps): 
     // XP from completed goals
     totalXP += completedCount * XP_REWARDS.goalCompleted;
 
-    // XP from streaks
+    // XP from goal streaks
     streaks.forEach((streak) => {
       if (streak.goalType === 'weekly') {
         totalXP += streak.currentStreak * XP_REWARDS.weeklyStreakBonus;
@@ -156,6 +157,16 @@ export const useAgentLevel = ({ completedCount, streaks }: UseAgentLevelProps): 
       // Bonus for longest streak
       totalXP += streak.longestStreak * XP_REWARDS.longestStreakBonus;
     });
+
+    // XP from login streak (10 XP base per day logged)
+    if (loginStreak > 0) {
+      let loginXP = loginStreak * 10;
+      // Bonus tiers
+      if (loginStreak >= 7) loginXP += loginStreak * 2;   // Week bonus
+      if (loginStreak >= 30) loginXP += loginStreak * 3;  // Month bonus
+      if (loginStreak >= 100) loginXP += loginStreak * 5; // Century bonus
+      totalXP += loginXP;
+    }
 
     // Find current level
     let currentLevel = LEVEL_TIERS[0];

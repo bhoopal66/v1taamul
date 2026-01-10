@@ -22,6 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { CompactLevelBadge } from '@/components/profile/CompactLevelBadge';
 import { SoundToggle } from '@/components/ui/SoundToggle';
+import { LoginStreakBadge } from '@/components/profile/LoginStreakBadge';
+import { useLoginStreak } from '@/hooks/useLoginStreak';
 
 interface NavItemProps {
   to: string;
@@ -51,6 +53,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label }) => {
 export const AppSidebar: React.FC = () => {
   const { profile, userRole } = useAuth();
   const navigate = useNavigate();
+  const { streakData } = useLoginStreak();
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -139,9 +142,18 @@ export const AppSidebar: React.FC = () => {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {profile?.full_name || profile?.username || 'User'}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">
+                {profile?.full_name || profile?.username || 'User'}
+              </p>
+              {streakData && streakData.currentStreak > 0 && (
+                <LoginStreakBadge
+                  currentStreak={streakData.currentStreak}
+                  longestStreak={streakData.longestStreak}
+                  variant="compact"
+                />
+              )}
+            </div>
             <p className="text-xs text-sidebar-muted truncate">
               {getRoleLabel(userRole)}
             </p>

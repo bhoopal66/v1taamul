@@ -304,6 +304,28 @@ export function useCustomFilterPresets(storageKey: string) {
     });
   }, [storageKey]);
 
+  const duplicatePreset = useCallback((id: string, newName: string): CustomPreset | null => {
+    const originalPreset = customPresets.find(p => p.id === id);
+    if (!originalPreset) return null;
+    
+    const duplicatedPreset: CustomPreset = {
+      id: `custom-${Date.now()}`,
+      name: newName,
+      timePeriod: originalPreset.timePeriod,
+      leadStatus: originalPreset.leadStatus,
+      createdAt: Date.now(),
+      category: originalPreset.category,
+    };
+    
+    setCustomPresets(prev => {
+      const updated = [...prev, duplicatedPreset];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
+    
+    return duplicatedPreset;
+  }, [storageKey, customPresets]);
+
   const updatePreset = useCallback((id: string, updates: Partial<Omit<CustomPreset, 'id' | 'createdAt'>>) => {
     setCustomPresets(prev => {
       const updated = prev.map(p => p.id === id ? { ...p, ...updates } : p);
@@ -495,6 +517,7 @@ export function useCustomFilterPresets(storageKey: string) {
     customPresets,
     savePreset,
     deletePreset,
+    duplicatePreset,
     updatePreset,
     trackPresetUsage,
     getPresetAnalytics,

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { 
   Target, 
   Phone, 
@@ -27,8 +28,12 @@ import {
   XCircle,
   Clock,
   Sparkles,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+type ViewMode = 'list' | 'kanban';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'bg-blue-500', icon: Sparkles },
@@ -39,6 +44,7 @@ const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon:
 ];
 
 export const LeadsPage = () => {
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -143,6 +149,27 @@ export const LeadsPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* View Toggle */}
+          <div className="flex items-center border rounded-lg p-1 bg-muted/50">
+            <Button
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('kanban')}
+            >
+              <LayoutGrid className="w-4 h-4 mr-1" />
+              Kanban
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="w-4 h-4 mr-1" />
+              List
+            </Button>
+          </div>
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-green-500" />
@@ -155,66 +182,80 @@ export const LeadsPage = () => {
         </div>
       </div>
 
-      {/* Pipeline Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {PIPELINE_STAGES.map(stage => {
-          const count = stats[stage.status];
-          const Icon = stage.icon;
-          return (
-            <Card 
-              key={stage.status} 
-              className={`cursor-pointer transition-all hover:shadow-md ${
-                statusFilter === stage.status ? 'ring-2 ring-primary' : ''
-              }`}
-              onClick={() => setStatusFilter(statusFilter === stage.status ? 'all' : stage.status)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-full ${stage.color} bg-opacity-20`}>
-                    <Icon className={`w-4 h-4 ${stage.color.replace('bg-', 'text-')}`} />
+      {/* Pipeline Stats - Only show in list view */}
+      {viewMode === 'list' && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {PIPELINE_STAGES.map(stage => {
+            const count = stats[stage.status];
+            const Icon = stage.icon;
+            return (
+              <Card 
+                key={stage.status} 
+                className={`cursor-pointer transition-all hover:shadow-md ${
+                  statusFilter === stage.status ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setStatusFilter(statusFilter === stage.status ? 'all' : stage.status)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2 rounded-full ${stage.color} bg-opacity-20`}>
+                      <Icon className={`w-4 h-4 ${stage.color.replace('bg-', 'text-')}`} />
+                    </div>
+                    <Badge variant="outline">{count}</Badge>
                   </div>
-                  <Badge variant="outline">{count}</Badge>
-                </div>
-                <p className="mt-2 font-medium">{stage.label}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                  <p className="mt-2 font-medium">{stage.label}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by company, contact, phone, city, or industry..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+      {/* Search and Filters - Only show in list view */}
+      {viewMode === 'list' && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by company, contact, phone, city, or industry..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | 'all')}>
+                <SelectTrigger className="w-full md:w-48">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  {PIPELINE_STAGES.map(stage => (
+                    <SelectItem key={stage.status} value={stage.status}>
+                      {stage.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | 'all')}>
-              <SelectTrigger className="w-full md:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                {PIPELINE_STAGES.map(stage => (
-                  <SelectItem key={stage.status} value={stage.status}>
-                    {stage.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Leads List */}
-      {filteredLeads.length === 0 ? (
+      {/* Kanban Board View */}
+      {viewMode === 'kanban' && (
+        <LeadKanbanBoard
+          leads={leads}
+          onUpdateStatus={updateLeadStatus}
+          onEditLead={handleEditLead}
+          isUpdating={isUpdating}
+        />
+      )}
+
+      {/* Leads List - Only show in list view */}
+      {viewMode === 'list' && filteredLeads.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
             <Target className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -226,7 +267,8 @@ export const LeadsPage = () => {
             </p>
           </CardContent>
         </Card>
-      ) : (
+      )}
+      {viewMode === 'list' && filteredLeads.length > 0 && (
         <div className="space-y-4">
           {filteredLeads.map(lead => {
             const currentStageIndex = PIPELINE_STAGES.findIndex(s => s.status === lead.leadStatus);

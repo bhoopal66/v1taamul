@@ -24,6 +24,9 @@ import { RecentActivityFeed } from '@/components/dashboard/RecentActivityFeed';
 import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights';
 import { AllAgentsStatsGrid } from '@/components/dashboard/AllAgentsStatsGrid';
 import { AgentPerformanceList } from '@/components/dashboard/AgentPerformanceList';
+import { FeedbackBreakdownChart } from '@/components/dashboard/FeedbackBreakdownChart';
+import { CallVelocityGauge } from '@/components/dashboard/CallVelocityGauge';
+import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { useAllAgentsPerformance } from '@/hooks/useAllAgentsPerformance';
 import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES, CUSTOM_CATEGORY_COLORS } from '@/hooks/useCustomFilterPresets';
@@ -932,24 +935,43 @@ export const Dashboard: React.FC = () => {
               <WeeklyTrendChart data={weeklyData} isLoading={isLoading} />
             </div>
 
-            {/* Right Column - Goals & Activity */}
+            {/* Right Column - Goals, Velocity & Activity */}
             <div className="space-y-6">
               <DailyGoalProgress stats={myStats} isLoading={isLoading} />
+              <CallVelocityGauge 
+                currentCallsPerHour={hourlyData.length > 0 ? hourlyData[hourlyData.length - 1]?.calls || 0 : 0}
+                targetCallsPerHour={10}
+                previousCallsPerHour={hourlyData.length > 1 ? hourlyData[hourlyData.length - 2]?.calls : undefined}
+                isLoading={isLoading}
+              />
               <RecentActivityFeed activities={recentActivity} isLoading={isLoading} />
             </div>
           </div>
 
-          {/* Bottom Row - Insights & Leaderboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Middle Row - New Analytics Widgets */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <FeedbackBreakdownChart stats={myStats} isLoading={isLoading} />
+            <TopPerformersCard 
+              performers={leaderboard.slice(0, 3).map(l => ({
+                id: l.agentId,
+                name: l.agentName,
+                totalCalls: l.totalCalls,
+                interested: l.interested,
+                conversionRate: l.conversionRate,
+                rank: l.rank,
+              }))}
+              isLoading={isLoading}
+              currentUserId={profile?.id}
+            />
             <PerformanceInsights 
               stats={myStats} 
               hourlyData={hourlyData} 
               isLoading={isLoading} 
             />
-            <div className="lg:col-span-2">
-              <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
-            </div>
           </div>
+
+          {/* Bottom Row - Leaderboard */}
+          <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
         </>
       )}
 

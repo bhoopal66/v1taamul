@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +37,7 @@ import {
   RefreshCw,
   CheckCircle2,
   XCircle,
-  Calendar,
+  CalendarIcon,
   Building2,
   User,
   MapPin,
@@ -50,10 +53,11 @@ import {
   FileText,
   Download,
   FileSpreadsheet,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportContactsToCSV, exportContactsToExcel, ContactExportData } from '@/utils/contactsExport';
-import { format } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fns';
 import { useCallList, CallListContact, FeedbackStatus } from '@/hooks/useCallList';
 import { cn } from '@/lib/utils';
 
@@ -105,6 +109,12 @@ export const CallListPage: React.FC = () => {
   const [selectedContact, setSelectedContact] = useState<CallListContact | null>(null);
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackStatus | null>(null);
   const [feedbackNotes, setFeedbackNotes] = useState('');
+  
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('csv');
+  const [exportStartDate, setExportStartDate] = useState<Date | undefined>(undefined);
+  const [exportEndDate, setExportEndDate] = useState<Date | undefined>(undefined);
 
   const handleOpenFeedback = (contact: CallListContact) => {
     setSelectedContact(contact);
@@ -141,8 +151,37 @@ export const CallListPage: React.FC = () => {
     skipContact(contact.callListId);
   };
 
-  const handleExport = (format: 'csv' | 'excel') => {
-    const exportData: ContactExportData[] = filteredList.map(contact => ({
+  const openExportDialog = (format: 'csv' | 'excel') => {
+    setExportFormat(format);
+    setExportStartDate(undefined);
+    setExportEndDate(undefined);
+    setExportDialogOpen(true);
+  };
+
+  const handleExport = () => {
+    // Filter contacts by date range if specified
+    let contactsToExport = filteredList;
+    
+    if (exportStartDate || exportEndDate) {
+      contactsToExport = filteredList.filter(contact => {
+        if (!contact.calledAt) return false;
+        const calledDate = new Date(contact.calledAt);
+        
+        if (exportStartDate && exportEndDate) {
+          return isWithinInterval(calledDate, {
+            start: startOfDay(exportStartDate),
+            end: endOfDay(exportEndDate)
+          });
+        } else if (exportStartDate) {
+          return calledDate >= startOfDay(exportStartDate);
+        } else if (exportEndDate) {
+          return calledDate <= endOfDay(exportEndDate);
+        }
+        return true;
+      });
+    }
+
+    const exportData: ContactExportData[] = contactsToExport.map(contact => ({
       callOrder: contact.callOrder,
       companyName: contact.companyName,
       contactPersonName: contact.contactPersonName,
@@ -156,17 +195,40 @@ export const CallListPage: React.FC = () => {
       calledAt: contact.calledAt,
     }));
 
+    if (exportData.length === 0) {
+      toast.error('No contacts found for the selected date range');
+      return;
+    }
+
     try {
-      if (format === 'csv') {
-        exportContactsToCSV(exportData);
-        toast.success('Contacts exported to CSV');
+      const dateRangeSuffix = exportStartDate && exportEndDate 
+        ? `_${format(exportStartDate, 'yyyy-MM-dd')}_to_${format(exportEndDate, 'yyyy-MM-dd')}`
+        : exportStartDate 
+        ? `_from_${format(exportStartDate, 'yyyy-MM-dd')}`
+        : exportEndDate
+        ? `_until_${format(exportEndDate, 'yyyy-MM-dd')}`
+        : '';
+      
+      const filename = `contacts${dateRangeSuffix}.${exportFormat === 'csv' ? 'csv' : 'xlsx'}`;
+      
+      if (exportFormat === 'csv') {
+        exportContactsToCSV(exportData, filename);
+        toast.success(`Exported ${exportData.length} contacts to CSV`);
       } else {
-        exportContactsToExcel(exportData);
-        toast.success('Contacts exported to Excel');
+        exportContactsToExcel(exportData, filename);
+        toast.success(`Exported ${exportData.length} contacts to Excel`);
       }
+      setExportDialogOpen(false);
     } catch (error) {
       toast.error('Failed to export contacts');
     }
+  };
+
+  const setQuickDateRange = (days: number) => {
+    const end = new Date();
+    const start = subDays(end, days);
+    setExportStartDate(start);
+    setExportEndDate(end);
   };
 
   const filteredList = callList.filter(contact => {
@@ -231,11 +293,11 @@ export const CallListPage: React.FC = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-background">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
+              <DropdownMenuItem onClick={() => openExportDialog('csv')}>
                 <FileText className="w-4 h-4 mr-2" />
                 Export as CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('excel')}>
+              <DropdownMenuItem onClick={() => openExportDialog('excel')}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Export as Excel
               </DropdownMenuItem>
@@ -528,6 +590,147 @@ export const CallListPage: React.FC = () => {
                 <CheckCircle2 className="w-4 h-4 mr-2" />
               )}
               Log Call
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5 text-primary" />
+              Export Contacts
+            </DialogTitle>
+            <DialogDescription>
+              Select a date range to filter contacts by when they were called. Leave empty to export all contacts.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Quick Date Range Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setQuickDateRange(7)}>
+                Last 7 days
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickDateRange(30)}>
+                Last 30 days
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickDateRange(90)}>
+                Last 90 days
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => { setExportStartDate(undefined); setExportEndDate(undefined); }}
+              >
+                All time
+              </Button>
+            </div>
+
+            {/* Date Range Pickers */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>From Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !exportStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {exportStartDate ? format(exportStartDate, "PP") : "Pick date"}
+                      {exportStartDate && (
+                        <X 
+                          className="ml-auto h-4 w-4 opacity-50 hover:opacity-100" 
+                          onClick={(e) => { e.stopPropagation(); setExportStartDate(undefined); }}
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={exportStartDate}
+                      onSelect={setExportStartDate}
+                      disabled={(date) => date > new Date() || (exportEndDate ? date > exportEndDate : false)}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label>To Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !exportEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {exportEndDate ? format(exportEndDate, "PP") : "Pick date"}
+                      {exportEndDate && (
+                        <X 
+                          className="ml-auto h-4 w-4 opacity-50 hover:opacity-100" 
+                          onClick={(e) => { e.stopPropagation(); setExportEndDate(undefined); }}
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={exportEndDate}
+                      onSelect={setExportEndDate}
+                      disabled={(date) => date > new Date() || (exportStartDate ? date < exportStartDate : false)}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Selected Range Display */}
+            {(exportStartDate || exportEndDate) && (
+              <div className="p-3 rounded-lg bg-muted text-sm">
+                <span className="font-medium">Selected range: </span>
+                {exportStartDate && exportEndDate 
+                  ? `${format(exportStartDate, "PP")} to ${format(exportEndDate, "PP")}`
+                  : exportStartDate 
+                  ? `From ${format(exportStartDate, "PP")}`
+                  : `Until ${format(exportEndDate!, "PP")}`
+                }
+              </div>
+            )}
+
+            {/* Format Display */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {exportFormat === 'csv' ? (
+                <FileText className="w-4 h-4" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Exporting as {exportFormat === 'csv' ? 'CSV' : 'Excel'} file
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
             </Button>
           </DialogFooter>
         </DialogContent>

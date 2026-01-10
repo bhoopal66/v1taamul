@@ -5,6 +5,7 @@ import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Tr
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,7 @@ import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights'
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 interface FilterPreset {
@@ -301,10 +302,26 @@ export const Dashboard: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{preset.name}</span>
                                 {analytics && analytics.useCount > 0 && (
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
-                                    <BarChart3 className="w-2.5 h-2.5" />
-                                    {analytics.useCount}
-                                  </Badge>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
+                                          <BarChart3 className="w-2.5 h-2.5" />
+                                          {analytics.useCount}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="text-xs">
+                                        <p className="font-medium">Used {analytics.useCount} time{analytics.useCount !== 1 ? 's' : ''}</p>
+                                        {analytics.lastUsedAt && (
+                                          <p className="text-muted-foreground">
+                                            Last used {formatDistanceToNow(analytics.lastUsedAt, { addSuffix: true })}
+                                            <br />
+                                            {format(analytics.lastUsedAt, 'MMM d, yyyy h:mm a')}
+                                          </p>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
                               </div>
                               <span className="text-xs text-muted-foreground">

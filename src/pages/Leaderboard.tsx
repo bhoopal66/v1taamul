@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,6 +45,7 @@ import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilt
 import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { format, formatDistanceToNow } from 'date-fns';
 
 const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   if (rank === 1) {
@@ -532,10 +534,26 @@ export const Leaderboard: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{preset.name}</span>
                             {analytics && analytics.useCount > 0 && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
-                                <BarChart3 className="w-2.5 h-2.5" />
-                                {analytics.useCount}
-                              </Badge>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
+                                      <BarChart3 className="w-2.5 h-2.5" />
+                                      {analytics.useCount}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    <p className="font-medium">Used {analytics.useCount} time{analytics.useCount !== 1 ? 's' : ''}</p>
+                                    {analytics.lastUsedAt && (
+                                      <p className="text-muted-foreground">
+                                        Last used {formatDistanceToNow(analytics.lastUsedAt, { addSuffix: true })}
+                                        <br />
+                                        {format(analytics.lastUsedAt, 'MMM d, yyyy h:mm a')}
+                                      </p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">

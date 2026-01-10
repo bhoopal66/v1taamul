@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay, format, subHours } from 'date-fns';
+import { startOfDay, endOfDay, format, subDays, startOfWeek, addDays } from 'date-fns';
 
 export interface PerformanceStats {
   totalCalls: number;
@@ -27,6 +27,23 @@ export interface LeaderboardEntry {
   interested: number;
   conversionRate: number;
   rank: number;
+}
+
+export interface WeeklyTrendData {
+  day: string;
+  date: string;
+  calls: number;
+  interested: number;
+  notInterested: number;
+  conversionRate: number;
+}
+
+export interface RecentActivity {
+  id: string;
+  companyName: string;
+  contactName: string;
+  status: string;
+  timestamp: string;
 }
 
 export const usePerformanceData = () => {
@@ -129,6 +146,86 @@ export const usePerformanceData = () => {
     refetchInterval: 30000,
   });
 
+  // Fetch weekly trend data
+  const { data: weeklyData, isLoading: weeklyLoading, refetch: refetchWeekly } = useQuery({
+    queryKey: ['weekly-trend', user?.id],
+    queryFn: async (): Promise<WeeklyTrendData[]> => {
+      if (!user?.id) throw new Error('No user');
+
+      const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+      const days: WeeklyTrendData[] = [];
+
+      for (let i = 0; i < 7; i++) {
+        const day = addDays(weekStart, i);
+        const dayStart = startOfDay(day).toISOString();
+        const dayEnd = endOfDay(day).toISOString();
+
+        const { data: feedback } = await supabase
+          .from('call_feedback')
+          .select('feedback_status')
+          .eq('agent_id', user.id)
+          .gte('call_timestamp', dayStart)
+          .lte('call_timestamp', dayEnd);
+
+        const calls = feedback?.length || 0;
+        const interested = feedback?.filter(f => f.feedback_status === 'interested').length || 0;
+        const notInterested = feedback?.filter(f => f.feedback_status === 'not_interested').length || 0;
+
+        days.push({
+          day: format(day, 'EEE'),
+          date: format(day, 'MMM d'),
+          calls,
+          interested,
+          notInterested,
+          conversionRate: calls > 0 ? Math.round((interested / calls) * 100) : 0,
+        });
+      }
+
+      return days;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  // Fetch recent activity
+  const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useQuery({
+    queryKey: ['recent-activity', user?.id],
+    queryFn: async (): Promise<RecentActivity[]> => {
+      if (!user?.id) throw new Error('No user');
+
+      const todayStart = startOfDay(today).toISOString();
+
+      const { data: feedback, error } = await supabase
+        .from('call_feedback')
+        .select(`
+          id,
+          feedback_status,
+          call_timestamp,
+          contact_id,
+          master_contacts!call_feedback_contact_id_fkey (
+            company_name,
+            contact_person_name
+          )
+        `)
+        .eq('agent_id', user.id)
+        .gte('call_timestamp', todayStart)
+        .order('call_timestamp', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      return (feedback || []).map(f => ({
+        id: f.id,
+        companyName: (f.master_contacts as any)?.company_name || 'Unknown Company',
+        contactName: (f.master_contacts as any)?.contact_person_name || 'Unknown Contact',
+        status: f.feedback_status || 'called',
+        timestamp: f.call_timestamp || new Date().toISOString(),
+      }));
+    },
+    enabled: !!user?.id,
+    refetchInterval: 15000, // Refetch every 15 seconds for near real-time
+  });
+
   // Fetch team leaderboard (for supervisors and above, or all agents)
   const { data: leaderboard, isLoading: leaderboardLoading, refetch: refetchLeaderboard } = useQuery({
     queryKey: ['team-leaderboard', userRole],
@@ -191,6 +288,8 @@ export const usePerformanceData = () => {
   const refetchAll = () => {
     refetchStats();
     refetchHourly();
+    refetchWeekly();
+    refetchActivity();
     refetchLeaderboard();
   };
 
@@ -205,8 +304,10 @@ export const usePerformanceData = () => {
       conversionRate: 0,
     },
     hourlyData: hourlyData || [],
+    weeklyData: weeklyData || [],
+    recentActivity: recentActivity || [],
     leaderboard: leaderboard || [],
-    isLoading: statsLoading || hourlyLoading || leaderboardLoading,
+    isLoading: statsLoading || hourlyLoading || weeklyLoading || activityLoading || leaderboardLoading,
     refetch: refetchAll,
   };
 };

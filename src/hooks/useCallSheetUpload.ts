@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 export interface ParsedContact {
   rowNumber: number;
@@ -68,6 +69,58 @@ export const useCallSheetUpload = () => {
   const queryClient = useQueryClient();
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Subscribe to realtime updates for upload status changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('upload-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'call_sheet_uploads',
+          filter: `agent_id=eq.${user.id}`,
+        },
+        (payload: RealtimePostgresChangesPayload<{ 
+          status: string; 
+          file_name: string | null;
+          approval_timestamp: string | null;
+        }>) => {
+          const newRecord = payload.new as { status: string; file_name: string | null } | undefined;
+          const oldRecord = payload.old as { status: string } | undefined;
+          
+          if (!newRecord || !oldRecord) return;
+          
+          // Only notify if status actually changed
+          if (newRecord.status !== oldRecord.status) {
+            const fileName = newRecord.file_name || 'Your upload';
+            
+            if (newRecord.status === 'approved') {
+              toast.success(`🎉 ${fileName} has been approved!`, {
+                description: 'Your contacts are now ready for calling.',
+                duration: 6000,
+              });
+            } else if (newRecord.status === 'rejected') {
+              toast.error(`❌ ${fileName} was rejected`, {
+                description: 'Check the upload history for details.',
+                duration: 6000,
+              });
+            }
+            
+            // Refresh the upload history
+            queryClient.invalidateQueries({ queryKey: ['upload-history'] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // Fetch upload history
   const { data: uploadHistory, isLoading: historyLoading } = useQuery({

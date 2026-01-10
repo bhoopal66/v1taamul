@@ -13,6 +13,7 @@ import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import { AgentProfile } from "./pages/AgentProfile";
 import { Leaderboard } from "./pages/Leaderboard";
 import { UploadPage } from "./pages/UploadPage";
+import { CallListPage } from "./pages/CallListPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,7 +33,7 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile" element={<AgentProfile />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/call-list" element={<Dashboard />} />
+              <Route path="/call-list" element={<CallListPage />} />
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/leads" element={<Dashboard />} />
               <Route path="/contacts" element={<Dashboard />} />

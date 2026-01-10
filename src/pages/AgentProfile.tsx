@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAgentProfile } from '@/hooks/useAgentProfile';
+import { useAgentGoals } from '@/hooks/useAgentGoals';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,6 +40,7 @@ import { PerformanceCertificate } from '@/components/profile/PerformanceCertific
 import { AchievementGrid } from '@/components/profile/AchievementGrid';
 import { WeeklyReport } from '@/components/profile/WeeklyReport';
 import { GoalTracker } from '@/components/profile/GoalTracker';
+import { StreakMilestones } from '@/components/profile/StreakMilestones';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -58,6 +60,7 @@ export const AgentProfile: React.FC = () => {
     inProgressAchievements,
     isLoading 
   } = useAgentProfile();
+  const { streaks } = useAgentGoals();
 
   if (isLoading) {
     return (
@@ -311,6 +314,9 @@ export const AgentProfile: React.FC = () => {
 
       {/* Goal Tracker */}
       <GoalTracker />
+
+      {/* Streak Milestones */}
+      <StreakMilestones streaks={streaks} />
 
       {/* Weekly Performance Report */}
       <WeeklyReport />

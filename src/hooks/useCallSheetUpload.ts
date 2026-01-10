@@ -36,6 +36,14 @@ export interface UploadHistory {
   status: 'pending' | 'approved' | 'rejected' | 'supplemented';
 }
 
+export interface RejectionDetail {
+  id: string;
+  rowNumber: number;
+  companyName: string | null;
+  phoneNumber: string | null;
+  rejectionReason: string;
+}
+
 const REQUIRED_COLUMNS = ['company_name', 'contact_person_name', 'phone_number', 'trade_license_number'];
 
 const normalizeColumnName = (name: string): string => {
@@ -326,6 +334,48 @@ export const useCallSheetUpload = () => {
     setParsedData(null);
   }, []);
 
+  // Fetch rejection details for a specific upload
+  const fetchRejectionDetails = useCallback(async (uploadId: string): Promise<RejectionDetail[]> => {
+    const { data, error } = await supabase
+      .from('upload_rejections')
+      .select('*')
+      .eq('upload_id', uploadId)
+      .order('row_number', { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map(r => ({
+      id: r.id,
+      rowNumber: r.row_number || 0,
+      companyName: r.company_name,
+      phoneNumber: r.phone_number,
+      rejectionReason: r.rejection_reason || 'Unknown reason',
+    }));
+  }, []);
+
+  // Resubmit a rejected upload (reset status to pending)
+  const resubmitUpload = useMutation({
+    mutationFn: async (uploadId: string) => {
+      const { error } = await supabase
+        .from('call_sheet_uploads')
+        .update({ 
+          status: 'pending',
+          approval_timestamp: null,
+        })
+        .eq('id', uploadId)
+        .eq('agent_id', user?.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Upload resubmitted for approval');
+      queryClient.invalidateQueries({ queryKey: ['upload-history'] });
+    },
+    onError: (error) => {
+      toast.error(`Resubmit failed: ${error.message}`);
+    },
+  });
+
   return {
     parsedData,
     isProcessing,
@@ -335,5 +385,8 @@ export const useCallSheetUpload = () => {
     uploadHistory: uploadHistory || [],
     historyLoading,
     clearParsedData,
+    fetchRejectionDetails,
+    resubmitUpload: resubmitUpload.mutate,
+    isResubmitting: resubmitUpload.isPending,
   };
 };

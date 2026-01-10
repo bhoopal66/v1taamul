@@ -8,6 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Upload,
   FileSpreadsheet,
@@ -24,10 +26,13 @@ import {
   Loader2,
   FileCheck,
   AlertCircle,
+  MoreVertical,
+  RotateCcw,
+  Eye,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { format, formatDistanceToNow } from 'date-fns';
-import { useCallSheetUpload, ParsedContact } from '@/hooks/useCallSheetUpload';
+import { formatDistanceToNow } from 'date-fns';
+import { useCallSheetUpload, RejectionDetail, UploadHistory } from '@/hooks/useCallSheetUpload';
 import { cn } from '@/lib/utils';
 
 export const UploadPage: React.FC = () => {
@@ -41,12 +46,41 @@ export const UploadPage: React.FC = () => {
     uploadHistory,
     historyLoading,
     clearParsedData,
+    fetchRejectionDetails,
+    resubmitUpload,
+    isResubmitting,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'valid' | 'invalid'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Rejection details dialog state
+  const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
+  const [selectedUploadForRejections, setSelectedUploadForRejections] = useState<UploadHistory | null>(null);
+  const [rejectionDetails, setRejectionDetails] = useState<RejectionDetail[]>([]);
+  const [loadingRejections, setLoadingRejections] = useState(false);
+
+  const handleViewRejections = async (upload: UploadHistory) => {
+    setSelectedUploadForRejections(upload);
+    setRejectionDialogOpen(true);
+    setLoadingRejections(true);
+    
+    try {
+      const details = await fetchRejectionDetails(upload.id);
+      setRejectionDetails(details);
+    } catch (error) {
+      console.error('Failed to fetch rejection details:', error);
+      setRejectionDetails([]);
+    } finally {
+      setLoadingRejections(false);
+    }
+  };
+
+  const handleResubmit = (uploadId: string) => {
+    resubmitUpload(uploadId);
+  };
 
   const downloadTemplate = useCallback(() => {
     const sampleData = [
@@ -516,10 +550,52 @@ export const UploadPage: React.FC = () => {
                 <ScrollArea className="h-[500px]">
                   <div className="divide-y">
                     {uploadHistory.map((upload) => (
-                      <div key={upload.id} className="p-4 hover:bg-muted/50 transition-colors">
+                      <div key={upload.id} className="p-4 hover:bg-muted/50 transition-colors group">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <p className="font-medium text-sm truncate flex-1">{upload.fileName}</p>
-                          {getStatusBadge(upload.status)}
+                          <div className="flex items-center gap-1">
+                            {getStatusBadge(upload.status)}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <MoreVertical className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {(upload.invalidEntries > 0 || upload.status === 'rejected') && (
+                                  <DropdownMenuItem onClick={() => handleViewRejections(upload)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Issues
+                                  </DropdownMenuItem>
+                                )}
+                                {upload.status === 'rejected' && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleResubmit(upload.id)}
+                                    disabled={isResubmitting}
+                                  >
+                                    <RotateCcw className="w-4 h-4 mr-2" />
+                                    Resubmit for Approval
+                                  </DropdownMenuItem>
+                                )}
+                                {upload.status === 'pending' && (
+                                  <DropdownMenuItem disabled className="text-muted-foreground">
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Awaiting Review
+                                  </DropdownMenuItem>
+                                )}
+                                {upload.status === 'approved' && (
+                                  <DropdownMenuItem disabled className="text-muted-foreground">
+                                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                                    Already Approved
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span>{upload.totalEntries} total</span>
@@ -540,6 +616,82 @@ export const UploadPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Rejection Details Dialog */}
+      <Dialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              Rejection Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUploadForRejections && (
+                <>
+                  Issues found in <strong>{selectedUploadForRejections.fileName}</strong>
+                  {' '} — {selectedUploadForRejections.invalidEntries + selectedUploadForRejections.duplicateEntries} entries with problems
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingRejections ? (
+            <div className="py-12 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-2">Loading details...</p>
+            </div>
+          ) : rejectionDetails.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No detailed rejection records found</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[400px] pr-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Row</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Issue</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rejectionDetails.map((detail) => (
+                    <TableRow key={detail.id}>
+                      <TableCell className="text-muted-foreground">{detail.rowNumber}</TableCell>
+                      <TableCell className="font-medium">{detail.companyName || '-'}</TableCell>
+                      <TableCell className="font-mono text-sm">{detail.phoneNumber || '-'}</TableCell>
+                      <TableCell>
+                        <span className="text-sm text-destructive">{detail.rejectionReason}</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+
+          {selectedUploadForRejections?.status === 'rejected' && (
+            <div className="flex justify-end pt-4 border-t">
+              <Button 
+                onClick={() => {
+                  handleResubmit(selectedUploadForRejections.id);
+                  setRejectionDialogOpen(false);
+                }}
+                disabled={isResubmitting}
+              >
+                {isResubmitting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                )}
+                Resubmit for Approval
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -25,7 +25,7 @@ import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights'
 import { AllAgentsStatsGrid } from '@/components/dashboard/AllAgentsStatsGrid';
 import { AgentPerformanceList } from '@/components/dashboard/AgentPerformanceList';
 import { FeedbackBreakdownChart } from '@/components/dashboard/FeedbackBreakdownChart';
-import { CallVelocityGauge } from '@/components/dashboard/CallVelocityGauge';
+
 import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { useAllAgentsPerformance } from '@/hooks/useAllAgentsPerformance';
@@ -935,15 +935,9 @@ export const Dashboard: React.FC = () => {
               <WeeklyTrendChart data={weeklyData} isLoading={isLoading} />
             </div>
 
-            {/* Right Column - Goals, Velocity & Activity */}
+            {/* Right Column - Goals & Activity */}
             <div className="space-y-6">
               <DailyGoalProgress stats={myStats} isLoading={isLoading} />
-              <CallVelocityGauge 
-                currentCallsPerHour={hourlyData.length > 0 ? hourlyData[hourlyData.length - 1]?.calls || 0 : 0}
-                targetCallsPerHour={10}
-                previousCallsPerHour={hourlyData.length > 1 ? hourlyData[hourlyData.length - 2]?.calls : undefined}
-                isLoading={isLoading}
-              />
               <RecentActivityFeed activities={recentActivity} isLoading={isLoading} />
             </div>
           </div>

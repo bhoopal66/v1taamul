@@ -14,6 +14,7 @@ import { AgentProfile } from "./pages/AgentProfile";
 import { Leaderboard } from "./pages/Leaderboard";
 import { UploadPage } from "./pages/UploadPage";
 import { CallListPage } from "./pages/CallListPage";
+import { LeadsPage } from "./pages/LeadsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,7 +36,7 @@ const App = () => (
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/call-list" element={<CallListPage />} />
               <Route path="/upload" element={<UploadPage />} />
-              <Route path="/leads" element={<Dashboard />} />
+              <Route path="/leads" element={<LeadsPage />} />
               <Route path="/contacts" element={<Dashboard />} />
               <Route path="/supervisor" element={<SupervisorDashboard />} />
               <Route path="/team" element={<SupervisorDashboard />} />

@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Trophy,
   Medal,
@@ -24,6 +26,7 @@ import {
   ArrowDown,
   Filter,
   X,
+  Zap,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
 import { cn } from '@/lib/utils';
@@ -270,6 +273,28 @@ export const Leaderboard: React.FC = () => {
 
   const hasActiveFilters = timePeriod !== 'this_week' || leadStatusFilter !== 'all' || teamFilter !== 'all';
 
+  interface FilterPreset {
+    name: string;
+    description: string;
+    timePeriod: TimePeriod;
+    leadStatus: LeadStatusFilter;
+  }
+
+  const filterPresets: FilterPreset[] = [
+    { name: "Today's Rankings", description: 'Live standings today', timePeriod: 'today', leadStatus: 'all' },
+    { name: 'Weekly Performance', description: 'This week rankings', timePeriod: 'this_week', leadStatus: 'all' },
+    { name: 'Monthly Champions', description: 'Full month standings', timePeriod: 'this_month', leadStatus: 'all' },
+    { name: 'Top Converters', description: 'This week with leads', timePeriod: 'this_week', leadStatus: 'matched' },
+    { name: 'All-Time Legends', description: 'Career rankings', timePeriod: 'all_time', leadStatus: 'all' },
+    { name: 'Need Support', description: 'No leads this week', timePeriod: 'this_week', leadStatus: 'unmatched' },
+    { name: 'Last Week Review', description: 'Previous week analysis', timePeriod: 'last_week', leadStatus: 'all' },
+  ];
+
+  const applyPreset = (preset: FilterPreset) => {
+    handleTimePeriodChange(preset.timePeriod);
+    handleLeadStatusChange(preset.leadStatus);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -342,7 +367,31 @@ export const Leaderboard: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Filters Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Zap className="w-4 h-4 text-primary" />
+                Quick Filters
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Filter Presets</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {filterPresets.map((preset) => (
+                <DropdownMenuItem
+                  key={preset.name}
+                  onClick={() => applyPreset(preset)}
+                  className="flex flex-col items-start gap-0.5 cursor-pointer"
+                >
+                  <span className="font-medium">{preset.name}</span>
+                  <span className="text-xs text-muted-foreground">{preset.description}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
           <Select value={timePeriod} onValueChange={handleTimePeriodChange}>
             <SelectTrigger className="w-[180px]">
               <Calendar className="w-4 h-4 mr-2" />

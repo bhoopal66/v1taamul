@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
@@ -16,6 +17,23 @@ import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights'
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+
+interface FilterPreset {
+  name: string;
+  description: string;
+  timePeriod: DashboardTimePeriod;
+  leadStatus: DashboardLeadStatusFilter;
+}
+
+const filterPresets: FilterPreset[] = [
+  { name: "Today's Focus", description: 'All activity today', timePeriod: 'today', leadStatus: 'all' },
+  { name: 'Weekly Review', description: "This week's performance", timePeriod: 'this_week', leadStatus: 'all' },
+  { name: 'Monthly Overview', description: 'Full month analysis', timePeriod: 'this_month', leadStatus: 'all' },
+  { name: 'Hot Leads', description: "Today's matched leads", timePeriod: 'today', leadStatus: 'matched' },
+  { name: 'Weekly Conversions', description: "This week's matched leads", timePeriod: 'this_week', leadStatus: 'matched' },
+  { name: 'Needs Follow-up', description: 'Unmatched this week', timePeriod: 'this_week', leadStatus: 'unmatched' },
+  { name: '6 Month Trend', description: 'Long-term performance', timePeriod: 'six_months', leadStatus: 'all' },
+];
 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -38,6 +56,11 @@ export const Dashboard: React.FC = () => {
   const handleLeadStatusChange = (value: DashboardLeadStatusFilter) => {
     setLeadStatusFilter(value);
     localStorage.setItem('dashboard-lead-filter', value);
+  };
+
+  const applyPreset = (preset: FilterPreset) => {
+    handleTimePeriodChange(preset.timePeriod);
+    handleLeadStatusChange(preset.leadStatus);
   };
   
   const { myStats, hourlyData, weeklyData, recentActivity, leaderboard, isLoading, refetch } = usePerformanceData({
@@ -78,7 +101,7 @@ export const Dashboard: React.FC = () => {
       {/* Enhanced Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/10 p-6 md:p-8">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="relative flex flex-col md:flex-row md:items-start md:justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Sparkles className="w-4 h-4 text-primary" />
@@ -121,46 +144,73 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={timePeriod} onValueChange={handleTimePeriodChange}>
-              <SelectTrigger className="w-[140px] bg-background/50 backdrop-blur-sm">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="this_week">This Week</SelectItem>
-                <SelectItem value="this_month">This Month</SelectItem>
-                <SelectItem value="six_months">6 Months</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={leadStatusFilter} onValueChange={handleLeadStatusChange}>
-              <SelectTrigger className="w-[150px] bg-background/50 backdrop-blur-sm">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Lead status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Leads</SelectItem>
-                <SelectItem value="matched">Matched</SelectItem>
-                <SelectItem value="unmatched">Unmatched</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button asChild variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm">
-              <Link to="/upload">
-                <Upload className="w-4 h-4" />
-                Upload Contacts
-              </Link>
-            </Button>
-            <Button asChild className="gap-2 shadow-lg">
-              <Link to="/call-list">
-                <Phone className="w-4 h-4" />
-                Start Calling
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </Button>
+          <div className="flex flex-col gap-3">
+            {/* Filter Presets */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 bg-background/50 backdrop-blur-sm">
+                  <Zap className="w-4 h-4 text-primary" />
+                  Quick Filters
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filter Presets</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {filterPresets.map((preset) => (
+                  <DropdownMenuItem
+                    key={preset.name}
+                    onClick={() => applyPreset(preset)}
+                    className="flex flex-col items-start gap-0.5 cursor-pointer"
+                  >
+                    <span className="font-medium">{preset.name}</span>
+                    <span className="text-xs text-muted-foreground">{preset.description}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Custom Filters */}
+            <div className="flex flex-wrap gap-2">
+              <Select value={timePeriod} onValueChange={handleTimePeriodChange}>
+                <SelectTrigger className="w-[140px] bg-background/50 backdrop-blur-sm">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="six_months">6 Months</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={leadStatusFilter} onValueChange={handleLeadStatusChange}>
+                <SelectTrigger className="w-[150px] bg-background/50 backdrop-blur-sm">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Lead status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Leads</SelectItem>
+                  <SelectItem value="matched">Matched</SelectItem>
+                  <SelectItem value="unmatched">Unmatched</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm">
+                <Link to="/upload">
+                  <Upload className="w-4 h-4" />
+                  Upload Contacts
+                </Link>
+              </Button>
+              <Button asChild className="gap-2 shadow-lg">
+                <Link to="/call-list">
+                  <Phone className="w-4 h-4" />
+                  Start Calling
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

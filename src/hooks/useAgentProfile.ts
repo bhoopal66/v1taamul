@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay, subDays, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { startOfDay, subDays, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 export interface MonthlyPerformance {
   month: string;

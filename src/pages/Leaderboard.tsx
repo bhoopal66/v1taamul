@@ -35,6 +35,8 @@ import {
   Star,
   Download,
   UploadCloud,
+  Link2,
+  Check,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
 import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
@@ -235,8 +237,18 @@ export const Leaderboard: React.FC = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets } = useCustomFilterPresets('leaderboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData } = useCustomFilterPresets('leaderboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [linkCopied, setLinkCopied] = React.useState(false);
+
+  // Handle shared presets from URL
+  useEffect(() => {
+    const pending = getPendingSharedPresets();
+    if (pending && pending.length > 0) {
+      const result = importFromData(pending);
+      toast.success(`Imported ${result.imported} shared preset(s) from link`);
+    }
+  }, [getPendingSharedPresets, importFromData]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -262,6 +274,22 @@ export const Leaderboard: React.FC = () => {
     }
     exportPresets();
     toast.success(`Exported ${customPresets.length} preset(s)`);
+  };
+
+  const handleShareLink = async () => {
+    if (customPresets.length === 0) {
+      toast.error('No custom presets to share');
+      return;
+    }
+    const link = generateShareLink('/leaderboard');
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      toast.success('Share link copied to clipboard!');
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy link');
+    }
   };
 
   const handleTimePeriodChange = (value: TimePeriod) => {
@@ -571,13 +599,18 @@ export const Leaderboard: React.FC = () => {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Manage Presets</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleShareLink} className="gap-2 cursor-pointer">
+                {linkCopied ? <Check className="w-4 h-4 text-green-500" /> : <Link2 className="w-4 h-4" />}
+                Share via Link
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleExport} className="gap-2 cursor-pointer">
                 <Download className="w-4 h-4" />
-                Export Presets
+                Export as File
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2 cursor-pointer">
                 <UploadCloud className="w-4 h-4" />
-                Import Presets
+                Import from File
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -57,8 +57,18 @@ export const Dashboard: React.FC = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets } = useCustomFilterPresets('dashboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [linkCopied, setLinkCopied] = React.useState(false);
+
+  // Handle shared presets from URL
+  useEffect(() => {
+    const pending = getPendingSharedPresets();
+    if (pending && pending.length > 0) {
+      const result = importFromData(pending);
+      toast.success(`Imported ${result.imported} shared preset(s) from link`);
+    }
+  }, [getPendingSharedPresets, importFromData]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,6 +94,22 @@ export const Dashboard: React.FC = () => {
     }
     exportPresets();
     toast.success(`Exported ${customPresets.length} preset(s)`);
+  };
+
+  const handleShareLink = async () => {
+    if (customPresets.length === 0) {
+      toast.error('No custom presets to share');
+      return;
+    }
+    const link = generateShareLink('/dashboard');
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      toast.success('Share link copied to clipboard!');
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy link');
+    }
   };
 
   const handleTimePeriodChange = (value: DashboardTimePeriod) => {
@@ -344,13 +370,18 @@ export const Dashboard: React.FC = () => {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Manage Presets</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleShareLink} className="gap-2 cursor-pointer">
+                    {linkCopied ? <Check className="w-4 h-4 text-green-500" /> : <Link2 className="w-4 h-4" />}
+                    Share via Link
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleExport} className="gap-2 cursor-pointer">
                     <Download className="w-4 h-4" />
-                    Export Presets
+                    Export as File
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2 cursor-pointer">
                     <UploadCloud className="w-4 h-4" />
-                    Import Presets
+                    Import from File
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

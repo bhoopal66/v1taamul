@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
+import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { 
   Target, 
   Phone, 
@@ -30,10 +31,11 @@ import {
   Sparkles,
   LayoutGrid,
   List,
+  BarChart3,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-type ViewMode = 'list' | 'kanban';
+type ViewMode = 'list' | 'kanban' | 'analytics';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'bg-blue-500', icon: Sparkles },
@@ -169,6 +171,15 @@ export const LeadsPage = () => {
               <List className="w-4 h-4 mr-1" />
               List
             </Button>
+            <Button
+              variant={viewMode === 'analytics' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('analytics')}
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Analytics
+            </Button>
           </div>
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
@@ -252,6 +263,11 @@ export const LeadsPage = () => {
           onEditLead={handleEditLead}
           isUpdating={isUpdating}
         />
+      )}
+
+      {/* Analytics View */}
+      {viewMode === 'analytics' && (
+        <LeadAnalytics leads={leads} />
       )}
 
       {/* Leads List - Only show in list view */}

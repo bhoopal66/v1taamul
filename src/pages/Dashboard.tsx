@@ -18,8 +18,26 @@ import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
-  const [timePeriod, setTimePeriod] = useState<DashboardTimePeriod>('today');
-  const [leadStatusFilter, setLeadStatusFilter] = useState<DashboardLeadStatusFilter>('all');
+  
+  const [timePeriod, setTimePeriod] = useState<DashboardTimePeriod>(() => {
+    const saved = localStorage.getItem('dashboard-time-period');
+    return (saved as DashboardTimePeriod) || 'today';
+  });
+  
+  const [leadStatusFilter, setLeadStatusFilter] = useState<DashboardLeadStatusFilter>(() => {
+    const saved = localStorage.getItem('dashboard-lead-filter');
+    return (saved as DashboardLeadStatusFilter) || 'all';
+  });
+
+  const handleTimePeriodChange = (value: DashboardTimePeriod) => {
+    setTimePeriod(value);
+    localStorage.setItem('dashboard-time-period', value);
+  };
+
+  const handleLeadStatusChange = (value: DashboardLeadStatusFilter) => {
+    setLeadStatusFilter(value);
+    localStorage.setItem('dashboard-lead-filter', value);
+  };
   
   const { myStats, hourlyData, weeklyData, recentActivity, leaderboard, isLoading, refetch } = usePerformanceData({
     timePeriod,
@@ -52,7 +70,7 @@ export const Dashboard: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as DashboardTimePeriod)}>
+            <Select value={timePeriod} onValueChange={handleTimePeriodChange}>
               <SelectTrigger className="w-[140px] bg-background/50 backdrop-blur-sm">
                 <Calendar className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Period" />
@@ -65,7 +83,7 @@ export const Dashboard: React.FC = () => {
               </SelectContent>
             </Select>
             
-            <Select value={leadStatusFilter} onValueChange={(v) => setLeadStatusFilter(v as DashboardLeadStatusFilter)}>
+            <Select value={leadStatusFilter} onValueChange={handleLeadStatusChange}>
               <SelectTrigger className="w-[150px] bg-background/50 backdrop-blur-sm">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Lead status" />

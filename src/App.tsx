@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import { Dashboard } from "./pages/Dashboard";
 import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import { AgentProfile } from "./pages/AgentProfile";
+import { Leaderboard } from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile" element={<AgentProfile />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/call-list" element={<Dashboard />} />
               <Route path="/upload" element={<Dashboard />} />
               <Route path="/leads" element={<Dashboard />} />

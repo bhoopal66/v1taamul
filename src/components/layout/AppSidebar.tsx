@@ -15,6 +15,7 @@ import {
   Target,
   UserCircle,
   Headphones,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -96,6 +97,7 @@ export const AppSidebar: React.FC = () => {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         <NavItem to="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" />
         <NavItem to="/profile" icon={<UserCircle className="w-5 h-5" />} label="My Profile" />
+        <NavItem to="/leaderboard" icon={<Trophy className="w-5 h-5" />} label="Leaderboard" />
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />

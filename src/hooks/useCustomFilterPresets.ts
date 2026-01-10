@@ -6,6 +6,16 @@ export interface CustomPreset {
   timePeriod: string;
   leadStatus: string;
   createdAt: number;
+  useCount?: number;
+  lastUsedAt?: number;
+}
+
+export interface PresetAnalytics {
+  id: string;
+  name: string;
+  useCount: number;
+  lastUsedAt: number | null;
+  usagePercentage: number;
 }
 
 export interface ExportedPresets {
@@ -101,6 +111,44 @@ export function useCustomFilterPresets(storageKey: string) {
       return updated;
     });
   }, [storageKey]);
+
+  const trackPresetUsage = useCallback((id: string) => {
+    setCustomPresets(prev => {
+      const updated = prev.map(p => {
+        if (p.id === id) {
+          return {
+            ...p,
+            useCount: (p.useCount || 0) + 1,
+            lastUsedAt: Date.now(),
+          };
+        }
+        return p;
+      });
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
+  }, [storageKey]);
+
+  const getPresetAnalytics = useCallback((): PresetAnalytics[] => {
+    const totalUsage = customPresets.reduce((sum, p) => sum + (p.useCount || 0), 0);
+    
+    return customPresets
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        useCount: p.useCount || 0,
+        lastUsedAt: p.lastUsedAt || null,
+        usagePercentage: totalUsage > 0 ? Math.round(((p.useCount || 0) / totalUsage) * 100) : 0,
+      }))
+      .sort((a, b) => b.useCount - a.useCount);
+  }, [customPresets]);
+
+  const getMostUsedPreset = useCallback((): CustomPreset | null => {
+    if (customPresets.length === 0) return null;
+    return customPresets.reduce((max, p) => 
+      (p.useCount || 0) > (max.useCount || 0) ? p : max
+    , customPresets[0]);
+  }, [customPresets]);
 
   const exportPresets = useCallback(() => {
     const exportData: ExportedPresets = {
@@ -235,6 +283,9 @@ export function useCustomFilterPresets(storageKey: string) {
     savePreset,
     deletePreset,
     updatePreset,
+    trackPresetUsage,
+    getPresetAnalytics,
+    getMostUsedPreset,
     exportPresets,
     importPresets,
     importFromData,

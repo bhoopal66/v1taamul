@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { CallsChart } from '@/components/dashboard/CallsChart';
 import { ConversionChart } from '@/components/dashboard/ConversionChart';
@@ -11,13 +12,19 @@ import { DailyGoalProgress } from '@/components/dashboard/DailyGoalProgress';
 import { WeeklyTrendChart } from '@/components/dashboard/WeeklyTrendChart';
 import { RecentActivityFeed } from '@/components/dashboard/RecentActivityFeed';
 import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights';
-import { usePerformanceData } from '@/hooks/usePerformanceData';
+import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
-  const { myStats, hourlyData, weeklyData, recentActivity, leaderboard, isLoading, refetch } = usePerformanceData();
+  const [timePeriod, setTimePeriod] = useState<DashboardTimePeriod>('today');
+  const [leadStatusFilter, setLeadStatusFilter] = useState<DashboardLeadStatusFilter>('all');
+  
+  const { myStats, hourlyData, weeklyData, recentActivity, leaderboard, isLoading, refetch } = usePerformanceData({
+    timePeriod,
+    leadStatusFilter,
+  });
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -43,6 +50,32 @@ export const Dashboard: React.FC = () => {
             <p className="text-muted-foreground mt-2 max-w-lg">
               Here's your real-time performance dashboard. Track your calls, monitor your goals, and stay ahead of the competition.
             </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as DashboardTimePeriod)}>
+              <SelectTrigger className="w-[140px] bg-background/50 backdrop-blur-sm">
+                <Calendar className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="this_week">This Week</SelectItem>
+                <SelectItem value="this_month">This Month</SelectItem>
+                <SelectItem value="six_months">6 Months</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={leadStatusFilter} onValueChange={(v) => setLeadStatusFilter(v as DashboardLeadStatusFilter)}>
+              <SelectTrigger className="w-[150px] bg-background/50 backdrop-blur-sm">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Lead status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Leads</SelectItem>
+                <SelectItem value="matched">Matched</SelectItem>
+                <SelectItem value="unmatched">Unmatched</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <Button asChild variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -64,8 +64,11 @@ export const Dashboard: React.FC = () => {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('Rose');
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [presetToDuplicate, setPresetToDuplicate] = useState<CustomPreset | null>(null);
+  const [duplicateName, setDuplicateName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, updateCategoryColor, deleteCategory, isDefaultCategory, getCategoryColor, customCategories } = useCustomFilterPresets('dashboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, duplicatePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, updateCategoryColor, deleteCategory, isDefaultCategory, getCategoryColor, customCategories } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -197,6 +200,28 @@ export const Dashboard: React.FC = () => {
   const handleResetUsageStats = () => {
     resetUsageStats();
     toast.success('Usage statistics reset');
+  };
+
+  const handleOpenDuplicateDialog = (preset: CustomPreset) => {
+    setPresetToDuplicate(preset);
+    setDuplicateName(`${preset.name} (Copy)`);
+    setDuplicateDialogOpen(true);
+  };
+
+  const handleDuplicatePreset = () => {
+    if (!presetToDuplicate || !duplicateName.trim()) {
+      toast.error('Please enter a name for the duplicate');
+      return;
+    }
+    const result = duplicatePreset(presetToDuplicate.id, duplicateName.trim());
+    if (result) {
+      toast.success(`Created duplicate "${duplicateName.trim()}"`);
+      setDuplicateDialogOpen(false);
+      setPresetToDuplicate(null);
+      setDuplicateName('');
+    } else {
+      toast.error('Failed to duplicate preset');
+    }
   };
 
   // Keyboard shortcuts for filter presets (Ctrl+1, Ctrl+2, etc.)
@@ -381,15 +406,28 @@ export const Dashboard: React.FC = () => {
                                     {getTimePeriodLabel(preset.timePeriod as DashboardTimePeriod)} · {getLeadStatusLabel(preset.leadStatus as DashboardLeadStatusFilter)}
                                   </span>
                                 </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletePreset(preset);
-                                  }}
-                                  className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenDuplicateDialog(preset);
+                                    }}
+                                    className="p-1 hover:text-primary"
+                                    title="Duplicate preset"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePreset(preset);
+                                    }}
+                                    className="p-1 hover:text-destructive"
+                                    title="Delete preset"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </DropdownMenuItem>
                             );
                           })}
@@ -591,6 +629,61 @@ export const Dashboard: React.FC = () => {
                     <Button onClick={handleSavePreset} className="gap-2">
                       <Save className="w-4 h-4" />
                       Save Preset
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Duplicate Preset Dialog */}
+              <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                  <DialogHeader>
+                    <DialogTitle>Duplicate Preset</DialogTitle>
+                    <DialogDescription>
+                      Create a copy of "{presetToDuplicate?.name}" with a new name.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duplicate-name">New Preset Name</Label>
+                      <Input
+                        id="duplicate-name"
+                        placeholder="Enter name for the duplicate"
+                        value={duplicateName}
+                        onChange={(e) => setDuplicateName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleDuplicatePreset()}
+                        autoFocus
+                      />
+                    </div>
+                    {presetToDuplicate && (
+                      <div className="rounded-lg bg-muted p-3 space-y-1">
+                        <p className="text-sm font-medium">Original Preset Settings:</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <Calendar className="w-3 h-3" />
+                            {getTimePeriodLabel(presetToDuplicate.timePeriod as DashboardTimePeriod)}
+                          </Badge>
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <Filter className="w-3 h-3" />
+                            {getLeadStatusLabel(presetToDuplicate.leadStatus as DashboardLeadStatusFilter)}
+                          </Badge>
+                          {presetToDuplicate.category && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                              <Tag className="w-3 h-3" />
+                              {presetToDuplicate.category}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDuplicateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleDuplicatePreset} className="gap-2">
+                      <Copy className="w-4 h-4" />
+                      Duplicate
                     </Button>
                   </DialogFooter>
                 </DialogContent>

@@ -37,6 +37,7 @@ import {
   UploadCloud,
   Link2,
   Check,
+  BarChart3,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
 import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
@@ -237,7 +238,7 @@ export const Leaderboard: React.FC = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData } = useCustomFilterPresets('leaderboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics } = useCustomFilterPresets('leaderboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -364,7 +365,11 @@ export const Leaderboard: React.FC = () => {
   const applyPreset = useCallback((preset: FilterPreset | CustomPreset) => {
     handleTimePeriodChange(preset.timePeriod as TimePeriod);
     handleLeadStatusChange(preset.leadStatus as LeadStatusFilter);
-  }, []);
+    // Track usage for custom presets
+    if ('id' in preset && preset.id.startsWith('custom-')) {
+      trackPresetUsage(preset.id);
+    }
+  }, [trackPresetUsage]);
 
   const handleSavePreset = () => {
     if (!newPresetName.trim()) {
@@ -507,31 +512,70 @@ export const Leaderboard: React.FC = () => {
                     <Star className="w-3 h-3" />
                     My Presets
                   </DropdownMenuLabel>
-                  {customPresets.map((preset) => (
-                    <DropdownMenuItem
-                      key={preset.id}
-                      className="flex items-center justify-between gap-2 cursor-pointer group"
-                    >
-                      <div 
-                        className="flex flex-col gap-0.5 flex-1"
-                        onClick={() => applyPreset(preset)}
+                  {customPresets.map((preset) => {
+                    const analytics = getPresetAnalytics().find(a => a.id === preset.id);
+                    return (
+                      <DropdownMenuItem
+                        key={preset.id}
+                        className="flex items-center justify-between gap-2 cursor-pointer group"
                       >
-                        <span className="font-medium">{preset.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {getTimePeriodLabel(preset.timePeriod as TimePeriod)} · {getLeadStatusLabel(preset.leadStatus as LeadStatusFilter)}
-                        </span>
+                        <div 
+                          className="flex flex-col gap-0.5 flex-1"
+                          onClick={() => applyPreset(preset)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{preset.name}</span>
+                            {analytics && analytics.useCount > 0 && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
+                                <BarChart3 className="w-2.5 h-2.5" />
+                                {analytics.useCount}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {getTimePeriodLabel(preset.timePeriod as TimePeriod)} · {getLeadStatusLabel(preset.leadStatus as LeadStatusFilter)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePreset(preset);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  
+                  {/* Usage Analytics Summary */}
+                  {getPresetAnalytics().some(a => a.useCount > 0) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5">
+                        <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          <BarChart3 className="w-3 h-3" />
+                          Usage Analytics
+                        </div>
+                        <div className="space-y-1">
+                          {getPresetAnalytics().slice(0, 3).map(a => (
+                            <div key={a.id} className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-primary rounded-full transition-all"
+                                  style={{ width: `${a.usagePercentage}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground w-8 text-right">
+                                {a.usagePercentage}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePreset(preset);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </DropdownMenuItem>
-                  ))}
+                    </>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

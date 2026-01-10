@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
 export interface CustomPreset {
   id: string;
@@ -8,6 +8,7 @@ export interface CustomPreset {
   createdAt: number;
   useCount?: number;
   lastUsedAt?: number;
+  category?: string;
 }
 
 export interface PresetAnalytics {
@@ -24,12 +25,15 @@ export interface ExportedPresets {
   presets: CustomPreset[];
 }
 
+export const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Reports', 'Team'] as const;
+
 // URL-safe base64 encoding/decoding
 const encodePresets = (presets: CustomPreset[]): string => {
   const data = JSON.stringify(presets.map(p => ({
     n: p.name,
     t: p.timePeriod,
     l: p.leadStatus,
+    c: p.category,
   })));
   return btoa(encodeURIComponent(data));
 };
@@ -42,6 +46,7 @@ const decodePresets = (encoded: string): Partial<CustomPreset>[] | null => {
       name: p.n,
       timePeriod: p.t,
       leadStatus: p.l,
+      category: p.c,
     }));
   } catch {
     return null;
@@ -78,13 +83,14 @@ export function useCustomFilterPresets(storageKey: string) {
     }
   }, []);
 
-  const savePreset = useCallback((name: string, timePeriod: string, leadStatus: string) => {
+  const savePreset = useCallback((name: string, timePeriod: string, leadStatus: string, category?: string) => {
     const newPreset: CustomPreset = {
       id: `custom-${Date.now()}`,
       name,
       timePeriod,
       leadStatus,
       createdAt: Date.now(),
+      category,
     };
     
     setCustomPresets(prev => {
@@ -95,6 +101,33 @@ export function useCustomFilterPresets(storageKey: string) {
     
     return newPreset;
   }, [storageKey]);
+
+  const getCategories = useMemo(() => {
+    const customCategories = customPresets
+      .map(p => p.category)
+      .filter((c): c is string => Boolean(c));
+    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])];
+    return allCategories.sort();
+  }, [customPresets]);
+
+  const getPresetsByCategory = useMemo(() => {
+    const grouped: Record<string, CustomPreset[]> = { 'Uncategorized': [] };
+    
+    customPresets.forEach(preset => {
+      const category = preset.category || 'Uncategorized';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(preset);
+    });
+    
+    // Remove empty Uncategorized if all presets have categories
+    if (grouped['Uncategorized'].length === 0) {
+      delete grouped['Uncategorized'];
+    }
+    
+    return grouped;
+  }, [customPresets]);
 
   const deletePreset = useCallback((id: string) => {
     setCustomPresets(prev => {
@@ -249,6 +282,7 @@ export function useCustomFilterPresets(storageKey: string) {
       timePeriod: preset.timePeriod!,
       leadStatus: preset.leadStatus!,
       createdAt: Date.now(),
+      category: preset.category,
     }));
     
     imported = validPresets.length;
@@ -306,5 +340,7 @@ export function useCustomFilterPresets(storageKey: string) {
     getPendingSharedPresets,
     clearAllPresets,
     fileInputRef,
+    getCategories,
+    getPresetsByCategory,
   };
 }

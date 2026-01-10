@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
@@ -40,9 +40,10 @@ import {
   Check,
   BarChart3,
   RotateCcw,
+  Tag,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
-import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
+import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES } from '@/hooks/useCustomFilterPresets';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -241,8 +242,9 @@ export const Leaderboard: React.FC = () => {
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetCategory, setNewPresetCategory] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats } = useCustomFilterPresets('leaderboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory } = useCustomFilterPresets('leaderboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -380,9 +382,10 @@ export const Leaderboard: React.FC = () => {
       toast.error('Please enter a preset name');
       return;
     }
-    savePreset(newPresetName.trim(), timePeriod, leadStatusFilter);
+    savePreset(newPresetName.trim(), timePeriod, leadStatusFilter, newPresetCategory || undefined);
     toast.success(`Saved preset "${newPresetName.trim()}"`);
     setNewPresetName('');
+    setNewPresetCategory('');
     setSaveDialogOpen(false);
   };
 
@@ -521,55 +524,65 @@ export const Leaderboard: React.FC = () => {
                     <Star className="w-3 h-3" />
                     My Presets
                   </DropdownMenuLabel>
-                  {customPresets.map((preset) => {
-                    const analytics = getPresetAnalytics().find(a => a.id === preset.id);
-                    return (
-                      <DropdownMenuItem
-                        key={preset.id}
-                        className="flex items-center justify-between gap-2 cursor-pointer group"
-                      >
-                        <div 
-                          className="flex flex-col gap-0.5 flex-1"
-                          onClick={() => applyPreset(preset)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{preset.name}</span>
-                            {analytics && analytics.useCount > 0 && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
-                                      <BarChart3 className="w-2.5 h-2.5" />
-                                      {analytics.useCount}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs">
-                                    {preset.lastUsedAt ? (
-                                      <span>Last used {formatDistanceToNow(new Date(preset.lastUsedAt), { addSuffix: true })}</span>
-                                    ) : (
-                                      <span>Never used</span>
-                                    )}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {getTimePeriodLabel(preset.timePeriod as TimePeriod)} · {getLeadStatusLabel(preset.leadStatus as LeadStatusFilter)}
-                          </span>
+                  {Object.entries(getPresetsByCategory).map(([category, presets]) => (
+                    <React.Fragment key={category}>
+                      {Object.keys(getPresetsByCategory).length > 1 && (
+                        <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                          <Tag className="w-2.5 h-2.5" />
+                          {category}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePreset(preset);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </DropdownMenuItem>
-                    );
-                  })}
+                      )}
+                      {presets.map((preset) => {
+                        const analytics = getPresetAnalytics().find(a => a.id === preset.id);
+                        return (
+                          <DropdownMenuItem
+                            key={preset.id}
+                            className="flex items-center justify-between gap-2 cursor-pointer group"
+                          >
+                            <div 
+                              className="flex flex-col gap-0.5 flex-1"
+                              onClick={() => applyPreset(preset)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{preset.name}</span>
+                                {analytics && analytics.useCount > 0 && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
+                                          <BarChart3 className="w-2.5 h-2.5" />
+                                          {analytics.useCount}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="text-xs">
+                                        {preset.lastUsedAt ? (
+                                          <span>Last used {formatDistanceToNow(new Date(preset.lastUsedAt), { addSuffix: true })}</span>
+                                        ) : (
+                                          <span>Never used</span>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {getTimePeriodLabel(preset.timePeriod as TimePeriod)} · {getLeadStatusLabel(preset.leadStatus as LeadStatusFilter)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePreset(preset);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
                   
                   {/* Usage Analytics Summary */}
                   {getPresetAnalytics().some(a => a.useCount > 0) && (
@@ -654,6 +667,25 @@ export const Leaderboard: React.FC = () => {
                     onChange={(e) => setNewPresetName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="preset-category">Category (optional)</Label>
+                  <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
+                    <SelectTrigger id="preset-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No category</SelectItem>
+                      {getCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-3 h-3" />
+                            {cat}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="rounded-lg bg-muted p-3 space-y-1">
                   <p className="text-sm font-medium">Current Filters:</p>

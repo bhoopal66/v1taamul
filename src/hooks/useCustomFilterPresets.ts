@@ -27,37 +27,57 @@ export interface ExportedPresets {
 
 export const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Reports', 'Team'] as const;
 
-export const CATEGORY_COLORS = {
+export type CategoryColor = { bg: string; text: string; border: string; dot: string };
+
+export const CATEGORY_COLORS: Record<string, CategoryColor> = {
   Work: { bg: 'bg-blue-500/20', text: 'text-blue-600', border: 'border-blue-500/30', dot: 'bg-blue-500' },
   Personal: { bg: 'bg-purple-500/20', text: 'text-purple-600', border: 'border-purple-500/30', dot: 'bg-purple-500' },
   Reports: { bg: 'bg-amber-500/20', text: 'text-amber-600', border: 'border-amber-500/30', dot: 'bg-amber-500' },
   Team: { bg: 'bg-green-500/20', text: 'text-green-600', border: 'border-green-500/30', dot: 'bg-green-500' },
   Uncategorized: { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-muted', dot: 'bg-muted-foreground' },
-} as const;
+};
 
-export const CUSTOM_CATEGORY_COLORS = [
-  { bg: 'bg-rose-500/20', text: 'text-rose-600', border: 'border-rose-500/30', dot: 'bg-rose-500' },
-  { bg: 'bg-cyan-500/20', text: 'text-cyan-600', border: 'border-cyan-500/30', dot: 'bg-cyan-500' },
-  { bg: 'bg-orange-500/20', text: 'text-orange-600', border: 'border-orange-500/30', dot: 'bg-orange-500' },
-  { bg: 'bg-indigo-500/20', text: 'text-indigo-600', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
-  { bg: 'bg-teal-500/20', text: 'text-teal-600', border: 'border-teal-500/30', dot: 'bg-teal-500' },
-  { bg: 'bg-pink-500/20', text: 'text-pink-600', border: 'border-pink-500/30', dot: 'bg-pink-500' },
-  { bg: 'bg-lime-500/20', text: 'text-lime-600', border: 'border-lime-500/30', dot: 'bg-lime-500' },
-  { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-600', border: 'border-fuchsia-500/30', dot: 'bg-fuchsia-500' },
-] as const;
+export const CUSTOM_CATEGORY_COLORS: Record<string, CategoryColor> = {
+  Rose: { bg: 'bg-rose-500/20', text: 'text-rose-600', border: 'border-rose-500/30', dot: 'bg-rose-500' },
+  Cyan: { bg: 'bg-cyan-500/20', text: 'text-cyan-600', border: 'border-cyan-500/30', dot: 'bg-cyan-500' },
+  Orange: { bg: 'bg-orange-500/20', text: 'text-orange-600', border: 'border-orange-500/30', dot: 'bg-orange-500' },
+  Indigo: { bg: 'bg-indigo-500/20', text: 'text-indigo-600', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
+  Teal: { bg: 'bg-teal-500/20', text: 'text-teal-600', border: 'border-teal-500/30', dot: 'bg-teal-500' },
+  Pink: { bg: 'bg-pink-500/20', text: 'text-pink-600', border: 'border-pink-500/30', dot: 'bg-pink-500' },
+  Lime: { bg: 'bg-lime-500/20', text: 'text-lime-600', border: 'border-lime-500/30', dot: 'bg-lime-500' },
+  Fuchsia: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-600', border: 'border-fuchsia-500/30', dot: 'bg-fuchsia-500' },
+  Red: { bg: 'bg-red-500/20', text: 'text-red-600', border: 'border-red-500/30', dot: 'bg-red-500' },
+  Emerald: { bg: 'bg-emerald-500/20', text: 'text-emerald-600', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  Violet: { bg: 'bg-violet-500/20', text: 'text-violet-600', border: 'border-violet-500/30', dot: 'bg-violet-500' },
+  Sky: { bg: 'bg-sky-500/20', text: 'text-sky-600', border: 'border-sky-500/30', dot: 'bg-sky-500' },
+};
 
-export type CategoryColor = { bg: string; text: string; border: string; dot: string };
+// Custom category with color
+export interface CustomCategory {
+  name: string;
+  colorName: string;
+}
 
-const getCustomCategoriesFromStorage = (storageKey: string): string[] => {
+const getCustomCategoriesFromStorage = (storageKey: string): CustomCategory[] => {
   try {
     const saved = localStorage.getItem(`${storageKey}-categories`);
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    // Handle migration from old format (string[]) to new format (CustomCategory[])
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+      const colorNames = Object.keys(CUSTOM_CATEGORY_COLORS);
+      return parsed.map((name: string, index: number) => ({
+        name,
+        colorName: colorNames[index % colorNames.length],
+      }));
+    }
+    return parsed;
   } catch {
     return [];
   }
 };
 
-const saveCustomCategoriesToStorage = (storageKey: string, categories: string[]) => {
+const saveCustomCategoriesToStorage = (storageKey: string, categories: CustomCategory[]) => {
   localStorage.setItem(`${storageKey}-categories`, JSON.stringify(categories));
 };
 
@@ -99,26 +119,41 @@ export function useCustomFilterPresets(storageKey: string) {
     }
   });
 
-  const [customCategories, setCustomCategories] = useState<string[]>(() => 
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => 
     getCustomCategoriesFromStorage(storageKey)
   );
 
-  const addCategory = useCallback((category: string) => {
+  const addCategory = useCallback((category: string, colorName: string = 'Rose') => {
     const trimmed = category.trim();
     if (!trimmed) return false;
     
     // Check if already exists in default or custom categories
-    if (DEFAULT_CATEGORIES.includes(trimmed as any) || customCategories.includes(trimmed)) {
+    if (DEFAULT_CATEGORIES.includes(trimmed as any) || customCategories.some(c => c.name === trimmed)) {
       return false;
     }
     
     setCustomCategories(prev => {
-      const updated = [...prev, trimmed];
+      const updated = [...prev, { name: trimmed, colorName }];
       saveCustomCategoriesToStorage(storageKey, updated);
       return updated;
     });
     return true;
   }, [storageKey, customCategories]);
+
+  const updateCategoryColor = useCallback((category: string, colorName: string) => {
+    // Can't update default categories
+    if (DEFAULT_CATEGORIES.includes(category as any)) {
+      return false;
+    }
+    
+    setCustomCategories(prev => {
+      const updated = prev.map(c => c.name === category ? { ...c, colorName } : c);
+      saveCustomCategoriesToStorage(storageKey, updated);
+      return updated;
+    });
+    
+    return true;
+  }, [storageKey]);
 
   const deleteCategory = useCallback((category: string) => {
     // Can't delete default categories
@@ -127,7 +162,7 @@ export function useCustomFilterPresets(storageKey: string) {
     }
     
     setCustomCategories(prev => {
-      const updated = prev.filter(c => c !== category);
+      const updated = prev.filter(c => c.name !== category);
       saveCustomCategoriesToStorage(storageKey, updated);
       return updated;
     });
@@ -154,12 +189,12 @@ export function useCustomFilterPresets(storageKey: string) {
     }
     
     // Check if new name already exists
-    if (DEFAULT_CATEGORIES.includes(trimmedNew as any) || customCategories.includes(trimmedNew)) {
+    if (DEFAULT_CATEGORIES.includes(trimmedNew as any) || customCategories.some(c => c.name === trimmedNew)) {
       return false;
     }
     
     setCustomCategories(prev => {
-      const updated = prev.map(c => c === oldName ? trimmedNew : c);
+      const updated = prev.map(c => c.name === oldName ? { ...c, name: trimmedNew } : c);
       saveCustomCategoriesToStorage(storageKey, updated);
       return updated;
     });
@@ -217,7 +252,8 @@ export function useCustomFilterPresets(storageKey: string) {
     const presetCategories = customPresets
       .map(p => p.category)
       .filter((c): c is string => Boolean(c));
-    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories, ...presetCategories])];
+    const customCategoryNames = customCategories.map(c => c.name);
+    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategoryNames, ...presetCategories])];
     return allCategories.sort();
   }, [customPresets, customCategories]);
 
@@ -231,10 +267,10 @@ export function useCustomFilterPresets(storageKey: string) {
       return CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS];
     }
     
-    // For custom categories, assign a color based on index
-    const customIndex = customCategories.indexOf(category);
-    if (customIndex >= 0) {
-      return CUSTOM_CATEGORY_COLORS[customIndex % CUSTOM_CATEGORY_COLORS.length];
+    // For custom categories, use the stored color
+    const customCat = customCategories.find(c => c.name === category);
+    if (customCat && customCat.colorName in CUSTOM_CATEGORY_COLORS) {
+      return CUSTOM_CATEGORY_COLORS[customCat.colorName];
     }
     
     // Fallback to uncategorized color
@@ -475,6 +511,7 @@ export function useCustomFilterPresets(storageKey: string) {
     getPresetsByCategory,
     customCategories,
     addCategory,
+    updateCategoryColor,
     deleteCategory,
     renameCategory,
     isDefaultCategory,

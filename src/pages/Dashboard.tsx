@@ -63,7 +63,7 @@ export const Dashboard: React.FC = () => {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, deleteCategory, isDefaultCategory } = useCustomFilterPresets('dashboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, deleteCategory, isDefaultCategory, getCategoryColor } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -324,11 +324,13 @@ export const Dashboard: React.FC = () => {
                         <Star className="w-3 h-3" />
                         My Presets
                       </DropdownMenuLabel>
-                      {Object.entries(getPresetsByCategory).map(([category, presets]) => (
+                      {Object.entries(getPresetsByCategory).map(([category, presets]) => {
+                        const categoryColor = getCategoryColor(category);
+                        return (
                         <React.Fragment key={category}>
                           {Object.keys(getPresetsByCategory).length > 1 && (
-                            <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                              <Tag className="w-2.5 h-2.5" />
+                            <div className={`px-2 py-1 text-[10px] font-medium uppercase tracking-wider flex items-center gap-1.5 ${categoryColor.text}`}>
+                              <span className={`w-2 h-2 rounded-full ${categoryColor.dot}`} />
                               {category}
                             </div>
                           )}
@@ -382,8 +384,8 @@ export const Dashboard: React.FC = () => {
                             );
                           })}
                         </React.Fragment>
-                      ))}
-                      
+                        );
+                      })}
                       {/* Usage Analytics Summary */}
                       {getPresetAnalytics().some(a => a.useCount > 0) && (
                         <>
@@ -496,17 +498,20 @@ export const Dashboard: React.FC = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="">No category</SelectItem>
-                            {getCategories.map((cat) => (
+                            {getCategories.map((cat) => {
+                              const catColor = getCategoryColor(cat);
+                              return (
                               <SelectItem key={cat} value={cat}>
                                 <div className="flex items-center gap-2">
-                                  <Tag className="w-3 h-3" />
-                                  {cat}
+                                  <span className={`w-2.5 h-2.5 rounded-full ${catColor.dot}`} />
+                                  <span className={catColor.text}>{cat}</span>
                                   {!isDefaultCategory(cat) && (
                                     <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">Custom</Badge>
                                   )}
                                 </div>
                               </SelectItem>
-                            ))}
+                              );
+                            })}
                             <DropdownMenuSeparator />
                             <div 
                               className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
@@ -521,9 +526,11 @@ export const Dashboard: React.FC = () => {
                       {/* Show custom categories with delete option */}
                       {getCategories.filter(cat => !isDefaultCategory(cat)).length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {getCategories.filter(cat => !isDefaultCategory(cat)).map(cat => (
-                            <Badge key={cat} variant="secondary" className="gap-1 text-xs">
-                              <Tag className="w-2.5 h-2.5" />
+                          {getCategories.filter(cat => !isDefaultCategory(cat)).map(cat => {
+                            const catColor = getCategoryColor(cat);
+                            return (
+                            <Badge key={cat} variant="outline" className={`gap-1 text-xs ${catColor.bg} ${catColor.text} ${catColor.border}`}>
+                              <span className={`w-2 h-2 rounded-full ${catColor.dot}`} />
                               {cat}
                               <button
                                 onClick={() => handleDeleteCategory(cat)}
@@ -532,7 +539,8 @@ export const Dashboard: React.FC = () => {
                                 <X className="w-2.5 h-2.5" />
                               </button>
                             </Badge>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

@@ -37,6 +37,7 @@ import {
 import { format } from 'date-fns';
 import { PerformanceCertificate } from '@/components/profile/PerformanceCertificate';
 import { AchievementGrid } from '@/components/profile/AchievementGrid';
+import { WeeklyReport } from '@/components/profile/WeeklyReport';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -306,6 +307,9 @@ export const AgentProfile: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Weekly Performance Report */}
+      <WeeklyReport />
 
       {/* Achievements Section with Sharing */}
       <AchievementGrid

@@ -27,6 +27,19 @@ export interface ExportedPresets {
 
 export const DEFAULT_CATEGORIES = ['Work', 'Personal', 'Reports', 'Team'] as const;
 
+const getCustomCategoriesFromStorage = (storageKey: string): string[] => {
+  try {
+    const saved = localStorage.getItem(`${storageKey}-categories`);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomCategoriesToStorage = (storageKey: string, categories: string[]) => {
+  localStorage.setItem(`${storageKey}-categories`, JSON.stringify(categories));
+};
+
 // URL-safe base64 encoding/decoding
 const encodePresets = (presets: CustomPreset[]): string => {
   const data = JSON.stringify(presets.map(p => ({
@@ -64,6 +77,83 @@ export function useCustomFilterPresets(storageKey: string) {
       return [];
     }
   });
+
+  const [customCategories, setCustomCategories] = useState<string[]>(() => 
+    getCustomCategoriesFromStorage(storageKey)
+  );
+
+  const addCategory = useCallback((category: string) => {
+    const trimmed = category.trim();
+    if (!trimmed) return false;
+    
+    // Check if already exists in default or custom categories
+    if (DEFAULT_CATEGORIES.includes(trimmed as any) || customCategories.includes(trimmed)) {
+      return false;
+    }
+    
+    setCustomCategories(prev => {
+      const updated = [...prev, trimmed];
+      saveCustomCategoriesToStorage(storageKey, updated);
+      return updated;
+    });
+    return true;
+  }, [storageKey, customCategories]);
+
+  const deleteCategory = useCallback((category: string) => {
+    // Can't delete default categories
+    if (DEFAULT_CATEGORIES.includes(category as any)) {
+      return false;
+    }
+    
+    setCustomCategories(prev => {
+      const updated = prev.filter(c => c !== category);
+      saveCustomCategoriesToStorage(storageKey, updated);
+      return updated;
+    });
+    
+    // Update presets that had this category to be uncategorized
+    setCustomPresets(prev => {
+      const updated = prev.map(p => 
+        p.category === category ? { ...p, category: undefined } : p
+      );
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
+    
+    return true;
+  }, [storageKey]);
+
+  const renameCategory = useCallback((oldName: string, newName: string) => {
+    const trimmedNew = newName.trim();
+    if (!trimmedNew) return false;
+    
+    // Can't rename default categories
+    if (DEFAULT_CATEGORIES.includes(oldName as any)) {
+      return false;
+    }
+    
+    // Check if new name already exists
+    if (DEFAULT_CATEGORIES.includes(trimmedNew as any) || customCategories.includes(trimmedNew)) {
+      return false;
+    }
+    
+    setCustomCategories(prev => {
+      const updated = prev.map(c => c === oldName ? trimmedNew : c);
+      saveCustomCategoriesToStorage(storageKey, updated);
+      return updated;
+    });
+    
+    // Update presets that had this category
+    setCustomPresets(prev => {
+      const updated = prev.map(p => 
+        p.category === oldName ? { ...p, category: trimmedNew } : p
+      );
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
+    
+    return true;
+  }, [storageKey, customCategories]);
 
   // Check for shared presets in URL on mount
   useEffect(() => {
@@ -103,12 +193,16 @@ export function useCustomFilterPresets(storageKey: string) {
   }, [storageKey]);
 
   const getCategories = useMemo(() => {
-    const customCategories = customPresets
+    const presetCategories = customPresets
       .map(p => p.category)
       .filter((c): c is string => Boolean(c));
-    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])];
+    const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories, ...presetCategories])];
     return allCategories.sort();
-  }, [customPresets]);
+  }, [customPresets, customCategories]);
+
+  const isDefaultCategory = useCallback((category: string): boolean => {
+    return DEFAULT_CATEGORIES.includes(category as any);
+  }, []);
 
   const getPresetsByCategory = useMemo(() => {
     const grouped: Record<string, CustomPreset[]> = { 'Uncategorized': [] };
@@ -342,5 +436,10 @@ export function useCustomFilterPresets(storageKey: string) {
     fileInputRef,
     getCategories,
     getPresetsByCategory,
+    customCategories,
+    addCategory,
+    deleteCategory,
+    renameCategory,
+    isDefaultCategory,
   };
 }

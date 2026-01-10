@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -60,8 +60,10 @@ export const Dashboard: React.FC = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetCategory, setNewPresetCategory] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory } = useCustomFilterPresets('dashboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, deleteCategory, isDefaultCategory } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -144,7 +146,37 @@ export const Dashboard: React.FC = () => {
     toast.success(`Saved preset "${newPresetName.trim()}"`);
     setNewPresetName('');
     setNewPresetCategory('');
+    setIsCreatingCategory(false);
+    setNewCategoryName('');
     setSaveDialogOpen(false);
+  };
+
+  const handleCreateCategory = () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Please enter a category name');
+      return;
+    }
+    const success = addCategory(newCategoryName.trim());
+    if (success) {
+      setNewPresetCategory(newCategoryName.trim());
+      toast.success(`Created category "${newCategoryName.trim()}"`);
+    } else {
+      toast.error('Category already exists');
+    }
+    setNewCategoryName('');
+    setIsCreatingCategory(false);
+  };
+
+  const handleDeleteCategory = (category: string) => {
+    const success = deleteCategory(category);
+    if (success) {
+      toast.success(`Deleted category "${category}"`);
+      if (newPresetCategory === category) {
+        setNewPresetCategory('');
+      }
+    } else {
+      toast.error('Cannot delete default categories');
+    }
   };
 
   const handleDeletePreset = (preset: CustomPreset) => {
@@ -438,22 +470,71 @@ export const Dashboard: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="preset-category">Category (optional)</Label>
-                      <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
-                        <SelectTrigger id="preset-category">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">No category</SelectItem>
-                          {getCategories.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              <div className="flex items-center gap-2">
-                                <Tag className="w-3 h-3" />
-                                {cat}
-                              </div>
-                            </SelectItem>
+                      {isCreatingCategory ? (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="New category name"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={handleCreateCategory}>
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            setIsCreatingCategory(false);
+                            setNewCategoryName('');
+                          }}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
+                          <SelectTrigger id="preset-category">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">No category</SelectItem>
+                            {getCategories.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                <div className="flex items-center gap-2">
+                                  <Tag className="w-3 h-3" />
+                                  {cat}
+                                  {!isDefaultCategory(cat) && (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">Custom</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <div 
+                              className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                              onClick={() => setIsCreatingCategory(true)}
+                            >
+                              <Plus className="w-3 h-3" />
+                              Create new category
+                            </div>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {/* Show custom categories with delete option */}
+                      {getCategories.filter(cat => !isDefaultCategory(cat)).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {getCategories.filter(cat => !isDefaultCategory(cat)).map(cat => (
+                            <Badge key={cat} variant="secondary" className="gap-1 text-xs">
+                              <Tag className="w-2.5 h-2.5" />
+                              {cat}
+                              <button
+                                onClick={() => handleDeleteCategory(cat)}
+                                className="ml-0.5 hover:text-destructive"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      )}
                     </div>
                     <div className="rounded-lg bg-muted p-3 space-y-1">
                       <p className="text-sm font-medium">Current Filters:</p>
@@ -480,6 +561,7 @@ export const Dashboard: React.FC = () => {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              
               
               {/* Import/Export */}
               <DropdownMenu>

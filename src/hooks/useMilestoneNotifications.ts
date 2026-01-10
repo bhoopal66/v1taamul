@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { EarnedMilestone } from './useStreakMilestones';
 import { GoalMetric } from './useAgentGoals';
+import { playCelebrationSound } from './useCelebrationSound';
 
 const SEEN_MILESTONES_KEY = 'seen_streak_milestones';
 
@@ -81,13 +82,15 @@ export const useMilestoneNotifications = (earnedMilestones: EarnedMilestone[]) =
       seenMilestones.add(milestoneKey);
       saveSeen(seenMilestones);
 
-      // Show celebration toast
-      const emoji = rarityEmojis[milestone.rarity] || '🎉';
+      // Get message for rarity
       const message = rarityMessages[milestone.rarity] || 'Congratulations!';
       const metricLabel = metricLabels[milestone.metric];
       
-      // Delay slightly for dramatic effect
+      // Delay slightly for dramatic effect, then play sound and show toast
       setTimeout(() => {
+        // Play celebration sound based on rarity
+        playCelebrationSound(milestone.rarity as 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary');
+        
         if (milestone.rarity === 'legendary') {
           toast.success(
             `${milestone.icon} LEGENDARY BADGE UNLOCKED! ${milestone.name} - ${milestone.description} (${metricLabel} ${milestone.goalType})`,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -278,22 +278,39 @@ export const Leaderboard: React.FC = () => {
     description: string;
     timePeriod: TimePeriod;
     leadStatus: LeadStatusFilter;
+    shortcut?: string;
   }
 
   const filterPresets: FilterPreset[] = [
-    { name: "Today's Rankings", description: 'Live standings today', timePeriod: 'today', leadStatus: 'all' },
-    { name: 'Weekly Performance', description: 'This week rankings', timePeriod: 'this_week', leadStatus: 'all' },
-    { name: 'Monthly Champions', description: 'Full month standings', timePeriod: 'this_month', leadStatus: 'all' },
-    { name: 'Top Converters', description: 'This week with leads', timePeriod: 'this_week', leadStatus: 'matched' },
+    { name: "Today's Rankings", description: 'Live standings today', timePeriod: 'today', leadStatus: 'all', shortcut: '1' },
+    { name: 'Weekly Performance', description: 'This week rankings', timePeriod: 'this_week', leadStatus: 'all', shortcut: '2' },
+    { name: 'Monthly Champions', description: 'Full month standings', timePeriod: 'this_month', leadStatus: 'all', shortcut: '3' },
+    { name: 'Top Converters', description: 'This week with leads', timePeriod: 'this_week', leadStatus: 'matched', shortcut: '4' },
     { name: 'All-Time Legends', description: 'Career rankings', timePeriod: 'all_time', leadStatus: 'all' },
     { name: 'Need Support', description: 'No leads this week', timePeriod: 'this_week', leadStatus: 'unmatched' },
     { name: 'Last Week Review', description: 'Previous week analysis', timePeriod: 'last_week', leadStatus: 'all' },
   ];
 
-  const applyPreset = (preset: FilterPreset) => {
+  const applyPreset = useCallback((preset: FilterPreset) => {
     handleTimePeriodChange(preset.timePeriod);
     handleLeadStatusChange(preset.leadStatus);
-  };
+  }, []);
+
+  // Keyboard shortcuts for filter presets (Ctrl+1, Ctrl+2, etc.)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        const preset = filterPresets.find(p => p.shortcut === e.key);
+        if (preset) {
+          e.preventDefault();
+          applyPreset(preset);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [applyPreset]);
 
   if (isLoading) {
     return (
@@ -383,10 +400,17 @@ export const Leaderboard: React.FC = () => {
                 <DropdownMenuItem
                   key={preset.name}
                   onClick={() => applyPreset(preset)}
-                  className="flex flex-col items-start gap-0.5 cursor-pointer"
+                  className="flex items-start justify-between gap-2 cursor-pointer"
                 >
-                  <span className="font-medium">{preset.name}</span>
-                  <span className="text-xs text-muted-foreground">{preset.description}</span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium">{preset.name}</span>
+                    <span className="text-xs text-muted-foreground">{preset.description}</span>
+                  </div>
+                  {preset.shortcut && (
+                    <kbd className="pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 flex">
+                      <span className="text-xs">⌘</span>{preset.shortcut}
+                    </kbd>
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

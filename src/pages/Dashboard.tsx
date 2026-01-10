@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap } from 'lucide-react';
@@ -23,13 +23,14 @@ interface FilterPreset {
   description: string;
   timePeriod: DashboardTimePeriod;
   leadStatus: DashboardLeadStatusFilter;
+  shortcut?: string;
 }
 
 const filterPresets: FilterPreset[] = [
-  { name: "Today's Focus", description: 'All activity today', timePeriod: 'today', leadStatus: 'all' },
-  { name: 'Weekly Review', description: "This week's performance", timePeriod: 'this_week', leadStatus: 'all' },
-  { name: 'Monthly Overview', description: 'Full month analysis', timePeriod: 'this_month', leadStatus: 'all' },
-  { name: 'Hot Leads', description: "Today's matched leads", timePeriod: 'today', leadStatus: 'matched' },
+  { name: "Today's Focus", description: 'All activity today', timePeriod: 'today', leadStatus: 'all', shortcut: '1' },
+  { name: 'Weekly Review', description: "This week's performance", timePeriod: 'this_week', leadStatus: 'all', shortcut: '2' },
+  { name: 'Monthly Overview', description: 'Full month analysis', timePeriod: 'this_month', leadStatus: 'all', shortcut: '3' },
+  { name: 'Hot Leads', description: "Today's matched leads", timePeriod: 'today', leadStatus: 'matched', shortcut: '4' },
   { name: 'Weekly Conversions', description: "This week's matched leads", timePeriod: 'this_week', leadStatus: 'matched' },
   { name: 'Needs Follow-up', description: 'Unmatched this week', timePeriod: 'this_week', leadStatus: 'unmatched' },
   { name: '6 Month Trend', description: 'Long-term performance', timePeriod: 'six_months', leadStatus: 'all' },
@@ -58,10 +59,26 @@ export const Dashboard: React.FC = () => {
     localStorage.setItem('dashboard-lead-filter', value);
   };
 
-  const applyPreset = (preset: FilterPreset) => {
+  const applyPreset = useCallback((preset: FilterPreset) => {
     handleTimePeriodChange(preset.timePeriod);
     handleLeadStatusChange(preset.leadStatus);
-  };
+  }, []);
+
+  // Keyboard shortcuts for filter presets (Ctrl+1, Ctrl+2, etc.)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        const preset = filterPresets.find(p => p.shortcut === e.key);
+        if (preset) {
+          e.preventDefault();
+          applyPreset(preset);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [applyPreset]);
   
   const { myStats, hourlyData, weeklyData, recentActivity, leaderboard, isLoading, refetch } = usePerformanceData({
     timePeriod,
@@ -160,10 +177,17 @@ export const Dashboard: React.FC = () => {
                   <DropdownMenuItem
                     key={preset.name}
                     onClick={() => applyPreset(preset)}
-                    className="flex flex-col items-start gap-0.5 cursor-pointer"
+                    className="flex items-start justify-between gap-2 cursor-pointer"
                   >
-                    <span className="font-medium">{preset.name}</span>
-                    <span className="text-xs text-muted-foreground">{preset.description}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{preset.name}</span>
+                      <span className="text-xs text-muted-foreground">{preset.description}</span>
+                    </div>
+                    {preset.shortcut && (
+                      <kbd className="pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 flex">
+                        <span className="text-xs">⌘</span>{preset.shortcut}
+                      </kbd>
+                    )}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

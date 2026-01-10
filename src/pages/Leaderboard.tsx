@@ -45,7 +45,8 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
-import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES } from '@/hooks/useCustomFilterPresets';
+import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES, CUSTOM_CATEGORY_COLORS } from '@/hooks/useCustomFilterPresets';
+import { CategoryColorPicker } from '@/components/ui/CategoryColorPicker';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -247,8 +248,9 @@ export const Leaderboard: React.FC = () => {
   const [newPresetCategory, setNewPresetCategory] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryColor, setNewCategoryColor] = useState('Rose');
   
-  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, deleteCategory, isDefaultCategory, getCategoryColor } = useCustomFilterPresets('leaderboard-custom-presets');
+  const { customPresets, savePreset, deletePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, updateCategoryColor, deleteCategory, isDefaultCategory, getCategoryColor, customCategories } = useCustomFilterPresets('leaderboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = React.useState(false);
 
@@ -400,7 +402,7 @@ export const Leaderboard: React.FC = () => {
       toast.error('Please enter a category name');
       return;
     }
-    const success = addCategory(newCategoryName.trim());
+    const success = addCategory(newCategoryName.trim(), newCategoryColor);
     if (success) {
       setNewPresetCategory(newCategoryName.trim());
       toast.success(`Created category "${newCategoryName.trim()}"`);
@@ -408,7 +410,15 @@ export const Leaderboard: React.FC = () => {
       toast.error('Category already exists');
     }
     setNewCategoryName('');
+    setNewCategoryColor('Rose');
     setIsCreatingCategory(false);
+  };
+
+  const handleUpdateCategoryColor = (category: string, colorName: string) => {
+    const success = updateCategoryColor(category, colorName);
+    if (success) {
+      toast.success(`Updated color for "${category}"`);
+    }
   };
 
   const handleDeleteCategory = (category: string) => {
@@ -707,23 +717,34 @@ export const Leaderboard: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="preset-category">Category (optional)</Label>
                   {isCreatingCategory ? (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="New category name"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
-                        autoFocus
-                      />
-                      <Button size="sm" onClick={handleCreateCategory}>
-                        <Check className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setIsCreatingCategory(false);
-                        setNewCategoryName('');
-                      }}>
-                        <X className="w-4 h-4" />
-                      </Button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="New category name"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCreateCategory()}
+                          autoFocus
+                          className="flex-1"
+                        />
+                        <Button size="sm" onClick={handleCreateCategory}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setIsCreatingCategory(false);
+                          setNewCategoryName('');
+                          setNewCategoryColor('Rose');
+                        }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">Color:</Label>
+                        <CategoryColorPicker
+                          selectedColor={newCategoryColor}
+                          onColorSelect={setNewCategoryColor}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
@@ -757,18 +778,23 @@ export const Leaderboard: React.FC = () => {
                       </SelectContent>
                     </Select>
                   )}
-                  {/* Show custom categories with delete option */}
-                  {getCategories.filter(cat => !isDefaultCategory(cat)).length > 0 && (
+                  {/* Show custom categories with color picker and delete option */}
+                  {customCategories.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {getCategories.filter(cat => !isDefaultCategory(cat)).map(cat => {
-                        const catColor = getCategoryColor(cat);
+                      {customCategories.map(cat => {
+                        const catColor = getCategoryColor(cat.name);
                         return (
-                        <Badge key={cat} variant="outline" className={`gap-1 text-xs ${catColor.bg} ${catColor.text} ${catColor.border}`}>
+                        <Badge key={cat.name} variant="outline" className={`gap-1 text-xs ${catColor.bg} ${catColor.text} ${catColor.border} group`}>
                           <span className={`w-2 h-2 rounded-full ${catColor.dot}`} />
-                          {cat}
+                          {cat.name}
+                          <CategoryColorPicker
+                            selectedColor={cat.colorName}
+                            onColorSelect={(color) => handleUpdateCategoryColor(cat.name, color)}
+                            triggerClassName="h-5 px-1 py-0 border-0 bg-transparent hover:bg-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+                          />
                           <button
-                            onClick={() => handleDeleteCategory(cat)}
-                            className="ml-0.5 hover:text-destructive"
+                            onClick={() => handleDeleteCategory(cat.name)}
+                            className="ml-0.5 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-2.5 h-2.5" />
                           </button>

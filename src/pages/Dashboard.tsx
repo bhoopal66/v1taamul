@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -301,10 +303,23 @@ export const Dashboard: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{preset.name}</span>
                                 {analytics && analytics.useCount > 0 && (
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
-                                    <BarChart3 className="w-2.5 h-2.5" />
-                                    {analytics.useCount}
-                                  </Badge>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
+                                          <BarChart3 className="w-2.5 h-2.5" />
+                                          {analytics.useCount}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="text-xs">
+                                        {preset.lastUsedAt ? (
+                                          <span>Last used {formatDistanceToNow(new Date(preset.lastUsedAt), { addSuffix: true })}</span>
+                                        ) : (
+                                          <span>Never used</span>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
                               </div>
                               <span className="text-xs text-muted-foreground">

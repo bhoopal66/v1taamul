@@ -44,6 +44,8 @@ import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilt
 import { useCustomFilterPresets, CustomPreset } from '@/hooks/useCustomFilterPresets';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
 
 const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   if (rank === 1) {
@@ -532,10 +534,23 @@ export const Leaderboard: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{preset.name}</span>
                             {analytics && analytics.useCount > 0 && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5">
-                                <BarChart3 className="w-2.5 h-2.5" />
-                                {analytics.useCount}
-                              </Badge>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 gap-0.5 cursor-help">
+                                      <BarChart3 className="w-2.5 h-2.5" />
+                                      {analytics.useCount}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    {preset.lastUsedAt ? (
+                                      <span>Last used {formatDistanceToNow(new Date(preset.lastUsedAt), { addSuffix: true })}</span>
+                                    ) : (
+                                      <span>Never used</span>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">

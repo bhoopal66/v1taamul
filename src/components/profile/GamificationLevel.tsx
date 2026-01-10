@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sparkles, Star, TrendingUp, Lock, Unlock, ChevronRight, Zap } from 'lucide-react';
 import { useAgentLevel, LEVEL_TIERS, AgentLevelData } from '@/hooks/useAgentLevel';
+import { useLevelUpCelebration } from '@/hooks/useLevelUpCelebration';
 import { GoalStreak } from '@/hooks/useAgentGoals';
 import { cn } from '@/lib/utils';
 
@@ -206,6 +207,12 @@ const LevelRoadmap: React.FC<{ levelData: AgentLevelData }> = ({ levelData }) =>
 
 export const GamificationLevel: React.FC<GamificationLevelProps> = ({ completedCount, streaks, loginStreak = 0 }) => {
   const levelData = useAgentLevel({ completedCount, streaks, loginStreak });
+  
+  // Hook to detect level-ups and trigger celebrations
+  useLevelUpCelebration({ 
+    currentLevel: levelData.currentLevel, 
+    totalXP: levelData.totalXP 
+  });
 
   return (
     <Card className="overflow-hidden">

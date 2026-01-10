@@ -290,6 +290,7 @@ export type Database = {
           expected_close_date: string | null
           id: string
           lead_score: number | null
+          lead_source: string | null
           lead_status: Database["public"]["Enums"]["lead_status"] | null
           notes: string | null
           qualified_date: string | null
@@ -303,6 +304,7 @@ export type Database = {
           expected_close_date?: string | null
           id?: string
           lead_score?: number | null
+          lead_source?: string | null
           lead_status?: Database["public"]["Enums"]["lead_status"] | null
           notes?: string | null
           qualified_date?: string | null
@@ -316,6 +318,7 @@ export type Database = {
           expected_close_date?: string | null
           id?: string
           lead_score?: number | null
+          lead_source?: string | null
           lead_status?: Database["public"]["Enums"]["lead_status"] | null
           notes?: string | null
           qualified_date?: string | null

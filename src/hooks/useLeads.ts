@@ -4,6 +4,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
+export type LeadSource = 'cold_call' | 'referral' | 'website' | 'social_media' | 'event' | 'inbound_call' | 'email_campaign' | 'partner';
+
+export const LEAD_SOURCES: { value: LeadSource; label: string; icon: string }[] = [
+  { value: 'cold_call', label: 'Cold Call', icon: '📞' },
+  { value: 'referral', label: 'Referral', icon: '🤝' },
+  { value: 'website', label: 'Website', icon: '🌐' },
+  { value: 'social_media', label: 'Social Media', icon: '📱' },
+  { value: 'event', label: 'Event', icon: '🎪' },
+  { value: 'inbound_call', label: 'Inbound Call', icon: '📲' },
+  { value: 'email_campaign', label: 'Email Campaign', icon: '📧' },
+  { value: 'partner', label: 'Partner', icon: '🏢' },
+];
 
 export interface Lead {
   id: string;
@@ -15,6 +27,7 @@ export interface Lead {
   industry: string | null;
   leadStatus: LeadStatus;
   leadScore: number;
+  leadSource: LeadSource;
   dealValue: number | null;
   expectedCloseDate: string | null;
   qualifiedDate: string | null;
@@ -73,6 +86,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         industry: item.master_contacts?.industry || null,
         leadStatus: (item.lead_status || 'new') as LeadStatus,
         leadScore: item.lead_score || 0,
+        leadSource: ((item as any).lead_source || 'cold_call') as LeadSource,
         dealValue: item.deal_value,
         expectedCloseDate: item.expected_close_date,
         qualifiedDate: item.qualified_date,
@@ -103,6 +117,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
       updates: {
         lead_status?: LeadStatus;
         lead_score?: number;
+        lead_source?: LeadSource;
         deal_value?: number | null;
         expected_close_date?: string | null;
         notes?: string | null;
@@ -146,6 +161,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
     leadId: string,
     details: {
       lead_score?: number;
+      lead_source?: LeadSource;
       deal_value?: number | null;
       expected_close_date?: string | null;
       notes?: string | null;

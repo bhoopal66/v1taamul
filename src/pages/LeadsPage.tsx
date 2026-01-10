@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLeads, Lead, LeadStatus } from '@/hooks/useLeads';
+import { useLeads, Lead, LeadStatus, LeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
 import { useLeadScoring, getScoreLabel } from '@/hooks/useLeadScoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
 import { LeadActivityTimeline } from '@/components/leads/LeadActivityTimeline';
+import { LeadSourceAnalytics } from '@/components/leads/LeadSourceAnalytics';
 import { 
   Target, 
   Phone, 
@@ -39,10 +40,11 @@ import {
   RefreshCw,
   Zap,
   Bell,
+  Megaphone,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup';
+type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup' | 'sources';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'bg-blue-500', icon: Sparkles },
@@ -63,6 +65,7 @@ export const LeadsPage = () => {
     expectedCloseDate: '',
     notes: '',
     leadScore: '',
+    leadSource: 'cold_call' as LeadSource,
   });
 
   const { leads, stats, isLoading, updateLeadStatus, updateLeadDetails, isUpdating } = useLeads(statusFilter);
@@ -87,6 +90,7 @@ export const LeadsPage = () => {
       expectedCloseDate: lead.expectedCloseDate || '',
       notes: lead.notes || '',
       leadScore: lead.leadScore?.toString() || '0',
+      leadSource: lead.leadSource || 'cold_call',
     });
     setEditDialogOpen(true);
   };
@@ -98,6 +102,7 @@ export const LeadsPage = () => {
       expected_close_date: editForm.expectedCloseDate || null,
       notes: editForm.notes || null,
       lead_score: parseInt(editForm.leadScore) || 0,
+      lead_source: editForm.leadSource,
     });
     setEditDialogOpen(false);
     setSelectedLead(null);
@@ -196,6 +201,15 @@ export const LeadsPage = () => {
             >
               <Bell className="w-4 h-4 mr-1" />
               Follow-ups
+            </Button>
+            <Button
+              variant={viewMode === 'sources' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('sources')}
+            >
+              <Megaphone className="w-4 h-4 mr-1" />
+              Sources
             </Button>
           </div>
           <TooltipProvider>
@@ -313,6 +327,11 @@ export const LeadsPage = () => {
           onEditLead={handleEditLead}
           onUpdateStatus={updateLeadStatus}
         />
+      )}
+
+      {/* Lead Source Analytics View */}
+      {viewMode === 'sources' && (
+        <LeadSourceAnalytics leads={leads} />
       )}
 
       {/* Leads List - Only show in list view */}
@@ -539,14 +558,37 @@ export const LeadsPage = () => {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
-                  <Input
-                    id="expectedCloseDate"
-                    type="date"
-                    value={editForm.expectedCloseDate}
-                    onChange={(e) => setEditForm(f => ({ ...f, expectedCloseDate: e.target.value }))}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
+                    <Input
+                      id="expectedCloseDate"
+                      type="date"
+                      value={editForm.expectedCloseDate}
+                      onChange={(e) => setEditForm(f => ({ ...f, expectedCloseDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="leadSource">Lead Source</Label>
+                    <Select 
+                      value={editForm.leadSource} 
+                      onValueChange={(v) => setEditForm(f => ({ ...f, leadSource: v as LeadSource }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LEAD_SOURCES.map(source => (
+                          <SelectItem key={source.value} value={source.value}>
+                            <span className="flex items-center gap-2">
+                              <span>{source.icon}</span>
+                              <span>{source.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>

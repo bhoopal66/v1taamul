@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
+import { LeadActivityTimeline } from '@/components/leads/LeadActivityTimeline';
 import { 
   Target, 
   Phone, 
@@ -504,55 +505,67 @@ export const LeadsPage = () => {
 
       {/* Edit Lead Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Lead Details</DialogTitle>
             <DialogDescription>
               Update the deal information for {selectedLead?.companyName}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="dealValue">Deal Value (AED)</Label>
-                <Input
-                  id="dealValue"
-                  type="number"
-                  placeholder="0"
-                  value={editForm.dealValue}
-                  onChange={(e) => setEditForm(f => ({ ...f, dealValue: e.target.value }))}
-                />
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid md:grid-cols-2 gap-6 py-4">
+              {/* Left Column - Edit Form */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dealValue">Deal Value (AED)</Label>
+                    <Input
+                      id="dealValue"
+                      type="number"
+                      placeholder="0"
+                      value={editForm.dealValue}
+                      onChange={(e) => setEditForm(f => ({ ...f, dealValue: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="leadScore">Lead Score (0-100)</Label>
+                    <Input
+                      id="leadScore"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editForm.leadScore}
+                      onChange={(e) => setEditForm(f => ({ ...f, leadScore: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
+                  <Input
+                    id="expectedCloseDate"
+                    type="date"
+                    value={editForm.expectedCloseDate}
+                    onChange={(e) => setEditForm(f => ({ ...f, expectedCloseDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Add notes about this lead..."
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="leadScore">Lead Score (1-10)</Label>
-                <Input
-                  id="leadScore"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={editForm.leadScore}
-                  onChange={(e) => setEditForm(f => ({ ...f, leadScore: e.target.value }))}
-                />
+
+              {/* Right Column - Activity Timeline */}
+              <div className="border-l pl-6">
+                {selectedLead && (
+                  <LeadActivityTimeline contactId={selectedLead.contactId} />
+                )}
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
-              <Input
-                id="expectedCloseDate"
-                type="date"
-                value={editForm.expectedCloseDate}
-                onChange={(e) => setEditForm(f => ({ ...f, expectedCloseDate: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add notes about this lead..."
-                value={editForm.notes}
-                onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                rows={3}
-              />
             </div>
           </div>
           <DialogFooter>

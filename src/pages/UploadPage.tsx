@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -23,10 +22,10 @@ import {
   History,
   Info,
   Loader2,
-  RefreshCw,
   FileCheck,
   AlertCircle,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useCallSheetUpload, ParsedContact } from '@/hooks/useCallSheetUpload';
 import { cn } from '@/lib/utils';
@@ -48,6 +47,43 @@ export const UploadPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'valid' | 'invalid'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = useCallback(() => {
+    const sampleData = [
+      {
+        company_name: 'ABC Trading LLC',
+        contact_person_name: 'John Smith',
+        phone_number: '+971501234567',
+        trade_license_number: 'TL-12345',
+        city: 'Dubai',
+        industry: 'Trading',
+      },
+      {
+        company_name: 'XYZ Services',
+        contact_person_name: 'Jane Doe',
+        phone_number: '+971502345678',
+        trade_license_number: 'TL-67890',
+        city: 'Abu Dhabi',
+        industry: 'Services',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // company_name
+      { wch: 20 }, // contact_person_name
+      { wch: 18 }, // phone_number
+      { wch: 18 }, // trade_license_number
+      { wch: 12 }, // city
+      { wch: 12 }, // industry
+    ];
+
+    XLSX.writeFile(workbook, 'call_sheet_template.xlsx');
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -159,6 +195,10 @@ export const UploadPage: React.FC = () => {
             </p>
           </div>
         </div>
+        <Button variant="outline" onClick={downloadTemplate} className="gap-2">
+          <Download className="w-4 h-4" />
+          Download Template
+        </Button>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">

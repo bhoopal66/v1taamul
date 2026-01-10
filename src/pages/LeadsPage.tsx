@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
+import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
 import { 
   Target, 
   Phone, 
@@ -36,10 +37,11 @@ import {
   BarChart3,
   RefreshCw,
   Zap,
+  Bell,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-type ViewMode = 'list' | 'kanban' | 'analytics';
+type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'bg-blue-500', icon: Sparkles },
@@ -185,6 +187,15 @@ export const LeadsPage = () => {
               <BarChart3 className="w-4 h-4 mr-1" />
               Analytics
             </Button>
+            <Button
+              variant={viewMode === 'followup' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('followup')}
+            >
+              <Bell className="w-4 h-4 mr-1" />
+              Follow-ups
+            </Button>
           </div>
           <TooltipProvider>
             <Tooltip>
@@ -292,6 +303,15 @@ export const LeadsPage = () => {
       {/* Analytics View */}
       {viewMode === 'analytics' && (
         <LeadAnalytics leads={leads} />
+      )}
+
+      {/* Follow-up Reminders View */}
+      {viewMode === 'followup' && (
+        <LeadFollowUpList
+          leads={leads}
+          onEditLead={handleEditLead}
+          onUpdateStatus={updateLeadStatus}
+        />
       )}
 
       {/* Leads List - Only show in list view */}

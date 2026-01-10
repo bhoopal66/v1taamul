@@ -903,7 +903,12 @@ export const Dashboard: React.FC = () => {
           />
           
           {/* Agent Performance List */}
-          <AgentPerformanceList agents={agentStats} isLoading={allAgentsLoading} />
+          <AgentPerformanceList 
+            agents={agentStats} 
+            isLoading={allAgentsLoading} 
+            summary={allAgentsSummary}
+            dateRangeLabel={dateRangeLabel}
+          />
           
           {/* Team Leaderboard */}
           <TeamLeaderboard data={leaderboard} isLoading={isLoading} />

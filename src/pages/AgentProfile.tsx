@@ -4,7 +4,6 @@ import { useAgentProfile } from '@/hooks/useAgentProfile';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { 
@@ -17,7 +16,6 @@ import {
   Bar,
   LineChart,
   Line,
-  ResponsiveContainer,
   ComposedChart
 } from 'recharts';
 import { 
@@ -37,6 +35,8 @@ import {
   Activity
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { PerformanceCertificate } from '@/components/profile/PerformanceCertificate';
+import { AchievementGrid } from '@/components/profile/AchievementGrid';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -307,79 +307,29 @@ export const AgentProfile: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Achievements Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Earned Achievements */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-primary" />
-              Earned Achievements
-              <Badge variant="secondary" className="ml-2">{earnedAchievements.length}</Badge>
-            </CardTitle>
-            <CardDescription>Milestones you've achieved</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {earnedAchievements.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Trophy className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No achievements yet</p>
-                <p className="text-sm">Start making calls to earn achievements!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {earnedAchievements.map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 text-center"
-                  >
-                    <span className="text-3xl mb-2">{achievement.icon}</span>
-                    <h4 className="font-semibold text-sm">{achievement.title}</h4>
-                    <p className="text-xs text-muted-foreground mt-1">{achievement.description}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Achievements Section with Sharing */}
+      <AchievementGrid
+        earnedAchievements={earnedAchievements}
+        inProgressAchievements={inProgressAchievements}
+        agentName={authProfile?.full_name || 'Agent'}
+      />
 
-        {/* In Progress Achievements */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-warning" />
-              In Progress
-              <Badge variant="outline" className="ml-2">{inProgressAchievements.length}</Badge>
-            </CardTitle>
-            <CardDescription>Keep going to unlock these</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {inProgressAchievements.slice(0, 5).map((achievement) => (
-                <div
-                  key={achievement.id}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 border"
-                >
-                  <span className="text-2xl opacity-50">{achievement.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-medium text-sm">{achievement.title}</h4>
-                      <span className="text-xs text-muted-foreground">
-                        {achievement.progress}/{achievement.target}
-                      </span>
-                    </div>
-                    <Progress 
-                      value={(achievement.progress / achievement.target) * 100} 
-                      className="h-2"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">{achievement.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Performance Certificate */}
+      <PerformanceCertificate
+        data={{
+          agentName: authProfile?.full_name || 'Agent',
+          totalCalls: profileStats.totalCallsAllTime,
+          totalInterested: profileStats.totalInterestedAllTime,
+          totalLeads: profileStats.totalLeadsAllTime,
+          conversionRate: profileStats.averageConversionRate,
+          rank: profileStats.rank,
+          totalAgents: profileStats.totalAgents,
+          daysActive: profileStats.daysActive,
+          earnedAchievements: earnedAchievements.length,
+          bestDay: profileStats.bestDay,
+          longestStreak: profileStats.longestStreak,
+        }}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

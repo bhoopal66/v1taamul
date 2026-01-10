@@ -100,14 +100,15 @@ export const AppSidebar: React.FC = () => {
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
         <NavItem to="/contacts" icon={<Users className="w-5 h-5" />} label="All Contacts" />
         
-        {(userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin') && (
+        {(userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin') && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-semibold text-sidebar-muted uppercase tracking-wider">
                 Management
               </p>
             </div>
-            <NavItem to="/team" icon={<Users className="w-5 h-5" />} label="Team" />
+            <NavItem to="/supervisor" icon={<BarChart3 className="w-5 h-5" />} label="Team Dashboard" />
+            <NavItem to="/team" icon={<Users className="w-5 h-5" />} label="Agent Management" />
             <NavItem to="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
           </>
         )}

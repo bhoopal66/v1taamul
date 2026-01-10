@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import { Dashboard } from "./pages/Dashboard";
+import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,7 +31,8 @@ const App = () => (
               <Route path="/upload" element={<Dashboard />} />
               <Route path="/leads" element={<Dashboard />} />
               <Route path="/contacts" element={<Dashboard />} />
-              <Route path="/team" element={<Dashboard />} />
+              <Route path="/supervisor" element={<SupervisorDashboard />} />
+              <Route path="/team" element={<SupervisorDashboard />} />
               <Route path="/reports" element={<Dashboard />} />
               <Route path="/messages" element={<Dashboard />} />
               <Route path="/settings" element={<Dashboard />} />

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAgentProfile } from '@/hooks/useAgentProfile';
 import { useAgentGoals } from '@/hooks/useAgentGoals';
+import { useLoginStreak } from '@/hooks/useLoginStreak';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,6 +42,7 @@ import { AchievementGrid } from '@/components/profile/AchievementGrid';
 import { WeeklyReport } from '@/components/profile/WeeklyReport';
 import { GoalTracker } from '@/components/profile/GoalTracker';
 import { StreakMilestones } from '@/components/profile/StreakMilestones';
+import { LoginStreakReminderBanner } from '@/components/profile/LoginStreakReminderBanner';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -61,7 +63,7 @@ export const AgentProfile: React.FC = () => {
     isLoading 
   } = useAgentProfile();
   const { streaks } = useAgentGoals();
-
+  const { streakData } = useLoginStreak();
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -83,6 +85,15 @@ export const AgentProfile: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Login Streak Reminder Banner */}
+      {streakData && (
+        <LoginStreakReminderBanner
+          currentStreak={streakData.currentStreak}
+          lastLoginDate={streakData.lastLoginDate}
+          isNewDay={streakData.isNewDay}
+        />
+      )}
+
       {/* Profile Header */}
       <Card className="overflow-hidden border-0 shadow-lg">
         <div className="h-32 bg-gradient-to-r from-primary via-primary/80 to-primary/60" />

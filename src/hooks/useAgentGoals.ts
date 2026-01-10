@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, isWithinInterval, parseISO } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, isWithinInterval, parseISO, subWeeks, subMonths } from 'date-fns';
 import { toast } from 'sonner';
 
 export type GoalType = 'weekly' | 'monthly';
@@ -16,6 +16,7 @@ export interface Goal {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,14 @@ export interface GoalWithProgress extends Goal {
   progressPercentage: number;
   isCompleted: boolean;
   daysRemaining: number;
+}
+
+export interface GoalStreak {
+  metric: GoalMetric;
+  goalType: GoalType;
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: string | null;
 }
 
 export interface CreateGoalInput {
@@ -47,31 +56,127 @@ const getDateRange = (goalType: GoalType): { start: Date; end: Date } => {
   };
 };
 
+// Calculate streaks from completed goals
+const calculateStreaks = (completedGoals: Goal[]): GoalStreak[] => {
+  const streakMap = new Map<string, { dates: Date[]; goalType: GoalType; metric: GoalMetric }>();
+
+  // Group by goal type and metric
+  completedGoals.forEach(goal => {
+    if (!goal.completed_at) return;
+    const key = `${goal.goal_type}-${goal.metric}`;
+    const existing = streakMap.get(key) || { dates: [], goalType: goal.goal_type, metric: goal.metric };
+    existing.dates.push(parseISO(goal.end_date));
+    streakMap.set(key, existing);
+  });
+
+  const streaks: GoalStreak[] = [];
+
+  streakMap.forEach(({ dates, goalType, metric }) => {
+    // Sort dates descending
+    dates.sort((a, b) => b.getTime() - a.getTime());
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    const today = new Date();
+
+    // Calculate current and longest streaks
+    for (let i = 0; i < dates.length; i++) {
+      const expectedDate = goalType === 'weekly'
+        ? endOfWeek(subWeeks(today, i), { weekStartsOn: 1 })
+        : endOfMonth(subMonths(today, i));
+
+      const dateStr = format(dates[i], 'yyyy-MM-dd');
+      const expectedStr = format(expectedDate, 'yyyy-MM-dd');
+
+      if (i === 0) {
+        // Check if most recent completion is current or previous period
+        const currentPeriodEnd = goalType === 'weekly'
+          ? endOfWeek(today, { weekStartsOn: 1 })
+          : endOfMonth(today);
+        const prevPeriodEnd = goalType === 'weekly'
+          ? endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+          : endOfMonth(subMonths(today, 1));
+
+        const isCurrentOrPrev = 
+          format(dates[i], 'yyyy-MM-dd') === format(currentPeriodEnd, 'yyyy-MM-dd') ||
+          format(dates[i], 'yyyy-MM-dd') === format(prevPeriodEnd, 'yyyy-MM-dd');
+
+        if (isCurrentOrPrev) {
+          tempStreak = 1;
+        }
+      } else if (tempStreak > 0) {
+        // Check consecutive periods
+        const prevDate = dates[i - 1];
+        const expectedPrev = goalType === 'weekly'
+          ? endOfWeek(subWeeks(dates[i], -1), { weekStartsOn: 1 })
+          : endOfMonth(subMonths(dates[i], -1));
+
+        if (format(prevDate, 'yyyy-MM-dd') === format(expectedPrev, 'yyyy-MM-dd')) {
+          tempStreak++;
+        } else {
+          currentStreak = Math.max(currentStreak, tempStreak);
+          tempStreak = 0;
+        }
+      }
+
+      longestStreak = Math.max(longestStreak, tempStreak);
+    }
+
+    currentStreak = tempStreak;
+    longestStreak = Math.max(longestStreak, currentStreak);
+
+    if (dates.length > 0) {
+      streaks.push({
+        metric,
+        goalType,
+        currentStreak,
+        longestStreak,
+        lastCompletedDate: format(dates[0], 'yyyy-MM-dd'),
+      });
+    }
+  });
+
+  return streaks;
+};
+
 export const useAgentGoals = (agentId?: string) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const targetUserId = agentId || user?.id;
 
   // Fetch goals with progress
-  const { data: goals, isLoading } = useQuery({
+  const { data: goalsData, isLoading } = useQuery({
     queryKey: ['agent-goals', targetUserId],
-    queryFn: async (): Promise<GoalWithProgress[]> => {
+    queryFn: async () => {
       if (!targetUserId) throw new Error('No user');
 
-      // Fetch goals
-      const { data: goalsData, error } = await supabase
+      // Fetch all goals (active and completed for streak calculation)
+      const { data: allGoals, error } = await supabase
         .from('agent_goals')
         .select('*')
         .eq('agent_id', targetUserId)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const today = new Date();
       const goalsWithProgress: GoalWithProgress[] = [];
+      const completedGoals: Goal[] = [];
 
-      for (const goal of goalsData || []) {
+      for (const goal of allGoals || []) {
+        // Collect completed goals for streak calculation
+        if (goal.completed_at) {
+          completedGoals.push({
+            ...goal,
+            goal_type: goal.goal_type as GoalType,
+            metric: goal.metric as GoalMetric,
+          });
+        }
+
+        // Only process active goals for current progress
+        if (!goal.is_active) continue;
+
         const startDate = parseISO(goal.start_date);
         const endDate = parseISO(goal.end_date);
         
@@ -118,8 +223,25 @@ export const useAgentGoals = (agentId?: string) => {
           currentValue = totalCalls > 0 ? Math.round((interested / totalCalls) * 100) : 0;
         }
 
+        const isCompleted = currentValue >= goal.target_value;
         const progressPercentage = Math.min(Math.round((currentValue / goal.target_value) * 100), 100);
         const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
+        // Auto-mark as completed if target reached and not already marked
+        if (isCompleted && !goal.completed_at) {
+          await supabase
+            .from('agent_goals')
+            .update({ completed_at: new Date().toISOString() })
+            .eq('id', goal.id);
+          
+          // Add to completed goals for streak
+          completedGoals.push({
+            ...goal,
+            goal_type: goal.goal_type as GoalType,
+            metric: goal.metric as GoalMetric,
+            completed_at: new Date().toISOString(),
+          });
+        }
 
         goalsWithProgress.push({
           ...goal,
@@ -127,12 +249,15 @@ export const useAgentGoals = (agentId?: string) => {
           metric: goal.metric as GoalMetric,
           currentValue,
           progressPercentage,
-          isCompleted: currentValue >= goal.target_value,
+          isCompleted,
           daysRemaining,
         });
       }
 
-      return goalsWithProgress;
+      // Calculate streaks
+      const streaks = calculateStreaks(completedGoals);
+
+      return { goals: goalsWithProgress, streaks, completedCount: completedGoals.length };
     },
     enabled: !!targetUserId,
   });
@@ -143,6 +268,15 @@ export const useAgentGoals = (agentId?: string) => {
       if (!targetUserId) throw new Error('No user');
 
       const { start, end } = getDateRange(input.goal_type);
+
+      // Deactivate existing goals of same type/metric
+      await supabase
+        .from('agent_goals')
+        .update({ is_active: false })
+        .eq('agent_id', targetUserId)
+        .eq('goal_type', input.goal_type)
+        .eq('metric', input.metric)
+        .eq('is_active', true);
 
       const { data, error } = await supabase
         .from('agent_goals')
@@ -211,7 +345,9 @@ export const useAgentGoals = (agentId?: string) => {
   });
 
   return {
-    goals: goals || [],
+    goals: goalsData?.goals || [],
+    streaks: goalsData?.streaks || [],
+    completedCount: goalsData?.completedCount || 0,
     isLoading,
     createGoal: createGoalMutation.mutate,
     updateGoal: updateGoalMutation.mutate,

@@ -22,7 +22,7 @@ import {
   Clock,
   Flame,
 } from 'lucide-react';
-import { useAgentGoals, GoalType, GoalMetric, GoalWithProgress, CreateGoalInput } from '@/hooks/useAgentGoals';
+import { useAgentGoals, GoalType, GoalMetric, GoalWithProgress, GoalStreak, CreateGoalInput } from '@/hooks/useAgentGoals';
 import { cn } from '@/lib/utils';
 
 const metricConfig: Record<GoalMetric, { label: string; icon: React.ReactNode; unit: string; color: string }> = {
@@ -135,6 +135,115 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onDelete }) => {
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+interface StreakDisplayProps {
+  streaks: GoalStreak[];
+}
+
+const StreakDisplay: React.FC<StreakDisplayProps> = ({ streaks }) => {
+  if (streaks.length === 0) return null;
+
+  // Get best streak for display
+  const bestCurrentStreak = streaks.reduce((best, s) => 
+    s.currentStreak > (best?.currentStreak || 0) ? s : best
+  , streaks[0]);
+
+  const totalCompletions = streaks.reduce((sum, s) => sum + s.longestStreak, 0);
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20">
+        <div className="p-2 rounded-full bg-warning/20">
+          <Flame className="w-5 h-5 text-warning" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{bestCurrentStreak?.currentStreak || 0}</p>
+          <p className="text-xs text-muted-foreground">Current Streak</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+        <div className="p-2 rounded-full bg-primary/20">
+          <Trophy className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">
+            {Math.max(...streaks.map(s => s.longestStreak), 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">Best Streak</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-success/10 to-success/5 border border-success/20">
+        <div className="p-2 rounded-full bg-success/20">
+          <CheckCircle2 className="w-5 h-5 text-success" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{streaks.length}</p>
+          <p className="text-xs text-muted-foreground">Active Streaks</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-info/10 to-info/5 border border-info/20">
+        <div className="p-2 rounded-full bg-info/20">
+          <Target className="w-5 h-5 text-info" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{totalCompletions}</p>
+          <p className="text-xs text-muted-foreground">Goals Completed</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Detailed streak cards
+const StreakCards: React.FC<{ streaks: GoalStreak[] }> = ({ streaks }) => {
+  if (streaks.length === 0) return null;
+
+  return (
+    <div className="space-y-3 mb-6">
+      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+        <Flame className="w-4 h-4" />
+        Your Goal Streaks
+      </h4>
+      <div className="grid gap-2 md:grid-cols-2">
+        {streaks.map((streak) => {
+          const config = metricConfig[streak.metric];
+          return (
+            <div 
+              key={`${streak.goalType}-${streak.metric}`}
+              className="flex items-center justify-between p-3 rounded-lg border bg-card"
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn('p-1.5 rounded bg-muted', config.color)}>
+                  {config.icon}
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{config.label}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{streak.goalType}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <p className="text-lg font-bold flex items-center gap-1">
+                    {streak.currentStreak > 0 && <Flame className="w-4 h-4 text-warning" />}
+                    {streak.currentStreak}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Current</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-muted-foreground">{streak.longestStreak}</p>
+                  <p className="text-xs text-muted-foreground">Best</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 
@@ -262,7 +371,7 @@ const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSubmit, isLoading
 };
 
 export const GoalTracker: React.FC = () => {
-  const { goals, isLoading, createGoal, deleteGoal, isCreating } = useAgentGoals();
+  const { goals, streaks, completedCount, isLoading, createGoal, deleteGoal, isCreating } = useAgentGoals();
 
   if (isLoading) {
     return (
@@ -306,23 +415,38 @@ export const GoalTracker: React.FC = () => {
         </div>
 
         {/* Summary Stats */}
-        {goals.length > 0 && (
+        {(goals.length > 0 || streaks.length > 0) && (
           <div className="flex gap-4 mt-4 pt-4 border-t">
             <div className="flex items-center gap-2 text-sm">
               <Trophy className="w-4 h-4 text-success" />
-              <span className="font-medium">{completedGoals.length}</span>
-              <span className="text-muted-foreground">completed</span>
+              <span className="font-medium">{completedCount}</span>
+              <span className="text-muted-foreground">all-time completed</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Target className="w-4 h-4 text-primary" />
               <span className="font-medium">{activeGoals.length}</span>
               <span className="text-muted-foreground">in progress</span>
             </div>
+            {streaks.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Flame className="w-4 h-4 text-warning" />
+                <span className="font-medium">
+                  {Math.max(...streaks.map(s => s.currentStreak), 0)}
+                </span>
+                <span className="text-muted-foreground">best streak</span>
+              </div>
+            )}
           </div>
         )}
       </CardHeader>
 
       <CardContent>
+        {/* Streak Display */}
+        {streaks.length > 0 && <StreakDisplay streaks={streaks} />}
+        
+        {/* Streak Cards */}
+        {streaks.length > 0 && <StreakCards streaks={streaks} />}
+
         {goals.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Target className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -330,15 +454,21 @@ export const GoalTracker: React.FC = () => {
             <p className="text-sm mt-1">Create your first goal to start tracking progress</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {goals.map(goal => (
-              <GoalCard 
-                key={goal.id} 
-                goal={goal} 
-                onDelete={deleteGoal}
-              />
-            ))}
-          </div>
+          <>
+            <h4 className="font-medium text-sm text-muted-foreground mb-3 flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Current Goals
+            </h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              {goals.map(goal => (
+                <GoalCard 
+                  key={goal.id} 
+                  goal={goal} 
+                  onDelete={deleteGoal}
+                />
+              ))}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

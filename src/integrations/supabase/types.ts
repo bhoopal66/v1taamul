@@ -17,6 +17,7 @@ export type Database = {
       agent_goals: {
         Row: {
           agent_id: string
+          completed_at: string | null
           created_at: string
           end_date: string
           goal_type: string
@@ -29,6 +30,7 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          completed_at?: string | null
           created_at?: string
           end_date: string
           goal_type: string
@@ -41,6 +43,7 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          completed_at?: string | null
           created_at?: string
           end_date?: string
           goal_type?: string

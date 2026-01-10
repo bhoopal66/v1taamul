@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatsGrid } from '@/components/dashboard/StatsGrid';
@@ -349,13 +350,30 @@ export const Dashboard: React.FC = () => {
                                 <BarChart3 className="w-3 h-3" />
                                 Usage Analytics
                               </span>
-                              <button
-                                onClick={handleResetUsageStats}
-                                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                <RotateCcw className="w-2.5 h-2.5" />
-                                Reset
-                              </button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <button
+                                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <RotateCcw className="w-2.5 h-2.5" />
+                                    Reset
+                                  </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Reset Usage Statistics?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will clear all usage counts and last used dates for your custom presets. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleResetUsageStats}>
+                                      Reset Stats
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                             <div className="space-y-1">
                               {getPresetAnalytics().slice(0, 3).map(a => (

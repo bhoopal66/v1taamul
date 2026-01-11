@@ -54,6 +54,7 @@ import {
   Loader2,
   AlertTriangle,
   UserPlus,
+  Edit2,
 } from 'lucide-react';
 import { useUserManagement, useCompanyPool, UserWithRole } from '@/hooks/useUserManagement';
 import { exportUserDataToExcel } from '@/utils/userDataExport';
@@ -110,6 +111,17 @@ export const UserManagementPage: React.FC = () => {
     password: '',
     fullName: '',
     role: 'agent' as AppRole,
+  });
+
+  // Edit user state
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [editUserForm, setEditUserForm] = useState({
+    id: '',
+    full_name: '',
+    username: '',
+    phone_number: '',
+    whatsapp_number: '',
   });
 
   // Check if current user has admin access
@@ -195,6 +207,46 @@ export const UserManagementPage: React.FC = () => {
       toast.error(message);
     } finally {
       setIsCreatingUser(false);
+    }
+  };
+
+  const handleEditUser = (user: UserWithRole) => {
+    setEditUserForm({
+      id: user.id,
+      full_name: user.full_name || '',
+      username: user.username || '',
+      phone_number: user.phone_number || '',
+      whatsapp_number: user.whatsapp_number || '',
+    });
+    setEditUserDialogOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    if (!editUserForm.id) return;
+    
+    setIsSavingUser(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editUserForm.full_name,
+          username: editUserForm.username,
+          phone_number: editUserForm.phone_number || null,
+          whatsapp_number: editUserForm.whatsapp_number || null,
+        })
+        .eq('id', editUserForm.id);
+      
+      if (error) throw error;
+      
+      toast.success('User profile updated successfully');
+      setEditUserDialogOpen(false);
+      
+      // Refresh user list
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update user');
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -362,6 +414,10 @@ export const UserManagementPage: React.FC = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="bg-background">
+                                <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                                  <Edit2 className="w-4 h-4 mr-2" />
+                                  Edit Profile
+                                </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onClick={() => setConfirmDialog({ 
                                     open: true, 
@@ -652,6 +708,77 @@ export const UserManagementPage: React.FC = () => {
                 <>
                   <UserPlus className="w-4 h-4 mr-2" />
                   Create User
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="w-5 h-5 text-primary" />
+              Edit User Profile
+            </DialogTitle>
+            <DialogDescription>
+              Update user profile information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-fullName">Full Name</Label>
+              <Input
+                id="edit-fullName"
+                placeholder="John Doe"
+                value={editUserForm.full_name}
+                onChange={(e) => setEditUserForm(f => ({ ...f, full_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-username">Username</Label>
+              <Input
+                id="edit-username"
+                placeholder="johndoe"
+                value={editUserForm.username}
+                onChange={(e) => setEditUserForm(f => ({ ...f, username: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone Number</Label>
+              <Input
+                id="edit-phone"
+                placeholder="+971 50 123 4567"
+                value={editUserForm.phone_number}
+                onChange={(e) => setEditUserForm(f => ({ ...f, phone_number: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-whatsapp">WhatsApp Number</Label>
+              <Input
+                id="edit-whatsapp"
+                placeholder="+971 50 123 4567"
+                value={editUserForm.whatsapp_number}
+                onChange={(e) => setEditUserForm(f => ({ ...f, whatsapp_number: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUserDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveUser} disabled={isSavingUser}>
+              {isSavingUser ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Save Changes
                 </>
               )}
             </Button>

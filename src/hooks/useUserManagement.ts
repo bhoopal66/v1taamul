@@ -10,6 +10,8 @@ export interface UserWithRole {
   email: string;
   full_name: string | null;
   username: string;
+  phone_number: string | null;
+  whatsapp_number: string | null;
   is_active: boolean | null;
   created_at: string | null;
   last_login: string | null;
@@ -52,6 +54,8 @@ export const useUserManagement = () => {
         email: profile.email,
         full_name: profile.full_name,
         username: profile.username,
+        phone_number: profile.phone_number,
+        whatsapp_number: profile.whatsapp_number,
         is_active: profile.is_active,
         created_at: profile.created_at,
         last_login: profile.last_login,

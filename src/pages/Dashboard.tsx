@@ -32,6 +32,7 @@ import { LeadPipelineFunnel } from '@/components/dashboard/LeadPipelineFunnel';
 import { PerformanceStreakCards } from '@/components/dashboard/PerformanceStreakCards';
 import { CallsTargetGauge } from '@/components/dashboard/CallsTargetGauge';
 import { TeamActivityTimeline } from '@/components/dashboard/TeamActivityTimeline';
+import { RealtimeNotificationsPanel } from '@/components/dashboard/RealtimeNotificationsPanel';
 
 import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
@@ -950,13 +951,19 @@ export const Dashboard: React.FC = () => {
       {/* Performance Alerts */}
       <MyPerformanceAlerts />
 
-      {/* Team Stats Grid */}
-      <AllAgentsStatsGrid 
-        summary={allAgentsSummary} 
-        isLoading={allAgentsLoading} 
-        onRefresh={refetchAllAgents}
-        dateRangeLabel={dateRangeLabel}
-      />
+      {/* Real-time Notifications and Stats Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* Team Stats Grid */}
+          <AllAgentsStatsGrid 
+            summary={allAgentsSummary} 
+            isLoading={allAgentsLoading} 
+            onRefresh={refetchAllAgents}
+            dateRangeLabel={dateRangeLabel}
+          />
+        </div>
+        <RealtimeNotificationsPanel />
+      </div>
 
       {/* Performance Streak Cards */}
       <PerformanceStreakCards data={streakData} isLoading={widgetsLoading} />

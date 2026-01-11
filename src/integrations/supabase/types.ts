@@ -849,6 +849,7 @@ export type Database = {
         Returns: boolean
       }
       move_old_contacts_to_pool: { Args: never; Returns: number }
+      trigger_performance_check: { Args: never; Returns: undefined }
       update_login_streak: {
         Args: { user_id: string }
         Returns: {

@@ -26,10 +26,17 @@ import { AllAgentsStatsGrid } from '@/components/dashboard/AllAgentsStatsGrid';
 import { AgentPerformanceList } from '@/components/dashboard/AgentPerformanceList';
 import { FeedbackBreakdownChart } from '@/components/dashboard/FeedbackBreakdownChart';
 import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
+import { CallVolumeHeatmap } from '@/components/dashboard/CallVolumeHeatmap';
+import { AgentComparisonRadar } from '@/components/dashboard/AgentComparisonRadar';
+import { LeadPipelineFunnel } from '@/components/dashboard/LeadPipelineFunnel';
+import { PerformanceStreakCards } from '@/components/dashboard/PerformanceStreakCards';
+import { CallsTargetGauge } from '@/components/dashboard/CallsTargetGauge';
+import { TeamActivityTimeline } from '@/components/dashboard/TeamActivityTimeline';
 
 import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
 import { useAllAgentsPerformance } from '@/hooks/useAllAgentsPerformance';
+import { useDashboardWidgets } from '@/hooks/useDashboardWidgets';
 import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES, CUSTOM_CATEGORY_COLORS } from '@/hooks/useCustomFilterPresets';
 import { CategoryColorPicker } from '@/components/ui/CategoryColorPicker';
 import { Link } from 'react-router-dom';
@@ -104,6 +111,15 @@ export const Dashboard: React.FC = () => {
     dateFrom,
     dateTo,
   });
+
+  // Dashboard widgets hook
+  const { 
+    heatmapData, 
+    funnelData, 
+    streakData, 
+    timelineData, 
+    isLoading: widgetsLoading 
+  } = useDashboardWidgets();
 
   // Auto-refresh effect
   useEffect(() => {
@@ -941,6 +957,30 @@ export const Dashboard: React.FC = () => {
         onRefresh={refetchAllAgents}
         dateRangeLabel={dateRangeLabel}
       />
+
+      {/* Performance Streak Cards */}
+      <PerformanceStreakCards data={streakData} isLoading={widgetsLoading} />
+
+      {/* Team Activity Timeline */}
+      <TeamActivityTimeline data={timelineData} isLoading={widgetsLoading} />
+
+      {/* Performance Analysis Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <CallsTargetGauge 
+          currentCalls={allAgentsSummary.totalCalls} 
+          targetCalls={Math.max(allAgentsSummary.totalAgents * 50, 100)} 
+          isLoading={allAgentsLoading} 
+        />
+        <LeadPipelineFunnel data={funnelData} isLoading={widgetsLoading} />
+        <AgentComparisonRadar 
+          agents={agents} 
+          agentStats={agentStats} 
+          isLoading={allAgentsLoading} 
+        />
+      </div>
+
+      {/* Call Volume Heatmap */}
+      <CallVolumeHeatmap data={heatmapData} isLoading={widgetsLoading} />
       
       {/* Agent Performance List */}
       <AgentPerformanceList 

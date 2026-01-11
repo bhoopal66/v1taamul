@@ -11,8 +11,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search, BarChart3 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TeamPerformanceCharts } from '@/components/teams/TeamPerformanceCharts';
 
 export const TeamManagementPage: React.FC = () => {
   const { 
@@ -259,7 +260,15 @@ export const TeamManagementPage: React.FC = () => {
             <UserPlus className="w-4 h-4" />
             Agents ({agents.length})
           </TabsTrigger>
+          <TabsTrigger value="performance" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Performance
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="performance" className="space-y-4">
+          <TeamPerformanceCharts />
+        </TabsContent>
 
         <TabsContent value="teams" className="space-y-4">
           {/* Teams Grid */}

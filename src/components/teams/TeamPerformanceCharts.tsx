@@ -3,9 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTeamPerformance, TeamPerformanceData } from '@/hooks/useTeamPerformance';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
-import { Phone, Target, TrendingUp, Trophy, AlertTriangle, Building2, Wifi } from 'lucide-react';
+import { Phone, Target, TrendingUp, Trophy, AlertTriangle, Building2, Wifi, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import { format } from 'date-fns';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--warning))', 'hsl(var(--success))', 'hsl(var(--info))'];
 
@@ -68,26 +74,160 @@ export const TeamPerformanceCharts: React.FC = () => {
     { metric: 'Efficiency', ...Object.fromEntries(topTeams.map(t => [t.teamName, Math.min(t.avgCallsPerAgent, 100)])) },
   ];
 
+  const exportToCSV = () => {
+    try {
+      const exportData = teamPerformance.map(team => ({
+        'Team Name': team.teamName,
+        'Type': team.teamType === 'remote' ? 'Remote' : 'Office',
+        'Members': team.memberCount,
+        'Total Calls': team.totalCalls,
+        'Interested': team.interested,
+        'Not Interested': team.notInterested,
+        'Not Answered': team.notAnswered,
+        'Leads Generated': team.leadsGenerated,
+        'Conversion Rate (%)': team.conversionRate,
+        'Avg Calls/Agent': team.avgCallsPerAgent,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Team Performance');
+      XLSX.writeFile(wb, `team_performance_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      toast.success('CSV exported successfully');
+    } catch (error) {
+      toast.error('Failed to export CSV');
+    }
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const currentDate = format(new Date(), 'MMMM d, yyyy');
+      
+      // Header
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Team Performance Report', pageWidth / 2, 20, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${currentDate}`, pageWidth / 2, 28, { align: 'center' });
+      doc.text(`Period: Last ${days} days`, pageWidth / 2, 35, { align: 'center' });
+
+      // Summary section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary', 14, 50);
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Calls: ${summary.totalCalls.toLocaleString()}`, 14, 60);
+      doc.text(`Total Leads: ${summary.totalLeads.toLocaleString()}`, 14, 68);
+      doc.text(`Average Conversion Rate: ${summary.avgConversionRate}%`, 14, 76);
+      doc.text(`Best Performing Team: ${summary.bestTeam || 'N/A'}`, 14, 84);
+      doc.text(`Needs Attention: ${summary.worstTeam || 'N/A'}`, 14, 92);
+
+      // Team details table
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Team Details', 14, 108);
+
+      // Table headers
+      const startY = 118;
+      const colWidths = [40, 20, 18, 22, 22, 22, 22, 22];
+      const headers = ['Team', 'Type', 'Members', 'Calls', 'Interested', 'Leads', 'Conv %', 'Avg/Agent'];
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      let xPos = 14;
+      headers.forEach((header, i) => {
+        doc.text(header, xPos, startY);
+        xPos += colWidths[i];
+      });
+
+      // Table rows
+      doc.setFont('helvetica', 'normal');
+      let yPos = startY + 8;
+      
+      teamPerformance.forEach((team, index) => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        xPos = 14;
+        const row = [
+          team.teamName.length > 18 ? team.teamName.slice(0, 18) + '...' : team.teamName,
+          team.teamType === 'remote' ? 'Remote' : 'Office',
+          String(team.memberCount),
+          team.totalCalls.toLocaleString(),
+          team.interested.toLocaleString(),
+          team.leadsGenerated.toLocaleString(),
+          `${team.conversionRate}%`,
+          String(team.avgCallsPerAgent),
+        ];
+
+        row.forEach((cell, i) => {
+          doc.text(cell, xPos, yPos);
+          xPos += colWidths[i];
+        });
+
+        yPos += 7;
+      });
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(128);
+      doc.text('Generated by Team Management System', pageWidth / 2, 285, { align: 'center' });
+
+      doc.save(`team_performance_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast.success('PDF exported successfully');
+    } catch (error) {
+      toast.error('Failed to export PDF');
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header with date filter */}
-      <div className="flex items-center justify-between">
+      {/* Header with date filter and export */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold">Team Performance Comparison</h2>
           <p className="text-sm text-muted-foreground">Compare performance metrics across all teams</p>
         </div>
-        <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="14">Last 14 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="60">Last 60 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportToCSV} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="w-4 h-4" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToPDF} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4" />
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="14">Last 14 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="60">Last 60 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Summary Cards */}

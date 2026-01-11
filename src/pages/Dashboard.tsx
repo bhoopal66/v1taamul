@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow, startOfMonth, endOfMonth, format, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -80,6 +80,10 @@ export const Dashboard: React.FC = () => {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [presetToDuplicate, setPresetToDuplicate] = useState<CustomPreset | null>(null);
   const [duplicateName, setDuplicateName] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
+    const saved = localStorage.getItem('dashboard-auto-refresh');
+    return saved === 'true';
+  });
   
   const { customPresets, savePreset, deletePreset, duplicatePreset, exportPresets, importPresets, generateShareLink, getPendingSharedPresets, importFromData, trackPresetUsage, getPresetAnalytics, resetUsageStats, getCategories, getPresetsByCategory, addCategory, updateCategoryColor, deleteCategory, isDefaultCategory, getCategoryColor, customCategories } = useCustomFilterPresets('dashboard-custom-presets');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -97,6 +101,17 @@ export const Dashboard: React.FC = () => {
     dateFrom,
     dateTo,
   });
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      refetchAllAgents();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [autoRefresh, refetchAllAgents]);
 
   const handleAgentChange = (value: string) => {
     setSelectedAgentId(value === 'all' ? null : value);
@@ -422,6 +437,30 @@ export const Dashboard: React.FC = () => {
                     </button>
                   </Badge>
                 )}
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={autoRefresh ? "default" : "outline"}
+                        size="sm"
+                        className={`gap-2 ${autoRefresh ? '' : 'bg-background/80'}`}
+                        onClick={() => {
+                          const newValue = !autoRefresh;
+                          setAutoRefresh(newValue);
+                          localStorage.setItem('dashboard-auto-refresh', String(newValue));
+                          toast.success(newValue ? 'Auto-refresh enabled (30s)' : 'Auto-refresh disabled');
+                        }}
+                      >
+                        <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+                        {autoRefresh ? 'Live' : 'Auto'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {autoRefresh ? 'Click to disable auto-refresh' : 'Click to enable auto-refresh (every 30s)'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             {/* Active Filter Badges */}
             {hasActiveFilters && (

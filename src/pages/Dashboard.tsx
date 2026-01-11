@@ -912,9 +912,6 @@ export const Dashboard: React.FC = () => {
             summary={allAgentsSummary}
             dateRangeLabel={dateRangeLabel}
           />
-          
-          {/* Team Leaderboard */}
-          <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
         </>
       ) : (
         <>

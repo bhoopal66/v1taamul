@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -106,6 +107,7 @@ export const CallListPage: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'called' | 'skipped'>('all');
+  const [filterArea, setFilterArea] = useState<string>('all');
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<CallListContact | null>(null);
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackStatus | null>(null);
@@ -116,6 +118,11 @@ export const CallListPage: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('csv');
   const [exportStartDate, setExportStartDate] = useState<Date | undefined>(undefined);
   const [exportEndDate, setExportEndDate] = useState<Date | undefined>(undefined);
+
+  // Get unique areas from call list
+  const uniqueAreas = Array.from(
+    new Set(callList.map(c => c.area).filter((area): area is string => !!area))
+  ).sort();
 
   const handleOpenFeedback = (contact: CallListContact) => {
     setSelectedContact(contact);
@@ -247,7 +254,11 @@ export const CallListPage: React.FC = () => {
       filterStatus === 'all' || 
       contact.callStatus === filterStatus;
 
-    return matchesSearch && matchesFilter;
+    const matchesArea = 
+      filterArea === 'all' || 
+      contact.area === filterArea;
+
+    return matchesSearch && matchesFilter && matchesArea;
   });
 
   const pendingContacts = filteredList.filter(c => c.callStatus === 'pending');
@@ -363,17 +374,35 @@ export const CallListPage: React.FC = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by company, contact, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by company, contact, area..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {uniqueAreas.length > 0 && (
+            <Select value={filterArea} onValueChange={setFilterArea}>
+              <SelectTrigger className="w-[180px]">
+                <MapPin className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filter by area" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Areas</SelectItem>
+                {uniqueAreas.map(area => (
+                  <SelectItem key={area} value={area}>
+                    {area}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(['all', 'pending', 'called', 'skipped'] as const).map((status) => (
             <Button
               key={status}
@@ -388,6 +417,15 @@ export const CallListPage: React.FC = () => {
                `Skipped (${stats.skipped})`}
             </Button>
           ))}
+          {filterArea !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              <MapPin className="w-3 h-3" />
+              {filterArea}
+              <button onClick={() => setFilterArea('all')} className="ml-1 hover:text-destructive">
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLeads, Lead, LeadStatus, LeadSource, ProductType, BankName, PRODUCT_TYPES, ACCOUNT_BANKS, LOAN_BANKS, createLeadSource, parseLeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
+import { LeadTypeFilter } from '@/components/leads/LeadKanbanBoard';
 import { useLeadScoring, getScoreLabel } from '@/hooks/useLeadScoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,7 @@ export const LeadsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<LeadTypeFilter>('all');
   const [editForm, setEditForm] = useState({
     dealValue: '',
     expectedCloseDate: '',
@@ -343,6 +345,8 @@ export const LeadsPage = () => {
           onConvertToLead={convertToLead}
           isUpdating={isUpdating}
           isConverting={isConverting}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
         />
       )}
 

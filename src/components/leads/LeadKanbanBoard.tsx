@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ConvertToLeadDialog } from './ConvertToLeadDialog';
 import { toast } from 'sonner';
 import { 
@@ -37,6 +38,8 @@ const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; bgCol
   { status: 'lost', label: 'Lost', color: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-950/30', icon: XCircle },
 ];
 
+export type LeadTypeFilter = 'all' | 'leads' | 'opportunities';
+
 interface LeadKanbanBoardProps {
   leads: Lead[];
   onUpdateStatus: (leadId: string, status: LeadStatus) => void;
@@ -44,13 +47,32 @@ interface LeadKanbanBoardProps {
   onConvertToLead: (contactId: string, tradeLicenseNumber: string) => void;
   isUpdating: boolean;
   isConverting: boolean;
+  typeFilter: LeadTypeFilter;
+  onTypeFilterChange: (filter: LeadTypeFilter) => void;
 }
 
-export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, onConvertToLead, isUpdating, isConverting }: LeadKanbanBoardProps) => {
+export const LeadKanbanBoard = ({ 
+  leads, 
+  onUpdateStatus, 
+  onEditLead, 
+  onConvertToLead, 
+  isUpdating, 
+  isConverting,
+  typeFilter,
+  onTypeFilterChange,
+}: LeadKanbanBoardProps) => {
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Lead | null>(null);
+
+  // Filter leads based on type filter
+  const filteredLeads = leads.filter(lead => {
+    if (typeFilter === 'all') return true;
+    if (typeFilter === 'leads') return lead.isLead;
+    if (typeFilter === 'opportunities') return !lead.isLead;
+    return true;
+  });
 
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return null;
@@ -62,7 +84,7 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, onConvertTo
   };
 
   const getLeadsByStatus = (status: LeadStatus) => {
-    return leads.filter(lead => lead.leadStatus === status);
+    return filteredLeads.filter(lead => lead.leadStatus === status);
   };
 
   const getColumnTotal = (status: LeadStatus) => {
@@ -117,7 +139,34 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, onConvertTo
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className="space-y-4">
+      {/* Filter Toggle */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium text-muted-foreground">Show:</span>
+        <ToggleGroup 
+          type="single" 
+          value={typeFilter} 
+          onValueChange={(value) => value && onTypeFilterChange(value as LeadTypeFilter)}
+          className="bg-muted/50 rounded-lg p-1"
+        >
+          <ToggleGroupItem value="all" className="px-3 h-8 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            All
+          </ToggleGroupItem>
+          <ToggleGroupItem value="leads" className="px-3 h-8 text-xs data-[state=on]:bg-green-100 data-[state=on]:text-green-700 dark:data-[state=on]:bg-green-950/50 dark:data-[state=on]:text-green-400">
+            <FileText className="w-3 h-3 mr-1" />
+            Leads
+          </ToggleGroupItem>
+          <ToggleGroupItem value="opportunities" className="px-3 h-8 text-xs data-[state=on]:bg-amber-100 data-[state=on]:text-amber-700 dark:data-[state=on]:bg-amber-950/50 dark:data-[state=on]:text-amber-400">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Opportunities
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <span className="text-xs text-muted-foreground">
+          ({filteredLeads.length} shown)
+        </span>
+      </div>
+
+      <div className="flex gap-4 overflow-x-auto pb-4">
       {PIPELINE_STAGES.map(stage => {
         const stageLeads = getLeadsByStatus(stage.status);
         const columnTotal = getColumnTotal(stage.status);
@@ -301,6 +350,8 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, onConvertTo
           </div>
         );
       })}
+
+      </div>
 
       {/* Convert to Lead Dialog */}
       <ConvertToLeadDialog

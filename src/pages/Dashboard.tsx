@@ -337,22 +337,12 @@ export const Dashboard: React.FC = () => {
             {/* View Mode Toggle */}
             <div className="flex items-center gap-2 mt-4">
               <Button
-                variant={viewMode === 'team' ? 'default' : 'outline'}
+                variant="default"
                 size="sm"
-                onClick={() => handleViewModeChange('team')}
                 className="gap-2"
               >
                 <Users className="w-4 h-4" />
                 Team View
-              </Button>
-              <Button
-                variant={viewMode === 'personal' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleViewModeChange('personal')}
-                className="gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                My Performance
               </Button>
             </div>
             

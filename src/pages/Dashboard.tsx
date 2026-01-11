@@ -883,22 +883,6 @@ export const Dashboard: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" className="gap-2 bg-background/50 backdrop-blur-sm">
-                <Link to="/upload">
-                  <Upload className="w-4 h-4" />
-                  Upload Contacts
-                </Link>
-              </Button>
-              <Button asChild className="gap-2 shadow-lg">
-                <Link to="/call-list">
-                  <Phone className="w-4 h-4" />
-                  Start Calling
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </Button>
-            </div>
           </div>
         </div>
       </div>
@@ -919,29 +903,6 @@ export const Dashboard: React.FC = () => {
         dateRangeLabel={dateRangeLabel}
       />
 
-      {/* Quick Actions Card */}
-      <Card className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Quick Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button asChild variant="default" className="gap-2">
-            <Link to="/call-list">
-              <Phone className="w-4 h-4" />
-              Continue Calling
-            </Link>
-          </Button>
-          <Button asChild variant="secondary" className="gap-2">
-            <Link to="/upload">
-              <Upload className="w-4 h-4" />
-              Upload New Contacts
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 };

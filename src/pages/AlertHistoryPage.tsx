@@ -21,7 +21,11 @@ import {
   User,
   Calendar,
   X,
-  Download
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { format, formatDistanceToNow, startOfDay, endOfDay, subDays, subMonths } from 'date-fns';
 
@@ -61,6 +65,8 @@ const DATE_PRESETS = [
   { label: 'Last 90 days', value: '90d' },
   { label: 'All time', value: 'all' },
 ];
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export const AlertHistoryPage: React.FC = () => {
   const { user } = useAuth();
@@ -189,6 +195,21 @@ export const AlertHistoryPage: React.FC = () => {
       return true;
     });
   }, [alerts, dateRange, severityFilter, statusFilter, typeFilter, teamFilter, agentFilter]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange, severityFilter, statusFilter, typeFilter, teamFilter, agentFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAlerts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedAlerts = filteredAlerts.slice(startIndex, endIndex);
 
   // Stats
   const stats = useMemo(() => {
@@ -485,15 +506,36 @@ export const AlertHistoryPage: React.FC = () => {
       {/* Alert List */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">
-            Alerts ({filteredAlerts.length})
-          </CardTitle>
-          <CardDescription>
-            {dateRange.start && dateRange.end 
-              ? `From ${format(dateRange.start, 'MMM d, yyyy')} to ${format(dateRange.end, 'MMM d, yyyy')}`
-              : 'All time'
-            }
-          </CardDescription>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <CardTitle className="text-lg">
+                Alerts ({filteredAlerts.length})
+              </CardTitle>
+              <CardDescription>
+                {dateRange.start && dateRange.end 
+                  ? `From ${format(dateRange.start, 'MMM d, yyyy')} to ${format(dateRange.end, 'MMM d, yyyy')}`
+                  : 'All time'
+                }
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">Show:</Label>
+              <Select value={pageSize.toString()} onValueChange={(v) => {
+                setPageSize(Number(v));
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {PAGE_SIZE_OPTIONS.map(size => (
+                    <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">per page</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {filteredAlerts.length === 0 ? (
@@ -502,66 +544,144 @@ export const AlertHistoryPage: React.FC = () => {
               <p>No alerts found matching your filters</p>
             </div>
           ) : (
-            <ScrollArea className="h-[500px]">
-              <div className="space-y-3">
-                {filteredAlerts.map((alert) => {
-                  const severityConfig = getSeverityConfig(alert.severity || 'warning');
-                  const statusConfig = getStatusConfig(alert.alert_status);
-                  const isPercentage = alert.metric === 'conversion_rate';
+            <>
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-3">
+                  {paginatedAlerts.map((alert) => {
+                    const severityConfig = getSeverityConfig(alert.severity || 'warning');
+                    const statusConfig = getStatusConfig(alert.alert_status);
+                    const isPercentage = alert.metric === 'conversion_rate';
 
-                  return (
-                    <div 
-                      key={alert.id} 
-                      className={`p-4 border rounded-lg space-y-3 ${alert.alert_status === 'active' ? severityConfig.bgClass : ''}`}
+                    return (
+                      <div 
+                        key={alert.id} 
+                        className={`p-4 border rounded-lg space-y-3 ${alert.alert_status === 'active' ? severityConfig.bgClass : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {severityConfig.icon}
+                            <Badge variant={alert.alert_type === 'team' ? 'default' : 'secondary'}>
+                              {alert.alert_type === 'team' ? (
+                                <><Users className="w-3 h-3 mr-1" /> {alert.team_name}</>
+                              ) : (
+                                <><User className="w-3 h-3 mr-1" /> {alert.agent_name}</>
+                              )}
+                            </Badge>
+                            <Badge className={severityConfig.badgeClass}>
+                              {alert.severity === 'critical' ? 'Critical' : 'Warning'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={statusConfig.variant} className="gap-1">
+                              {statusConfig.icon}
+                              {statusConfig.label}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">
+                            {METRIC_LABELS[alert.metric] || alert.metric} below target
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Achieved {alert.actual_value}{isPercentage ? '%' : ''} of {alert.target_value}{isPercentage ? '%' : ''} target 
+                            ({alert.percentage_achieved.toFixed(1)}%)
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3" />
+                            <span title={format(new Date(alert.created_at), 'PPpp')}>
+                              {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
+                            </span>
+                            <span className="text-muted-foreground/60">
+                              ({formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })})
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(endIndex, filteredAlerts.length)} of {filteredAlerts.length} alerts
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
                     >
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {severityConfig.icon}
-                          <Badge variant={alert.alert_type === 'team' ? 'default' : 'secondary'}>
-                            {alert.alert_type === 'team' ? (
-                              <><Users className="w-3 h-3 mr-1" /> {alert.team_name}</>
-                            ) : (
-                              <><User className="w-3 h-3 mr-1" /> {alert.agent_name}</>
-                            )}
-                          </Badge>
-                          <Badge className={severityConfig.badgeClass}>
-                            {alert.severity === 'critical' ? 'Critical' : 'Warning'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={statusConfig.variant} className="gap-1">
-                            {statusConfig.icon}
-                            {statusConfig.label}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">
-                          {METRIC_LABELS[alert.metric] || alert.metric} below target
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Achieved {alert.actual_value}{isPercentage ? '%' : ''} of {alert.target_value}{isPercentage ? '%' : ''} target 
-                          ({alert.percentage_achieved.toFixed(1)}%)
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3 h-3" />
-                          <span title={format(new Date(alert.created_at), 'PPpp')}>
-                            {format(new Date(alert.created_at), 'MMM d, yyyy h:mm a')}
-                          </span>
-                          <span className="text-muted-foreground/60">
-                            ({formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })})
-                          </span>
-                        </div>
-                      </div>
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1 mx-2">
+                      {/* Show page numbers */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? 'default' : 'outline'}
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

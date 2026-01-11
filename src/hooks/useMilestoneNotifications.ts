@@ -11,6 +11,7 @@ const metricLabels: Record<GoalMetric, string> = {
   interested: 'Interested',
   leads: 'Leads',
   conversion: 'Conversion',
+  talk_time: 'Talk Time',
 };
 
 const rarityEmojis: Record<string, string> = {

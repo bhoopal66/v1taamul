@@ -44,11 +44,13 @@ import {
   Plus,
   Pencil,
   Copy,
+  Clock,
 } from 'lucide-react';
 import { useLeaderboard, TimePeriod, LeaderboardAgent, TeamStats, LeadStatusFilter } from '@/hooks/useLeaderboard';
 import { useCustomFilterPresets, CustomPreset, DEFAULT_CATEGORIES, CUSTOM_CATEGORY_COLORS } from '@/hooks/useCustomFilterPresets';
 import { CategoryColorPicker } from '@/components/ui/CategoryColorPicker';
 import { cn } from '@/lib/utils';
+import { TalkTimeLeaderboard } from '@/components/dashboard/TalkTimeLeaderboard';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
@@ -1018,6 +1020,10 @@ export const Leaderboard: React.FC = () => {
             <Users className="w-4 h-4" />
             Team Comparison
           </TabsTrigger>
+          <TabsTrigger value="talk-time" className="gap-2">
+            <Clock className="w-4 h-4" />
+            Talk Time
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="rankings">
@@ -1105,6 +1111,10 @@ export const Leaderboard: React.FC = () => {
 
         <TabsContent value="teams">
           <TeamComparisonCard teams={teamStats} />
+        </TabsContent>
+
+        <TabsContent value="talk-time">
+          <TalkTimeLeaderboard />
         </TabsContent>
       </Tabs>
     </div>

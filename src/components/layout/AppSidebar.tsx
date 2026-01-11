@@ -106,7 +106,7 @@ export const AppSidebar: React.FC = () => {
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
-        <NavItem to="/contacts" icon={<Users className="w-5 h-5" />} label="All Contacts" />
+        
         
         {(userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin') && (
           <>

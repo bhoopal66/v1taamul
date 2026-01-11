@@ -509,14 +509,14 @@ export const UploadPage: React.FC = () => {
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="w-3 h-3 text-green-600" /> phone_number
                     </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="w-3 h-3 text-green-600" /> trade_license_number
-                    </li>
                   </ul>
                 </div>
                 <div>
                   <h4 className="font-medium mb-2">Optional Columns</h4>
                   <ul className="space-y-1 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <AlertTriangle className="w-3 h-3 text-yellow-600" /> trade_license_number
+                    </li>
                     <li className="flex items-center gap-2">
                       <AlertTriangle className="w-3 h-3 text-yellow-600" /> city
                     </li>

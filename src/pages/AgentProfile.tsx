@@ -34,7 +34,8 @@ import {
   Zap,
   Crown,
   BarChart3,
-  Activity
+  Activity,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PerformanceCertificate } from '@/components/profile/PerformanceCertificate';
@@ -45,6 +46,7 @@ import { StreakMilestones } from '@/components/profile/StreakMilestones';
 import { LoginStreakReminderBanner } from '@/components/profile/LoginStreakReminderBanner';
 import { LoginStreakMilestones } from '@/components/profile/LoginStreakMilestones';
 import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
+import { TalkTimeProfileCard } from '@/components/profile/TalkTimeProfileCard';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -199,7 +201,7 @@ export const AgentProfile: React.FC = () => {
 
       {/* Performance Charts */}
       <Tabs defaultValue="monthly" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="monthly" className="gap-2">
             <BarChart3 className="w-4 h-4" />
             Monthly Trend
@@ -207,6 +209,10 @@ export const AgentProfile: React.FC = () => {
           <TabsTrigger value="daily" className="gap-2">
             <Activity className="w-4 h-4" />
             Daily Activity
+          </TabsTrigger>
+          <TabsTrigger value="talk-time" className="gap-2">
+            <Clock className="w-4 h-4" />
+            Talk Time
           </TabsTrigger>
         </TabsList>
 
@@ -325,6 +331,10 @@ export const AgentProfile: React.FC = () => {
               </ChartContainer>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="talk-time">
+          <TalkTimeProfileCard />
         </TabsContent>
       </Tabs>
 

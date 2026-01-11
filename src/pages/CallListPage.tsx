@@ -111,6 +111,7 @@ export const CallListPage: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'called' | 'skipped'>('all');
+  const [filterCity, setFilterCity] = useState<string>('all');
   const [filterArea, setFilterArea] = useState<string>('all');
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<CallListContact | null>(null);
@@ -123,9 +124,13 @@ export const CallListPage: React.FC = () => {
   const [exportStartDate, setExportStartDate] = useState<Date | undefined>(undefined);
   const [exportEndDate, setExportEndDate] = useState<Date | undefined>(undefined);
 
-  // Get unique areas from call list
+  // Get unique areas and cities from call list
   const uniqueAreas = Array.from(
     new Set(callList.map(c => c.area).filter((area): area is string => !!area))
+  ).sort();
+
+  const uniqueCities = Array.from(
+    new Set(callList.map(c => c.city).filter((city): city is string => !!city))
   ).sort();
 
   const handleOpenFeedback = (contact: CallListContact) => {
@@ -262,7 +267,11 @@ export const CallListPage: React.FC = () => {
       filterArea === 'all' || 
       contact.area === filterArea;
 
-    return matchesSearch && matchesFilter && matchesArea;
+    const matchesCity = 
+      filterCity === 'all' || 
+      contact.city === filterCity;
+
+    return matchesSearch && matchesFilter && matchesArea && matchesCity;
   });
 
   const pendingContacts = filteredList.filter(c => c.callStatus === 'pending');
@@ -389,6 +398,22 @@ export const CallListPage: React.FC = () => {
               className="pl-10"
             />
           </div>
+          {uniqueCities.length > 0 && (
+            <Select value={filterCity} onValueChange={setFilterCity}>
+              <SelectTrigger className="w-[180px]">
+                <Building2 className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filter by city" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cities</SelectItem>
+                {uniqueCities.map(city => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {uniqueAreas.length > 0 && (
             <Select value={filterArea} onValueChange={setFilterArea}>
               <SelectTrigger className="w-[180px]">
@@ -421,6 +446,15 @@ export const CallListPage: React.FC = () => {
                `Skipped (${stats.skipped})`}
             </Button>
           ))}
+          {filterCity !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              <Building2 className="w-3 h-3" />
+              {filterCity}
+              <button onClick={() => setFilterCity('all')} className="ml-1 hover:text-destructive">
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
           {filterArea !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               <MapPin className="w-3 h-3" />

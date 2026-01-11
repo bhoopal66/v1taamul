@@ -18,6 +18,7 @@ export interface CallListContact {
   tradeLicenseNumber: string;
   city: string | null;
   industry: string | null;
+  area: string | null;
   callOrder: number;
   callStatus: CallStatus;
   calledAt: string | null;
@@ -113,6 +114,7 @@ export const useCallList = (selectedDate?: Date) => {
           tradeLicenseNumber: contact?.trade_license_number || '',
           city: contact?.city || null,
           industry: contact?.industry || null,
+          area: (contact as { area?: string | null })?.area || null,
           callOrder: item.call_order,
           callStatus: item.call_status as CallStatus,
           calledAt: item.called_at,

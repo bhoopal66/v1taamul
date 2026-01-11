@@ -129,6 +129,7 @@ export const AppSidebar: React.FC = () => {
                 Administration
               </p>
             </div>
+            <NavItem to="/team-management" icon={<Users className="w-5 h-5" />} label="Team Management" />
             <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
           </>
         )}

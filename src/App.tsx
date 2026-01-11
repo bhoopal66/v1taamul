@@ -17,6 +17,7 @@ import { CallListPage } from "./pages/CallListPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import UserManagementPage from "./pages/UserManagementPage";
+import TeamManagementPage from "./pages/TeamManagementPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/messages" element={<Dashboard />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/user-management" element={<UserManagementPage />} />
+              <Route path="/team-management" element={<TeamManagementPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

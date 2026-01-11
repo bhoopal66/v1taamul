@@ -412,6 +412,9 @@ export const UploadPage: React.FC = () => {
                             <TableHead>Contact Person</TableHead>
                             <TableHead>Phone</TableHead>
                             <TableHead>License #</TableHead>
+                            <TableHead>City</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Industry</TableHead>
                             <TableHead className="w-24">Status</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -426,6 +429,9 @@ export const UploadPage: React.FC = () => {
                               <TableCell>{contact.contactPersonName || '-'}</TableCell>
                               <TableCell className="font-mono text-sm">{contact.phoneNumber || '-'}</TableCell>
                               <TableCell>{contact.tradeLicenseNumber || '-'}</TableCell>
+                              <TableCell>{contact.city || '-'}</TableCell>
+                              <TableCell>{contact.area || '-'}</TableCell>
+                              <TableCell>{contact.industry || '-'}</TableCell>
                               <TableCell>
                                 {contact.isValid ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-600" />

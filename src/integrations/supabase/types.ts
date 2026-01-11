@@ -447,6 +447,7 @@ export type Database = {
           login_streak_longest: number | null
           phone_number: string | null
           supervisor_id: string | null
+          team_id: string | null
           updated_at: string | null
           username: string
           whatsapp_number: string | null
@@ -464,6 +465,7 @@ export type Database = {
           login_streak_longest?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
+          team_id?: string | null
           updated_at?: string | null
           username: string
           whatsapp_number?: string | null
@@ -481,6 +483,7 @@ export type Database = {
           login_streak_longest?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
+          team_id?: string | null
           updated_at?: string | null
           username?: string
           whatsapp_number?: string | null
@@ -489,6 +492,48 @@ export type Database = {
           {
             foreignKeyName: "profiles_supervisor_id_fkey"
             columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          leader_id: string | null
+          name: string
+          team_type: Database["public"]["Enums"]["team_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          leader_id?: string | null
+          name: string
+          team_type: Database["public"]["Enums"]["team_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          leader_id?: string | null
+          name?: string
+          team_type?: Database["public"]["Enums"]["team_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_leader_id_fkey"
+            columns: ["leader_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -643,15 +688,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_led_team_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_user_team_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_team_leader: {
+        Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
       move_old_contacts_to_pool: { Args: never; Returns: number }
@@ -690,6 +741,7 @@ export type Database = {
         | "wrong_number"
       lead_status: "new" | "contacted" | "qualified" | "converted" | "lost"
       message_direction: "inbound" | "outbound"
+      team_type: "remote" | "office"
       upload_status: "pending" | "approved" | "rejected" | "supplemented"
     }
     CompositeTypes: {
@@ -845,6 +897,7 @@ export const Constants = {
       ],
       lead_status: ["new", "contacted", "qualified", "converted", "lost"],
       message_direction: ["inbound", "outbound"],
+      team_type: ["remote", "office"],
       upload_status: ["pending", "approved", "rejected", "supplemented"],
     },
   },

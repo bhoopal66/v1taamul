@@ -52,9 +52,11 @@ const filterPresets: FilterPreset[] = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { profile, userRole } = useAuth();
+  const { profile, userRole, ledTeamId } = useAuth();
   
-  // Team view filters
+  // Check if user can see all agents
+  const canSeeAllAgents = ['admin', 'super_admin', 'operations_head', 'supervisor'].includes(userRole || '');
+  const isTeamLeader = !!ledTeamId && !canSeeAllAgents;
   
   // Team view filters
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -332,10 +334,12 @@ export const Dashboard: React.FC = () => {
               <span>{format(new Date(), 'EEEE, MMMM d, yyyy')}</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Team Dashboard
+              {isTeamLeader ? 'My Team Dashboard' : 'Team Dashboard'}
             </h1>
             <p className="text-muted-foreground mt-2 max-w-lg">
-              Overview of all agents performance. Filter by agent and date range.
+              {isTeamLeader 
+                ? 'Performance overview for your team members.' 
+                : 'Overview of all agents performance. Filter by agent and date range.'}
             </p>
             
             {/* Team View Filters */}

@@ -36,22 +36,32 @@ interface UseAllAgentsPerformanceOptions {
 }
 
 export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions = {}) => {
-  const { user } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const { 
     selectedAgentId = null, 
     dateFrom = startOfMonth(new Date()), 
     dateTo = endOfMonth(new Date()) 
   } = options;
 
-  // Fetch all agents
+  // Check if user can see all agents (admin, super_admin, operations_head, supervisor)
+  const canSeeAllAgents = ['admin', 'super_admin', 'operations_head', 'supervisor'].includes(userRole || '');
+
+  // Fetch all agents (filtered by team for team leaders)
   const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ['all-agents-list'],
+    queryKey: ['all-agents-list', ledTeamId, canSeeAllAgents],
     queryFn: async (): Promise<AgentOption[]> => {
-      const { data: profiles, error } = await supabase
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, username')
+        .select('id, full_name, username, team_id')
         .eq('is_active', true)
         .order('full_name');
+
+      // If user is a team leader (not admin/super_admin), filter by their team
+      if (ledTeamId && !canSeeAllAgents) {
+        query = query.eq('team_id', ledTeamId);
+      }
+
+      const { data: profiles, error } = await query;
 
       if (error) throw error;
 
@@ -65,10 +75,21 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
 
   // Fetch performance data for all agents or selected agent
   const { data: performanceData, isLoading: performanceLoading, refetch } = useQuery({
-    queryKey: ['all-agents-performance', selectedAgentId, dateFrom?.toISOString(), dateTo?.toISOString()],
+    queryKey: ['all-agents-performance', selectedAgentId, dateFrom?.toISOString(), dateTo?.toISOString(), ledTeamId, canSeeAllAgents],
     queryFn: async () => {
       const start = startOfDay(dateFrom).toISOString();
       const end = endOfDay(dateTo).toISOString();
+
+      // Get list of agent IDs we can view (for team filtering)
+      let agentIds: string[] | null = null;
+      if (ledTeamId && !canSeeAllAgents) {
+        const { data: teamProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('team_id', ledTeamId)
+          .eq('is_active', true);
+        agentIds = teamProfiles?.map(p => p.id) || [];
+      }
 
       // Build the query for call feedback
       let feedbackQuery = supabase
@@ -79,6 +100,8 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
 
       if (selectedAgentId) {
         feedbackQuery = feedbackQuery.eq('agent_id', selectedAgentId);
+      } else if (agentIds && agentIds.length > 0) {
+        feedbackQuery = feedbackQuery.in('agent_id', agentIds);
       }
 
       const { data: feedback, error: feedbackError } = await feedbackQuery;
@@ -93,15 +116,23 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
 
       if (selectedAgentId) {
         leadsQuery = leadsQuery.eq('agent_id', selectedAgentId);
+      } else if (agentIds && agentIds.length > 0) {
+        leadsQuery = leadsQuery.in('agent_id', agentIds);
       }
 
       const { data: leads, error: leadsError } = await leadsQuery;
       if (leadsError) throw leadsError;
 
-      // Get all profiles for agent names
-      const { data: profiles } = await supabase
+      // Get profiles for agent names (filtered by team if needed)
+      let profilesQuery = supabase
         .from('profiles')
         .select('id, full_name, username');
+      
+      if (agentIds && agentIds.length > 0) {
+        profilesQuery = profilesQuery.in('id', agentIds);
+      }
+      
+      const { data: profiles } = await profilesQuery;
 
       // Aggregate data by agent
       const agentMap = new Map<string, AgentDailyStats>();

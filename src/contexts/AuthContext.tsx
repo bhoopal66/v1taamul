@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   profile: any | null;
+  ledTeamId: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   userRole: null,
   profile: null,
+  ledTeamId: null,
 });
 
 export const useAuth = () => {
@@ -32,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
+  const [ledTeamId, setLedTeamId] = useState<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -55,6 +58,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (profileData) {
         setProfile(profileData);
+      }
+
+      // Check if user leads a team
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('leader_id', userId)
+        .maybeSingle();
+      
+      if (teamData) {
+        setLedTeamId(teamData.id);
+      } else {
+        setLedTeamId(null);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -98,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, profile }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, profile, ledTeamId }}>
       {children}
     </AuthContext.Provider>
   );

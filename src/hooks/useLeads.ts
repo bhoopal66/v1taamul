@@ -69,6 +69,7 @@ export interface Lead {
   companyName: string;
   contactPersonName: string;
   phoneNumber: string;
+  tradeLicenseNumber: string | null;
   city: string | null;
   industry: string | null;
   leadStatus: LeadStatus;
@@ -107,6 +108,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
             company_name,
             contact_person_name,
             phone_number,
+            trade_license_number,
             city,
             industry
           )
@@ -128,6 +130,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         companyName: item.master_contacts?.company_name || 'Unknown',
         contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
         phoneNumber: item.master_contacts?.phone_number || '',
+        tradeLicenseNumber: item.master_contacts?.trade_license_number || null,
         city: item.master_contacts?.city || null,
         industry: item.master_contacts?.industry || null,
         leadStatus: (item.lead_status || 'new') as LeadStatus,

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 import { 
   Target, 
   Phone, 
@@ -20,6 +21,8 @@ import {
   Sparkles,
   GripVertical,
   Zap,
+  FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getScoreLabel } from '@/hooks/useLeadScoring';
@@ -93,6 +96,15 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, isUpdating 
     setDragOverColumn(null);
     
     if (draggedLead && draggedLead.leadStatus !== targetStatus) {
+      // Check if moving to qualified/converted and trade license is missing
+      if ((targetStatus === 'qualified' || targetStatus === 'converted') && !draggedLead.tradeLicenseNumber) {
+        toast.error('Trade License Required', {
+          description: 'Please add a trade license number before qualifying this lead.',
+          duration: 5000,
+        });
+        setDraggedLead(null);
+        return;
+      }
       onUpdateStatus(draggedLead.id, targetStatus);
     }
     setDraggedLead(null);
@@ -211,6 +223,14 @@ export const LeadKanbanBoard = ({ leads, onUpdateStatus, onEditLead, isUpdating 
                                 </span>
                               )}
                             </div>
+
+                            {/* Trade License Warning */}
+                            {!lead.tradeLicenseNumber && (
+                              <div className="flex items-center gap-1 mt-1 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded px-1.5 py-0.5">
+                                <AlertTriangle className="w-3 h-3" />
+                                <span>No trade license</span>
+                              </div>
+                            )}
 
                             {/* Deal Value & Close Date */}
                             <div className="flex items-center justify-between mt-2 pt-2 border-t">

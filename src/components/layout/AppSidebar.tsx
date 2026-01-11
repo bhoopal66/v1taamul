@@ -121,12 +121,6 @@ export const AppSidebar: React.FC = () => {
           </>
         )}
 
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-muted uppercase tracking-wider">
-            Communication
-          </p>
-        </div>
-        <NavItem to="/messages" icon={<MessageSquare className="w-5 h-5" />} label="WhatsApp" />
       </nav>
 
       {/* User Section */}

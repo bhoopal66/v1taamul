@@ -12,6 +12,7 @@ export interface UserWithRole {
   username: string;
   phone_number: string | null;
   whatsapp_number: string | null;
+  team_id: string | null;
   is_active: boolean | null;
   created_at: string | null;
   last_login: string | null;
@@ -56,6 +57,7 @@ export const useUserManagement = () => {
         username: profile.username,
         phone_number: profile.phone_number,
         whatsapp_number: profile.whatsapp_number,
+        team_id: profile.team_id,
         is_active: profile.is_active,
         created_at: profile.created_at,
         last_login: profile.last_login,

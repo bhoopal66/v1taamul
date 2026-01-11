@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -122,6 +123,20 @@ export const UserManagementPage: React.FC = () => {
     username: '',
     phone_number: '',
     whatsapp_number: '',
+    team_id: '' as string | null,
+  });
+
+  // Fetch teams for assignment
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name, team_type')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Check if current user has admin access
@@ -217,6 +232,7 @@ export const UserManagementPage: React.FC = () => {
       username: user.username || '',
       phone_number: user.phone_number || '',
       whatsapp_number: user.whatsapp_number || '',
+      team_id: user.team_id || null,
     });
     setEditUserDialogOpen(true);
   };
@@ -233,6 +249,7 @@ export const UserManagementPage: React.FC = () => {
           username: editUserForm.username,
           phone_number: editUserForm.phone_number || null,
           whatsapp_number: editUserForm.whatsapp_number || null,
+          team_id: editUserForm.team_id || null,
         })
         .eq('id', editUserForm.id);
       
@@ -763,6 +780,30 @@ export const UserManagementPage: React.FC = () => {
                 value={editUserForm.whatsapp_number}
                 onChange={(e) => setEditUserForm(f => ({ ...f, whatsapp_number: e.target.value }))}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-team">Team Assignment</Label>
+              <Select 
+                value={editUserForm.team_id || 'none'} 
+                onValueChange={(value) => setEditUserForm(f => ({ ...f, team_id: value === 'none' ? null : value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Team</SelectItem>
+                  {teams.map(team => (
+                    <SelectItem key={team.id} value={team.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{team.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {team.team_type}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

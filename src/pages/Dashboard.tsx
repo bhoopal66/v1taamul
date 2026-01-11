@@ -54,11 +54,7 @@ const filterPresets: FilterPreset[] = [
 export const Dashboard: React.FC = () => {
   const { profile, userRole } = useAuth();
   
-  // View mode: 'personal' or 'team'
-  const [viewMode, setViewMode] = useState<'personal' | 'team'>(() => {
-    const saved = localStorage.getItem('dashboard-view-mode');
-    return (saved as 'personal' | 'team') || 'team';
-  });
+  // Team view filters
   
   // Team view filters
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -101,11 +97,6 @@ export const Dashboard: React.FC = () => {
     dateFrom,
     dateTo,
   });
-
-  const handleViewModeChange = (mode: 'personal' | 'team') => {
-    setViewMode(mode);
-    localStorage.setItem('dashboard-view-mode', mode);
-  };
 
   const handleAgentChange = (value: string) => {
     setSelectedAgentId(value === 'all' ? null : value);
@@ -326,17 +317,14 @@ export const Dashboard: React.FC = () => {
               <span>{format(new Date(), 'EEEE, MMMM d, yyyy')}</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-              {viewMode === 'team' ? 'Team Dashboard' : `${greeting()}, ${profile?.full_name?.split(' ')[0] || 'Agent'}!`}
+              Team Dashboard
             </h1>
             <p className="text-muted-foreground mt-2 max-w-lg">
-              {viewMode === 'team' 
-                ? 'Overview of all agents performance. Filter by agent and date range.'
-                : 'Here\'s your real-time performance dashboard. Track your calls, monitor your goals, and stay ahead of the competition.'}
+              Overview of all agents performance. Filter by agent and date range.
             </p>
             
             {/* Team View Filters */}
-            {viewMode === 'team' && (
-              <div className="flex flex-wrap items-center gap-3 mt-4">
+            <div className="flex flex-wrap items-center gap-3 mt-4">
                 <Select value={selectedAgentId || 'all'} onValueChange={handleAgentChange}>
                   <SelectTrigger className="w-[200px] bg-background/80">
                     <Users className="w-4 h-4 mr-2" />
@@ -391,7 +379,6 @@ export const Dashboard: React.FC = () => {
                   </Badge>
                 )}
               </div>
-            )}
             {/* Active Filter Badges */}
             {hasActiveFilters && (
               <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -872,77 +859,21 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Content based on view mode */}
-      {viewMode === 'team' ? (
-        <>
-          {/* Team Stats Grid */}
-          <AllAgentsStatsGrid 
-            summary={allAgentsSummary} 
-            isLoading={allAgentsLoading} 
-            onRefresh={refetchAllAgents}
-            dateRangeLabel={dateRangeLabel}
-          />
-          
-          {/* Agent Performance List */}
-          <AgentPerformanceList 
-            agents={agentStats} 
-            isLoading={allAgentsLoading} 
-            summary={allAgentsSummary}
-            dateRangeLabel={dateRangeLabel}
-          />
-        </>
-      ) : (
-        <>
-          {/* Stats Grid */}
-          <StatsGrid stats={myStats} isLoading={isLoading} onRefresh={refetch} />
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Charts */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Hourly Calls & Conversion */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <CallsChart data={hourlyData} isLoading={isLoading} />
-                <ConversionChart stats={myStats} isLoading={isLoading} />
-              </div>
-              
-              {/* Weekly Trend */}
-              <WeeklyTrendChart data={weeklyData} isLoading={isLoading} />
-            </div>
-
-            {/* Right Column - Goals & Activity */}
-            <div className="space-y-6">
-              <DailyGoalProgress stats={myStats} isLoading={isLoading} />
-              <RecentActivityFeed activities={recentActivity} isLoading={isLoading} />
-            </div>
-          </div>
-
-          {/* Middle Row - New Analytics Widgets */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FeedbackBreakdownChart stats={myStats} isLoading={isLoading} />
-            <TopPerformersCard 
-              performers={leaderboard.slice(0, 3).map(l => ({
-                id: l.agentId,
-                name: l.agentName,
-                totalCalls: l.totalCalls,
-                interested: l.interested,
-                conversionRate: l.conversionRate,
-                rank: l.rank,
-              }))}
-              isLoading={isLoading}
-              currentUserId={profile?.id}
-            />
-            <PerformanceInsights 
-              stats={myStats} 
-              hourlyData={hourlyData} 
-              isLoading={isLoading} 
-            />
-          </div>
-
-          {/* Bottom Row - Leaderboard */}
-          <TeamLeaderboard data={leaderboard} isLoading={isLoading} />
-        </>
-      )}
+      {/* Team Stats Grid */}
+      <AllAgentsStatsGrid 
+        summary={allAgentsSummary} 
+        isLoading={allAgentsLoading} 
+        onRefresh={refetchAllAgents}
+        dateRangeLabel={dateRangeLabel}
+      />
+      
+      {/* Agent Performance List */}
+      <AgentPerformanceList 
+        agents={agentStats} 
+        isLoading={allAgentsLoading} 
+        summary={allAgentsSummary}
+        dateRangeLabel={dateRangeLabel}
+      />
 
       {/* Quick Actions Card */}
       <Card className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20">

@@ -1,6 +1,8 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { signOut } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -75,6 +77,22 @@ export const AppSidebar: React.FC = () => {
   
   const isSupervisor = userRole === 'supervisor';
   const isTeamLeader = !!ledTeamId;
+
+  // Fetch user's team name
+  const { data: userTeam } = useQuery({
+    queryKey: ['user-team', profile?.team_id],
+    queryFn: async () => {
+      if (!profile?.team_id) return null;
+      const { data, error } = await supabase
+        .from('teams')
+        .select('name')
+        .eq('id', profile.team_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.team_id,
+  });
 
   // Get recent active alerts (max 5)
   const recentAlerts = alerts
@@ -307,6 +325,7 @@ export const AppSidebar: React.FC = () => {
             </div>
             <p className="text-xs text-sidebar-muted truncate">
               {getRoleLabel(userRole)}
+              {userTeam?.name && <span> • {userTeam.name}</span>}
             </p>
           </div>
         </div>

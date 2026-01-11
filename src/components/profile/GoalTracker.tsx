@@ -55,6 +55,12 @@ const metricConfig: Record<GoalMetric, { label: string; icon: React.ReactNode; u
     unit: '%',
     color: 'text-warning'
   },
+  talk_time: { 
+    label: 'Talk Time', 
+    icon: <Clock className="w-4 h-4" />, 
+    unit: 'mins',
+    color: 'text-purple-500'
+  },
 };
 
 interface GoalCardProps {
@@ -283,6 +289,7 @@ const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSubmit, isLoading
     interested: { weekly: 25, monthly: 100 },
     leads: { weekly: 10, monthly: 40 },
     conversion: { weekly: 25, monthly: 25 },
+    talk_time: { weekly: 300, monthly: 1200 },
   };
 
   return (

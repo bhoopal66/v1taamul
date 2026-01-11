@@ -5,7 +5,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, isWithinInter
 import { toast } from 'sonner';
 
 export type GoalType = 'weekly' | 'monthly';
-export type GoalMetric = 'calls' | 'interested' | 'leads' | 'conversion';
+export type GoalMetric = 'calls' | 'interested' | 'leads' | 'conversion' | 'talk_time';
 
 export interface Goal {
   id: string;
@@ -221,6 +221,15 @@ export const useAgentGoals = (agentId?: string) => {
           const totalCalls = feedback?.length || 0;
           const interested = feedback?.filter(f => f.feedback_status === 'interested').length || 0;
           currentValue = totalCalls > 0 ? Math.round((interested / totalCalls) * 100) : 0;
+        } else if (goal.metric === 'talk_time') {
+          const { data: talkTimeData } = await supabase
+            .from('agent_talk_time')
+            .select('talk_time_minutes')
+            .eq('agent_id', targetUserId)
+            .gte('date', format(startDate, 'yyyy-MM-dd'))
+            .lte('date', format(endDate, 'yyyy-MM-dd'));
+
+          currentValue = talkTimeData?.reduce((sum, t) => sum + (t.talk_time_minutes || 0), 0) || 0;
         }
 
         const isCompleted = currentValue >= goal.target_value;

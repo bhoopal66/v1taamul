@@ -18,6 +18,7 @@ const metricLabels: Record<GoalMetric, string> = {
   interested: 'Interested',
   leads: 'Leads',
   conversion: 'Conversion',
+  talk_time: 'Talk Time',
 };
 
 const rarityColors: Record<string, { bg: string; border: string; text: string; glow: string }> = {

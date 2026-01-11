@@ -33,6 +33,7 @@ import {
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
 import { useCallSheetUpload, RejectionDetail, UploadHistory } from '@/hooks/useCallSheetUpload';
+import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
 
 export const UploadPage: React.FC = () => {
@@ -537,6 +538,9 @@ export const UploadPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Talk Time Upload */}
+          <TalkTimeUpload />
         </div>
 
         {/* Upload History Sidebar */}

@@ -56,6 +56,36 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_talk_time: {
+        Row: {
+          agent_id: string
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          talk_time_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          talk_time_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          talk_time_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       approved_call_list: {
         Row: {
           agent_id: string

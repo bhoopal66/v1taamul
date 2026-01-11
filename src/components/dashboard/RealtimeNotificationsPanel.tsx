@@ -3,13 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Bell, BellOff, Phone, Star, UserCheck, Trash2, CheckCheck, Wifi, WifiOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Bell, BellOff, BellRing, Phone, Star, UserCheck, Trash2, CheckCheck, WifiOff, Settings } from 'lucide-react';
 import { useRealtimeNotifications, RealtimeNotification } from '@/hooks/useRealtimeNotifications';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export const RealtimeNotificationsPanel = () => {
   const { notifications, isConnected, unreadCount, clearNotifications, markAllAsRead } = useRealtimeNotifications();
+  const { 
+    enabled: browserNotificationsEnabled, 
+    settings: notificationSettings, 
+    isSupported, 
+    toggleNotifications, 
+    updateSettings,
+    permission 
+  } = useBrowserNotifications();
   const [isExpanded, setIsExpanded] = useState(true);
 
   const getIcon = (type: RealtimeNotification['type']) => {
@@ -101,6 +113,92 @@ export const RealtimeNotificationsPanel = () => {
                 </Button>
               </>
             )}
+            
+            {/* Browser Notifications Settings */}
+            {isSupported && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={cn("h-8 w-8", browserNotificationsEnabled && "text-primary")}
+                    title="Desktop notification settings"
+                  >
+                    <BellRing className="w-4 h-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Desktop Notifications</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Get notified when the dashboard is in the background
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="browser-notif" className="text-sm">
+                        Enable notifications
+                      </Label>
+                      <Switch 
+                        id="browser-notif"
+                        checked={browserNotificationsEnabled}
+                        onCheckedChange={toggleNotifications}
+                      />
+                    </div>
+
+                    {permission === 'denied' && (
+                      <p className="text-xs text-destructive">
+                        Notifications blocked. Please enable in browser settings.
+                      </p>
+                    )}
+
+                    {browserNotificationsEnabled && (
+                      <div className="space-y-3 pt-2 border-t">
+                        <p className="text-xs text-muted-foreground">Notify me about:</p>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="notif-calls" className="text-sm flex items-center gap-2">
+                            <Phone className="w-3 h-3" />
+                            New calls
+                          </Label>
+                          <Switch 
+                            id="notif-calls"
+                            checked={notificationSettings.calls}
+                            onCheckedChange={(checked) => updateSettings({ calls: checked })}
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="notif-interested" className="text-sm flex items-center gap-2">
+                            <Star className="w-3 h-3 text-yellow-500" />
+                            Interested leads
+                          </Label>
+                          <Switch 
+                            id="notif-interested"
+                            checked={notificationSettings.interested}
+                            onCheckedChange={(checked) => updateSettings({ interested: checked })}
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="notif-leads" className="text-sm flex items-center gap-2">
+                            <UserCheck className="w-3 h-3 text-green-500" />
+                            New leads generated
+                          </Label>
+                          <Switch 
+                            id="notif-leads"
+                            checked={notificationSettings.leads}
+                            onCheckedChange={(checked) => updateSettings({ leads: checked })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
             <Button 
               variant="ghost" 
               size="icon" 

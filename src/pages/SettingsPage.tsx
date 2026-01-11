@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
-import { Settings, Bell, Volume2, User, Shield, AlertCircle, BellOff } from 'lucide-react';
+import { Settings, Bell, Volume2, User, Shield, AlertCircle, BellOff, Edit2, Save, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Storage keys for notification preferences
 const STORAGE_KEYS = {
@@ -21,9 +22,72 @@ const STORAGE_KEYS = {
 };
 
 export const SettingsPage: React.FC = () => {
-  const { profile, userRole } = useAuth();
+  const { profile, userRole, refreshProfile } = useAuth();
   const { soundEnabled, toggleSound } = useSoundSettings();
   const { enabled: notificationsEnabled, permission, isSupported, toggleNotifications } = useBrowserNotifications();
+  
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedProfile, setEditedProfile] = useState({
+    full_name: '',
+    username: '',
+    phone_number: '',
+    whatsapp_number: '',
+  });
+  
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  
+  // Initialize edit form when profile loads
+  useEffect(() => {
+    if (profile) {
+      setEditedProfile({
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+        phone_number: profile.phone_number || '',
+        whatsapp_number: profile.whatsapp_number || '',
+      });
+    }
+  }, [profile]);
+  
+  const handleSaveProfile = async () => {
+    if (!profile?.id) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editedProfile.full_name,
+          username: editedProfile.username,
+          phone_number: editedProfile.phone_number,
+          whatsapp_number: editedProfile.whatsapp_number,
+        })
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+      
+      toast.success('Profile updated successfully');
+      setIsEditing(false);
+      refreshProfile?.();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    if (profile) {
+      setEditedProfile({
+        full_name: profile.full_name || '',
+        username: profile.username || '',
+        phone_number: profile.phone_number || '',
+        whatsapp_number: profile.whatsapp_number || '',
+      });
+    }
+  };
   
   // Notification preference states
   const [dailyGoalReminders, setDailyGoalReminders] = useState(() => 
@@ -80,24 +144,75 @@ export const SettingsPage: React.FC = () => {
         {/* Profile Settings */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Profile
-            </CardTitle>
-            <CardDescription>Your account information</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Profile
+                </CardTitle>
+                <CardDescription>Your account information</CardDescription>
+              </div>
+              {isAdmin && !isEditing && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Edit2 className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+              {isEditing && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={isSaving}>
+                    <X className="w-4 h-4 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSaveProfile} disabled={isSaving}>
+                    <Save className="w-4 h-4 mr-1" />
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Full Name</Label>
-              <Input value={profile?.full_name || ''} disabled />
+              <Input 
+                value={isEditing ? editedProfile.full_name : (profile?.full_name || '')} 
+                onChange={(e) => setEditedProfile(prev => ({ ...prev, full_name: e.target.value }))}
+                disabled={!isEditing} 
+              />
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
               <Input value={profile?.email || ''} disabled />
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Username</Label>
-              <Input value={profile?.username || ''} disabled />
+              <Input 
+                value={isEditing ? editedProfile.username : (profile?.username || '')} 
+                onChange={(e) => setEditedProfile(prev => ({ ...prev, username: e.target.value }))}
+                disabled={!isEditing} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input 
+                value={isEditing ? editedProfile.phone_number : (profile?.phone_number || '')} 
+                onChange={(e) => setEditedProfile(prev => ({ ...prev, phone_number: e.target.value }))}
+                disabled={!isEditing}
+                placeholder={isEditing ? 'Enter phone number' : 'Not set'}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp Number</Label>
+              <Input 
+                value={isEditing ? editedProfile.whatsapp_number : (profile?.whatsapp_number || '')} 
+                onChange={(e) => setEditedProfile(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                disabled={!isEditing}
+                placeholder={isEditing ? 'Enter WhatsApp number' : 'Not set'}
+              />
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
@@ -105,6 +220,9 @@ export const SettingsPage: React.FC = () => {
                 value={userRole?.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Agent'} 
                 disabled 
               />
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">Role changes require User Management</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -9,6 +9,7 @@ interface AuthContextType {
   userRole: string | null;
   profile: any | null;
   ledTeamId: string | null;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   profile: null,
   ledTeamId: null,
+  refreshProfile: async () => {},
 });
 
 export const useAuth = () => {
@@ -77,6 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchUserData(user.id);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -114,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, profile, ledTeamId }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, profile, ledTeamId, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

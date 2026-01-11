@@ -164,45 +164,51 @@ export const AppSidebar: React.FC = () => {
               ) : (
                 <ScrollArea className="max-h-[300px]">
                   <div className="divide-y divide-border">
-                    {recentAlerts.map((alert) => (
-                      <div 
-                        key={alert.id} 
-                        className="p-3 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 p-1.5 rounded-full bg-destructive/10">
-                            <TrendingDown className="w-3.5 h-3.5 text-destructive" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-foreground">
-                                {METRIC_LABELS[alert.metric] || alert.metric}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {alert.alert_type === 'team' ? alert.team_name : alert.agent_name}
-                              </Badge>
+                    {recentAlerts.map((alert) => {
+                      const isCritical = alert.severity === 'critical';
+                      return (
+                        <div 
+                          key={alert.id} 
+                          className={`p-3 hover:bg-muted/50 transition-colors ${isCritical ? 'bg-destructive/5' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 p-1.5 rounded-full ${isCritical ? 'bg-destructive/10' : 'bg-amber-500/10'}`}>
+                              <TrendingDown className={`w-3.5 h-3.5 ${isCritical ? 'text-destructive' : 'text-amber-500'}`} />
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {alert.actual_value} / {alert.target_value} ({alert.percentage_achieved.toFixed(0)}%)
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">
+                                  {METRIC_LABELS[alert.metric] || alert.metric}
+                                </span>
+                                <Badge 
+                                  variant={isCritical ? 'destructive' : 'secondary'}
+                                  className={`text-xs ${!isCritical ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}`}
+                                >
+                                  {isCritical ? 'Critical' : 'Warning'}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {alert.alert_type === 'team' ? alert.team_name : alert.agent_name} • {alert.actual_value} / {alert.target_value} ({alert.percentage_achieved.toFixed(0)}%)
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                acknowledgeAlert.mutate(alert.id);
+                              }}
+                            >
+                              Ack
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              acknowledgeAlert.mutate(alert.id);
-                            }}
-                          >
-                            Ack
-                          </Button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}

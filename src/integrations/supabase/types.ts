@@ -407,6 +407,7 @@ export type Database = {
           message: string | null
           metric: string
           percentage_achieved: number
+          severity: Database["public"]["Enums"]["alert_severity"]
           target_id: string
           target_value: number
           team_id: string | null
@@ -424,6 +425,7 @@ export type Database = {
           message?: string | null
           metric: string
           percentage_achieved: number
+          severity?: Database["public"]["Enums"]["alert_severity"]
           target_id: string
           target_value: number
           team_id?: string | null
@@ -441,6 +443,7 @@ export type Database = {
           message?: string | null
           metric?: string
           percentage_achieved?: number
+          severity?: Database["public"]["Enums"]["alert_severity"]
           target_id?: string
           target_value?: number
           team_id?: string | null
@@ -862,6 +865,7 @@ export type Database = {
     }
     Enums: {
       action_type: "upload" | "call" | "feedback" | "reassign" | "status_change"
+      alert_severity: "warning" | "critical"
       alert_status: "active" | "acknowledged" | "resolved"
       alert_type: "team" | "agent"
       app_role:
@@ -1017,6 +1021,7 @@ export const Constants = {
   public: {
     Enums: {
       action_type: ["upload", "call", "feedback", "reassign", "status_change"],
+      alert_severity: ["warning", "critical"],
       alert_status: ["active", "acknowledged", "resolved"],
       alert_type: ["team", "agent"],
       app_role: [

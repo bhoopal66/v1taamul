@@ -184,12 +184,15 @@ const handler = async (req: Request): Promise<Response> => {
           .gte("created_at", start);
 
         if (!existingAlerts || existingAlerts.length === 0) {
-          // Create new alert
+          // Create new alert with severity based on percentage achieved
           const metricLabels: Record<string, string> = {
             calls: "Calls",
             leads: "Leads",
             conversion_rate: "Conversion Rate",
           };
+
+          // Determine severity: critical if below 50%, warning if below threshold but above 50%
+          const severity = percentageAchieved < 50 ? "critical" : "warning";
 
           alertsToCreate.push({
             target_id: target.id,
@@ -201,6 +204,7 @@ const handler = async (req: Request): Promise<Response> => {
             actual_value: actualValue,
             percentage_achieved: Math.round(percentageAchieved * 10) / 10,
             alert_status: "active",
+            severity: severity,
             message: `${metricLabels[target.metric] || target.metric} is at ${actualValue} (${Math.round(percentageAchieved)}% of ${target.target_value} target) - below ${target.threshold_percentage}% threshold`,
           });
         }

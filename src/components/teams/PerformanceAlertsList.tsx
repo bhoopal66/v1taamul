@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, CheckCircle, Clock, Users, User, Bell, BellOff, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Users, User, Bell, BellOff, RefreshCw, AlertOctagon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,23 @@ const METRIC_LABELS: Record<string, string> = {
   calls: 'Calls',
   leads: 'Leads',
   conversion_rate: 'Conversion Rate',
+};
+
+const getSeverityConfig = (severity: 'warning' | 'critical') => {
+  if (severity === 'critical') {
+    return {
+      icon: <AlertOctagon className="w-4 h-4 text-destructive" />,
+      badgeVariant: 'destructive' as const,
+      bgClass: 'bg-destructive/5 border-destructive/30',
+      label: 'Critical',
+    };
+  }
+  return {
+    icon: <AlertTriangle className="w-4 h-4 text-amber-500" />,
+    badgeVariant: 'secondary' as const,
+    bgClass: 'bg-amber-500/5 border-amber-500/30',
+    label: 'Warning',
+  };
 };
 
 export const PerformanceAlertsList: React.FC = () => {
@@ -67,12 +84,13 @@ export const PerformanceAlertsList: React.FC = () => {
   const AlertCard: React.FC<{ alert: PerformanceAlert }> = ({ alert }) => {
     const metricLabel = METRIC_LABELS[alert.metric] || alert.metric;
     const isPercentage = alert.metric === 'conversion_rate';
+    const severityConfig = getSeverityConfig(alert.severity || 'warning');
 
     return (
-      <div className="p-4 border rounded-lg space-y-3 hover:bg-muted/50 transition-colors">
+      <div className={`p-4 border rounded-lg space-y-3 hover:bg-muted/50 transition-colors ${alert.alert_status === 'active' ? severityConfig.bgClass : ''}`}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            {getStatusIcon(alert.alert_status)}
+            {alert.alert_status === 'active' ? severityConfig.icon : getStatusIcon(alert.alert_status)}
             <Badge variant={alert.alert_type === 'team' ? 'default' : 'secondary'}>
               {alert.alert_type === 'team' ? (
                 <><Users className="w-3 h-3 mr-1" /> {alert.team_name}</>
@@ -80,6 +98,14 @@ export const PerformanceAlertsList: React.FC = () => {
                 <><User className="w-3 h-3 mr-1" /> {alert.agent_name}</>
               )}
             </Badge>
+            {alert.alert_status === 'active' && (
+              <Badge 
+                variant={severityConfig.badgeVariant}
+                className={alert.severity === 'critical' ? '' : 'bg-amber-500 hover:bg-amber-600 text-white'}
+              >
+                {severityConfig.label}
+              </Badge>
+            )}
           </div>
           <Badge variant={getStatusBadgeVariant(alert.alert_status)}>
             {alert.alert_status}

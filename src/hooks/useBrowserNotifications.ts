@@ -22,6 +22,7 @@ interface PerformanceAlertPayload {
   team_id: string | null;
   agent_id: string | null;
   alert_status: string;
+  severity: 'warning' | 'critical';
   message: string | null;
   created_at: string;
 }
@@ -130,13 +131,15 @@ export const useBrowserNotifications = () => {
 
           const metricLabel = METRIC_LABELS[alert.metric] || alert.metric;
           const entityType = alert.alert_type === 'team' ? 'Team' : 'Agent';
+          const severityIcon = alert.severity === 'critical' ? '🚨' : '⚠️';
+          const severityLabel = alert.severity === 'critical' ? 'CRITICAL' : 'Warning';
           
           showNotification(
-            `⚠️ Performance Alert`,
+            `${severityIcon} ${severityLabel}: Performance Alert`,
             {
               body: `${entityType} ${metricLabel} is at ${alert.percentage_achieved.toFixed(0)}% of target (${alert.actual_value}/${alert.target_value})`,
               tag: `alert-${alert.id}`,
-              requireInteraction: true,
+              requireInteraction: alert.severity === 'critical',
             }
           );
         }

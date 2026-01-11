@@ -32,6 +32,7 @@ export interface PerformanceAlert {
   actual_value: number;
   percentage_achieved: number;
   alert_status: 'active' | 'acknowledged' | 'resolved';
+  severity: 'warning' | 'critical';
   acknowledged_by: string | null;
   acknowledged_at: string | null;
   message: string | null;

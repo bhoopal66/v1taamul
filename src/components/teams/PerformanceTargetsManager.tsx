@@ -11,13 +11,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Target, Plus, Trash2, Users, User, Phone, TrendingUp, Percent, Calendar } from 'lucide-react';
+import { Target, Plus, Trash2, Users, User, Phone, TrendingUp, Percent, Calendar, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const METRICS = [
   { value: 'calls', label: 'Total Calls', icon: Phone },
   { value: 'leads', label: 'Leads Generated', icon: TrendingUp },
   { value: 'conversion_rate', label: 'Conversion Rate (%)', icon: Percent },
+  { value: 'talk_time', label: 'Talk Time (mins)', icon: Clock },
 ];
 
 const PERIODS = [
@@ -293,9 +294,10 @@ export const PerformanceTargetsManager: React.FC = () => {
                     {target.team_name || target.agent_name || 'Unknown'}
                   </TableCell>
                   <TableCell>{getMetricLabel(target.metric)}</TableCell>
-                  <TableCell>
+                <TableCell>
                     {target.target_value}
                     {target.metric === 'conversion_rate' && '%'}
+                    {target.metric === 'talk_time' && ' mins'}
                   </TableCell>
                   <TableCell>{target.threshold_percentage}%</TableCell>
                   <TableCell>{getPeriodLabel(target.period)}</TableCell>

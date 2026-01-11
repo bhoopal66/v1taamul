@@ -340,7 +340,7 @@ export const Dashboard: React.FC = () => {
                 variant={viewMode === 'team' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => handleViewModeChange('team')}
-                className="gap-2"
+                className={`gap-2 ${viewMode === 'team' ? 'bg-sidebar-background text-sidebar-foreground hover:bg-sidebar-background/90' : ''}`}
               >
                 <Users className="w-4 h-4" />
                 Team View

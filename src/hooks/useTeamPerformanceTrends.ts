@@ -28,35 +28,73 @@ export interface TeamTrendSummary {
 
 interface UseTeamPerformanceTrendsOptions {
   days?: number;
+  teamId?: string;
 }
 
 export const useTeamPerformanceTrends = (options: UseTeamPerformanceTrendsOptions = {}) => {
   const { user, userRole } = useAuth();
-  const { days = 14 } = options;
+  const { days = 14, teamId } = options;
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
 
   const { data: trendData, isLoading, refetch } = useQuery({
-    queryKey: ['team-performance-trends', days],
+    queryKey: ['team-performance-trends', days, teamId],
     queryFn: async (): Promise<{ dailyTrends: DailyTeamTrend[]; summary: TeamTrendSummary }> => {
       const endDate = new Date();
       const startDate = subDays(endDate, days - 1);
 
+      // Get agent IDs for the team if filtering by team
+      let agentIds: string[] | null = null;
+      if (teamId) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('team_id', teamId);
+        agentIds = profiles?.map(p => p.id) || [];
+      }
+
       // Get all feedback in date range
-      const { data: feedback, error: feedbackError } = await supabase
+      let feedbackQuery = supabase
         .from('call_feedback')
         .select('agent_id, feedback_status, call_timestamp')
         .gte('call_timestamp', startOfDay(startDate).toISOString())
         .lte('call_timestamp', endOfDay(endDate).toISOString());
 
+      if (agentIds && agentIds.length > 0) {
+        feedbackQuery = feedbackQuery.in('agent_id', agentIds);
+      } else if (agentIds && agentIds.length === 0) {
+        // No agents in team, return empty
+        return {
+          dailyTrends: [],
+          summary: {
+            totalCalls: 0,
+            totalInterested: 0,
+            totalLeads: 0,
+            avgConversionRate: 0,
+            avgCallsPerDay: 0,
+            bestDay: 'N/A',
+            trend: 'stable',
+            trendPercentage: 0,
+          },
+        };
+      }
+
+      const { data: feedback, error: feedbackError } = await feedbackQuery;
+
       if (feedbackError) throw feedbackError;
 
       // Get all leads in date range
-      const { data: leads, error: leadsError } = await supabase
+      let leadsQuery = supabase
         .from('leads')
         .select('agent_id, created_at')
         .gte('created_at', startOfDay(startDate).toISOString())
         .lte('created_at', endOfDay(endDate).toISOString());
+
+      if (agentIds && agentIds.length > 0) {
+        leadsQuery = leadsQuery.in('agent_id', agentIds);
+      }
+
+      const { data: leads, error: leadsError } = await leadsQuery;
 
       if (leadsError) throw leadsError;
 

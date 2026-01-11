@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Shield, AlertTriangle } from 'lucide-react';
 import { TeamStatsCards } from '@/components/supervisor/TeamStatsCards';
@@ -18,9 +20,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const SupervisorDashboard: React.FC = () => {
-  const { profile, userRole } = useAuth();
+  const { profile, userRole, ledTeamId } = useAuth();
   const [trendDays, setTrendDays] = useState<number>(14);
-  
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+
+  // Fetch all teams for the filter
+  const { data: teams } = useQuery({
+    queryKey: ['all-teams'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name, team_type')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const {
     teamPerformance,
     pendingUploads,
@@ -30,14 +46,14 @@ export const SupervisorDashboard: React.FC = () => {
     approveUpload,
     rejectUpload,
     refetch,
-  } = useSupervisorData();
+  } = useSupervisorData(selectedTeamId === 'all' ? undefined : selectedTeamId);
 
   const {
     dailyTrends,
     summary: trendSummary,
     isLoading: trendsLoading,
     refetch: refetchTrends,
-  } = useTeamPerformanceTrends({ days: trendDays });
+  } = useTeamPerformanceTrends({ days: trendDays, teamId: selectedTeamId === 'all' ? undefined : selectedTeamId });
 
   const handleRefresh = () => {
     refetch();
@@ -58,6 +74,8 @@ export const SupervisorDashboard: React.FC = () => {
     );
   }
 
+  const selectedTeam = teams?.find(t => t.id === selectedTeamId);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -68,22 +86,38 @@ export const SupervisorDashboard: React.FC = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Overall View
+              Team Overview
             </h1>
             <p className="text-muted-foreground mt-1">
-              Team overview and management • {profile?.full_name || 'Supervisor'}
+              {selectedTeamId === 'all' ? 'All Teams' : selectedTeam?.name || 'Team'} • {profile?.full_name || 'Supervisor'}
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={isLoading || trendsLoading}
-          className="gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading || trendsLoading ? 'animate-spin' : ''}`} />
-          Refresh Data
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Team Filter */}
+          <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select team" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Teams</SelectItem>
+              {teams?.map((team) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={isLoading || trendsLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading || trendsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Today's Stats Cards */}

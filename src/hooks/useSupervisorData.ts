@@ -39,7 +39,7 @@ export interface TeamStats {
   pendingUploads: number;
 }
 
-export const useSupervisorData = () => {
+export const useSupervisorData = (teamId?: string) => {
   const { user, userRole } = useAuth();
   const queryClient = useQueryClient();
   const today = new Date();
@@ -48,15 +48,21 @@ export const useSupervisorData = () => {
 
   // Fetch team agents with their performance
   const { data: teamPerformance, isLoading: teamLoading, refetch: refetchTeam } = useQuery({
-    queryKey: ['team-performance'],
+    queryKey: ['team-performance', teamId],
     queryFn: async (): Promise<AgentPerformance[]> => {
       const todayStart = startOfDay(today).toISOString();
       const todayEnd = endOfDay(today).toISOString();
 
-      // Get all agent profiles
-      const { data: profiles, error: profilesError } = await supabase
+      // Get agent profiles - filter by team if specified
+      let profilesQuery = supabase
         .from('profiles')
-        .select('id, full_name, email, username, is_active');
+        .select('id, full_name, email, username, is_active, team_id');
+      
+      if (teamId) {
+        profilesQuery = profilesQuery.eq('team_id', teamId);
+      }
+
+      const { data: profiles, error: profilesError } = await profilesQuery;
 
       if (profilesError) throw profilesError;
 

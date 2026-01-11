@@ -189,6 +189,7 @@ export const CallListPage: React.FC = () => {
       phoneNumber: contact.phoneNumber,
       tradeLicenseNumber: contact.tradeLicenseNumber,
       city: contact.city,
+      area: contact.area,
       industry: contact.industry,
       callStatus: contact.callStatus,
       lastFeedback: contact.lastFeedback,
@@ -457,7 +458,13 @@ export const CallListPage: React.FC = () => {
                   {contact.city && (
                     <p className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="w-4 h-4" />
-                      {contact.city}
+                      {contact.city}{contact.area && `, ${contact.area}`}
+                    </p>
+                  )}
+                  {!contact.city && contact.area && (
+                    <p className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="w-4 h-4" />
+                      {contact.area}
                     </p>
                   )}
                   {contact.industry && (

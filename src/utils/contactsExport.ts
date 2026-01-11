@@ -9,6 +9,7 @@ export interface ContactExportData {
   tradeLicenseNumber: string;
   city: string | null;
   industry: string | null;
+  area: string | null;
   callStatus: string;
   lastFeedback: string | null;
   lastNotes: string | null;
@@ -24,6 +25,7 @@ const formatContactsForExport = (contacts: ContactExportData[]) => {
     'Phone Number': contact.phoneNumber,
     'Trade License': contact.tradeLicenseNumber,
     'City': contact.city || '-',
+    'Area': contact.area || '-',
     'Industry': contact.industry || '-',
     'Call Status': contact.callStatus.charAt(0).toUpperCase() + contact.callStatus.slice(1),
     'Feedback': contact.lastFeedback 
@@ -87,6 +89,7 @@ export const exportContactsToExcel = (contacts: ContactExportData[], filename?: 
     { wch: 15 },  // Phone Number
     { wch: 20 },  // Trade License
     { wch: 15 },  // City
+    { wch: 15 },  // Area
     { wch: 20 },  // Industry
     { wch: 12 },  // Call Status
     { wch: 15 },  // Feedback

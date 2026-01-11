@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePerformanceAlerts, PerformanceAlert } from '@/hooks/usePerformanceAlerts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, CheckCircle, Clock, Users, User, Bell, BellOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Users, User, Bell, BellOff, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const METRIC_LABELS: Record<string, string> = {
   calls: 'Calls',
@@ -15,7 +17,24 @@ const METRIC_LABELS: Record<string, string> = {
 };
 
 export const PerformanceAlertsList: React.FC = () => {
-  const { alerts, isLoading, acknowledgeAlert, resolveAlert } = usePerformanceAlerts();
+  const { alerts, isLoading, acknowledgeAlert, resolveAlert, refetchAlerts } = usePerformanceAlerts();
+  const [isChecking, setIsChecking] = useState(false);
+
+  const runPerformanceCheck = async () => {
+    setIsChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-performance-alerts');
+      
+      if (error) throw error;
+      
+      toast.success(`Check complete: ${data.alerts_created} new alerts, ${data.alerts_resolved} resolved`);
+      refetchAlerts();
+    } catch (error: any) {
+      toast.error('Failed to run performance check: ' + error.message);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const activeAlerts = alerts.filter(a => a.alert_status === 'active');
   const acknowledgedAlerts = alerts.filter(a => a.alert_status === 'acknowledged');
@@ -137,6 +156,16 @@ export const PerformanceAlertsList: React.FC = () => {
               </CardTitle>
               <CardDescription>Alerts requiring immediate attention</CardDescription>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={runPerformanceCheck}
+              disabled={isChecking}
+            >
+              <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+              {isChecking ? 'Checking...' : 'Check Now'}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>

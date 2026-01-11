@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Users, Phone, TrendingUp, Target, MoreVertical, Mail } from 'lucide-react';
+import { Users, Phone, TrendingUp, Target, MoreVertical, Mail, Clock } from 'lucide-react';
 import { AgentPerformance } from '@/hooks/useSupervisorData';
 import {
   DropdownMenu,
@@ -12,6 +12,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+const formatDuration = (mins: number) => {
+  const hours = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  if (hours > 0) {
+    return `${hours}h ${remainingMins}m`;
+  }
+  return `${mins}m`;
+};
 
 interface AgentPerformanceTableProps {
   data: AgentPerformance[];
@@ -92,6 +101,11 @@ export const AgentPerformanceTable: React.FC<AgentPerformanceTableProps> = ({ da
                       <Target className="w-3.5 h-3.5" /> Leads
                     </div>
                   </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> Talk Time
+                    </div>
+                  </TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -156,6 +170,11 @@ export const AgentPerformanceTable: React.FC<AgentPerformanceTableProps> = ({ da
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="bg-accent/10 text-accent-foreground">
                         {agent.leadsGenerated}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" className="bg-violet-500/10 text-violet-600">
+                        {formatDuration(agent.talkTimeMinutes)}
                       </Badge>
                     </TableCell>
                     <TableCell>

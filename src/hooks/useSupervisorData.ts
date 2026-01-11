@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
 import { toast } from 'sonner';
 
 export interface AgentPerformance {
@@ -15,6 +15,7 @@ export interface AgentPerformance {
   notAnswered: number;
   conversionRate: number;
   leadsGenerated: number;
+  talkTimeMinutes: number;
 }
 
 export interface PendingUpload {
@@ -37,6 +38,7 @@ export interface TeamStats {
   totalLeadsToday: number;
   avgConversionRate: number;
   pendingUploads: number;
+  totalTalkTimeToday: number;
 }
 
 export const useSupervisorData = (teamId?: string) => {
@@ -80,10 +82,18 @@ export const useSupervisorData = (teamId?: string) => {
         .gte('created_at', todayStart)
         .lte('created_at', todayEnd);
 
+      // Get today's talk time
+      const todayDate = format(today, 'yyyy-MM-dd');
+      const { data: talkTime } = await supabase
+        .from('agent_talk_time')
+        .select('agent_id, talk_time_minutes')
+        .eq('date', todayDate);
+
       // Aggregate by agent
       return (profiles || []).map(profile => {
         const agentFeedback = feedback?.filter(f => f.agent_id === profile.id) || [];
         const agentLeads = leads?.filter(l => l.agent_id === profile.id) || [];
+        const agentTalkTime = talkTime?.find(t => t.agent_id === profile.id);
         
         const totalCalls = agentFeedback.length;
         const interested = agentFeedback.filter(f => f.feedback_status === 'interested').length;
@@ -101,6 +111,7 @@ export const useSupervisorData = (teamId?: string) => {
           notAnswered,
           conversionRate: totalCalls > 0 ? Math.round((interested / totalCalls) * 100) : 0,
           leadsGenerated: agentLeads.length,
+          talkTimeMinutes: agentTalkTime?.talk_time_minutes || 0,
         };
       });
     },
@@ -157,6 +168,7 @@ export const useSupervisorData = (teamId?: string) => {
       ? Math.round(teamPerformance.reduce((sum, a) => sum + a.conversionRate, 0) / teamPerformance.length)
       : 0,
     pendingUploads: pendingUploads?.length || 0,
+    totalTalkTimeToday: teamPerformance?.reduce((sum, a) => sum + a.talkTimeMinutes, 0) || 0,
   };
 
   // Approve upload mutation

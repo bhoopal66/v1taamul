@@ -1,12 +1,21 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Phone, Target, TrendingUp, FileCheck } from 'lucide-react';
+import { Users, UserCheck, Phone, Target, TrendingUp, FileCheck, Clock } from 'lucide-react';
 import { TeamStats } from '@/hooks/useSupervisorData';
 
 interface TeamStatsCardsProps {
   stats: TeamStats;
   isLoading: boolean;
 }
+
+const formatDuration = (mins: number) => {
+  const hours = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  if (hours > 0) {
+    return `${hours}h ${remainingMins}m`;
+  }
+  return `${mins}m`;
+};
 
 export const TeamStatsCards: React.FC<TeamStatsCardsProps> = ({ stats, isLoading }) => {
   const cards = [
@@ -32,6 +41,13 @@ export const TeamStatsCards: React.FC<TeamStatsCardsProps> = ({ stats, isLoading
       description: 'Total calls today',
     },
     {
+      label: 'Talk Time',
+      value: formatDuration(stats.totalTalkTimeToday),
+      icon: Clock,
+      color: 'bg-violet-500 text-white',
+      description: 'Total talk time today',
+    },
+    {
       label: 'Team Leads',
       value: stats.totalLeadsToday,
       icon: Target,
@@ -44,13 +60,6 @@ export const TeamStatsCards: React.FC<TeamStatsCardsProps> = ({ stats, isLoading
       icon: TrendingUp,
       color: 'bg-warning text-warning-foreground',
       description: 'Team average',
-    },
-    {
-      label: 'Pending Uploads',
-      value: stats.pendingUploads,
-      icon: FileCheck,
-      color: stats.pendingUploads > 0 ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground',
-      description: 'Awaiting approval',
     },
   ];
 

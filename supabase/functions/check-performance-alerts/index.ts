@@ -22,6 +22,7 @@ interface PerformanceData {
   calls: number;
   leads: number;
   interested: number;
+  talkTime: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -112,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       const { start, end } = getDateRange(target.period);
 
-      let performance: PerformanceData = { calls: 0, leads: 0, interested: 0 };
+      let performance: PerformanceData = { calls: 0, leads: 0, interested: 0, talkTime: 0 };
       let agentIds: string[] = [];
 
       if (target.target_type === "team" && target.team_id) {
@@ -150,6 +151,21 @@ const handler = async (req: Request): Promise<Response> => {
         performance.leads = leadsData.length;
       }
 
+      // Get talk time data
+      const { data: talkTimeData } = await supabase
+        .from("agent_talk_time")
+        .select("talk_time_minutes")
+        .in("agent_id", agentIds)
+        .gte("date", start.split("T")[0])
+        .lte("date", end.split("T")[0]);
+
+      if (talkTimeData) {
+        performance.talkTime = talkTimeData.reduce(
+          (sum, t) => sum + (t.talk_time_minutes || 0),
+          0
+        );
+      }
+
       // Calculate actual value based on metric
       let actualValue = 0;
       switch (target.metric) {
@@ -164,6 +180,9 @@ const handler = async (req: Request): Promise<Response> => {
             performance.calls > 0
               ? Math.round((performance.interested / performance.calls) * 100)
               : 0;
+          break;
+        case "talk_time":
+          actualValue = performance.talkTime;
           break;
       }
 
@@ -189,6 +208,7 @@ const handler = async (req: Request): Promise<Response> => {
             calls: "Calls",
             leads: "Leads",
             conversion_rate: "Conversion Rate",
+            talk_time: "Talk Time (mins)",
           };
 
           // Determine severity: critical if below 50%, warning if below threshold but above 50%
@@ -283,6 +303,18 @@ const handler = async (req: Request): Promise<Response> => {
             .lte("created_at", end);
 
           actualValue = leadsData?.length || 0;
+        } else if (target.metric === "talk_time") {
+          const { data: talkTimeData } = await supabase
+            .from("agent_talk_time")
+            .select("talk_time_minutes")
+            .in("agent_id", agentIds)
+            .gte("date", start.split("T")[0])
+            .lte("date", end.split("T")[0]);
+
+          actualValue = talkTimeData?.reduce(
+            (sum, t) => sum + (t.talk_time_minutes || 0),
+            0
+          ) || 0;
         }
 
         const percentageAchieved =

@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
+import { formatDistanceToNow, startOfMonth, endOfMonth, format, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -340,11 +340,55 @@ export const Dashboard: React.FC = () => {
                   </SelectContent>
                 </Select>
                 
-                <Popover>
-                  <PopoverTrigger asChild>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="gap-2 bg-background/80">
                       <Calendar className="w-4 h-4" />
                       {dateRangeLabel}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="bg-background">
+                    <DropdownMenuLabel>Quick Filters</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => {
+                      setDateFrom(new Date());
+                      setDateTo(new Date());
+                    }}>
+                      Today
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setDateFrom(subDays(new Date(), 6));
+                      setDateTo(new Date());
+                    }}>
+                      Last 7 days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setDateFrom(subDays(new Date(), 29));
+                      setDateTo(new Date());
+                    }}>
+                      Last 30 days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      setDateFrom(startOfMonth(new Date()));
+                      setDateTo(endOfMonth(new Date()));
+                    }}>
+                      This Month
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      const lastMonth = subDays(startOfMonth(new Date()), 1);
+                      setDateFrom(startOfMonth(lastMonth));
+                      setDateTo(endOfMonth(lastMonth));
+                    }}>
+                      Last Month
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Custom Range</DropdownMenuLabel>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="bg-background/80">
+                      <Filter className="w-4 h-4" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">

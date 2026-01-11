@@ -3,9 +3,12 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from './AppSidebar';
 import { Loader2 } from 'lucide-react';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 export const DashboardLayout: React.FC = () => {
   const { user, loading } = useAuth();
+  // Initialize browser notifications subscription
+  useBrowserNotifications();
 
   if (loading) {
     return (

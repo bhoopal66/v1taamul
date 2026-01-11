@@ -4,13 +4,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
-import { Settings, Bell, Volume2, User, Shield } from 'lucide-react';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
+import { Settings, Bell, Volume2, User, Shield, AlertCircle } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const { profile, userRole } = useAuth();
   const { soundEnabled, toggleSound } = useSoundSettings();
+  const { enabled: notificationsEnabled, permission, isSupported, toggleNotifications } = useBrowserNotifications();
 
   return (
     <div className="p-6 space-y-6">
@@ -78,12 +81,30 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Desktop Notifications</Label>
+                <div className="flex items-center gap-2">
+                  <Label>Desktop Notifications</Label>
+                  {!isSupported && (
+                    <Badge variant="secondary" className="text-xs">Not Supported</Badge>
+                  )}
+                  {isSupported && permission === 'denied' && (
+                    <Badge variant="destructive" className="text-xs">Blocked</Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Receive browser notifications
+                  Receive browser notifications for performance alerts
                 </p>
+                {permission === 'denied' && (
+                  <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Enable notifications in your browser settings
+                  </p>
+                )}
               </div>
-              <Switch disabled />
+              <Switch 
+                checked={notificationsEnabled && permission === 'granted'} 
+                onCheckedChange={toggleNotifications}
+                disabled={!isSupported || permission === 'denied'}
+              />
             </div>
           </CardContent>
         </Card>

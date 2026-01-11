@@ -523,6 +523,9 @@ export const UploadPage: React.FC = () => {
                     <li className="flex items-center gap-2">
                       <AlertTriangle className="w-3 h-3 text-yellow-600" /> industry
                     </li>
+                    <li className="flex items-center gap-2">
+                      <AlertTriangle className="w-3 h-3 text-yellow-600" /> area
+                    </li>
                   </ul>
                 </div>
               </div>

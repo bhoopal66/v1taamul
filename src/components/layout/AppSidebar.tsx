@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { signOut } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 import {
   LayoutDashboard,
   Phone,
@@ -18,16 +19,28 @@ import {
   Trophy,
   Shield,
   Bell,
+  AlertTriangle,
+  TrendingDown,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { CompactLevelBadge } from '@/components/profile/CompactLevelBadge';
 import { SoundToggle } from '@/components/ui/SoundToggle';
 import { LoginStreakBadge } from '@/components/profile/LoginStreakBadge';
 import { useLoginStreak } from '@/hooks/useLoginStreak';
 import { usePerformanceAlerts } from '@/hooks/usePerformanceAlerts';
+
+const METRIC_LABELS: Record<string, string> = {
+  total_calls: 'Total Calls',
+  interested_count: 'Interested',
+  leads_generated: 'Leads Generated',
+  conversion_rate: 'Conversion Rate',
+};
 
 interface NavItemProps {
   to: string;
@@ -58,7 +71,12 @@ export const AppSidebar: React.FC = () => {
   const { profile, userRole } = useAuth();
   const navigate = useNavigate();
   const { streakData } = useLoginStreak();
-  const { activeAlertsCount } = usePerformanceAlerts();
+  const { alerts, activeAlertsCount, acknowledgeAlert } = usePerformanceAlerts();
+
+  // Get recent active alerts (max 5)
+  const recentAlerts = alerts
+    .filter(a => a.alert_status === 'active')
+    .slice(0, 5);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -103,23 +121,105 @@ export const AppSidebar: React.FC = () => {
             </div>
           </div>
           
-          {/* Notification Bell */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-            onClick={() => navigate('/team-management?tab=alerts')}
-          >
-            <Bell className="w-5 h-5" />
-            {activeAlertsCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-xs flex items-center justify-center"
+          {/* Notification Bell with Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
               >
-                {activeAlertsCount > 99 ? '99+' : activeAlertsCount}
-              </Badge>
-            )}
-          </Button>
+                <Bell className="w-5 h-5" />
+                {activeAlertsCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-xs flex items-center justify-center"
+                  >
+                    {activeAlertsCount > 99 ? '99+' : activeAlertsCount}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent 
+              className="w-80 p-0 bg-popover border-border shadow-lg" 
+              align="start"
+              sideOffset={8}
+            >
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-foreground">Performance Alerts</h4>
+                  {activeAlertsCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {activeAlertsCount} active
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              {recentAlerts.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No active alerts</p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[300px]">
+                  <div className="divide-y divide-border">
+                    {recentAlerts.map((alert) => (
+                      <div 
+                        key={alert.id} 
+                        className="p-3 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 p-1.5 rounded-full bg-destructive/10">
+                            <TrendingDown className="w-3.5 h-3.5 text-destructive" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">
+                                {METRIC_LABELS[alert.metric] || alert.metric}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {alert.alert_type === 'team' ? alert.team_name : alert.agent_name}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {alert.actual_value} / {alert.target_value} ({alert.percentage_achieved.toFixed(0)}%)
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              acknowledgeAlert.mutate(alert.id);
+                            }}
+                          >
+                            Ack
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+              
+              <div className="p-2 border-t border-border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between text-muted-foreground hover:text-foreground"
+                  onClick={() => navigate('/team-management?tab=alerts')}
+                >
+                  View all alerts
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

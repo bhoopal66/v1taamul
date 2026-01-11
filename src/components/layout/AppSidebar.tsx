@@ -68,10 +68,13 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label }) => {
 };
 
 export const AppSidebar: React.FC = () => {
-  const { profile, userRole } = useAuth();
+  const { profile, userRole, ledTeamId } = useAuth();
   const navigate = useNavigate();
   const { streakData } = useLoginStreak();
   const { alerts, activeAlertsCount, acknowledgeAlert } = usePerformanceAlerts();
+  
+  const isSupervisor = userRole === 'supervisor';
+  const isTeamLeader = !!ledTeamId;
 
   // Get recent active alerts (max 5)
   const recentAlerts = alerts
@@ -261,14 +264,16 @@ export const AppSidebar: React.FC = () => {
           </>
         )}
 
-        {(userRole === 'admin' || userRole === 'super_admin') && (
+        {(userRole === 'admin' || userRole === 'super_admin' || (isSupervisor && isTeamLeader)) && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-bold text-sidebar-muted uppercase tracking-wider">
                 Administration
               </p>
             </div>
-            <NavItem to="/team-management" icon={<Users className="w-5 h-5" />} label="Team Management" />
+            {(userRole === 'admin' || userRole === 'super_admin') && (
+              <NavItem to="/team-management" icon={<Users className="w-5 h-5" />} label="Team Management" />
+            )}
             <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
           </>
         )}

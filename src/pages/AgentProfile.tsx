@@ -44,6 +44,7 @@ import { GoalTracker } from '@/components/profile/GoalTracker';
 import { StreakMilestones } from '@/components/profile/StreakMilestones';
 import { LoginStreakReminderBanner } from '@/components/profile/LoginStreakReminderBanner';
 import { LoginStreakMilestones } from '@/components/profile/LoginStreakMilestones';
+import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -192,6 +193,9 @@ export const AgentProfile: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Performance Alerts */}
+      <MyPerformanceAlerts />
 
       {/* Performance Charts */}
       <Tabs defaultValue="monthly" className="space-y-6">

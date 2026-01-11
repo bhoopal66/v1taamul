@@ -25,6 +25,7 @@ import { PerformanceInsights } from '@/components/dashboard/PerformanceInsights'
 import { AllAgentsStatsGrid } from '@/components/dashboard/AllAgentsStatsGrid';
 import { AgentPerformanceList } from '@/components/dashboard/AgentPerformanceList';
 import { FeedbackBreakdownChart } from '@/components/dashboard/FeedbackBreakdownChart';
+import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
 
 import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
@@ -929,6 +930,9 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Performance Alerts */}
+      <MyPerformanceAlerts />
 
       {/* Team Stats Grid */}
       <AllAgentsStatsGrid 

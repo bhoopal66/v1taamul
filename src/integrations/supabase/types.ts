@@ -394,6 +394,89 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          actual_value: number
+          agent_id: string | null
+          alert_status: Database["public"]["Enums"]["alert_status"]
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          created_at: string
+          id: string
+          message: string | null
+          metric: string
+          percentage_achieved: number
+          target_id: string
+          target_value: number
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          actual_value: number
+          agent_id?: string | null
+          alert_status?: Database["public"]["Enums"]["alert_status"]
+          alert_type: Database["public"]["Enums"]["alert_type"]
+          created_at?: string
+          id?: string
+          message?: string | null
+          metric: string
+          percentage_achieved: number
+          target_id: string
+          target_value: number
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          actual_value?: number
+          agent_id?: string | null
+          alert_status?: Database["public"]["Enums"]["alert_status"]
+          alert_type?: Database["public"]["Enums"]["alert_type"]
+          created_at?: string
+          id?: string
+          message?: string | null
+          metric?: string
+          percentage_achieved?: number
+          target_id?: string
+          target_value?: number
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "performance_targets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_cache: {
         Row: {
           agent_id: string
@@ -432,6 +515,66 @@ export type Database = {
           whatsapp_sent?: number | null
         }
         Relationships: []
+      }
+      performance_targets: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          metric: string
+          period: string
+          target_type: Database["public"]["Enums"]["alert_type"]
+          target_value: number
+          team_id: string | null
+          threshold_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          metric: string
+          period?: string
+          target_type: Database["public"]["Enums"]["alert_type"]
+          target_value: number
+          team_id?: string | null
+          threshold_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          metric?: string
+          period?: string
+          target_type?: Database["public"]["Enums"]["alert_type"]
+          target_value?: number
+          team_id?: string | null
+          threshold_percentage?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_targets_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_targets_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -718,6 +861,8 @@ export type Database = {
     }
     Enums: {
       action_type: "upload" | "call" | "feedback" | "reassign" | "status_change"
+      alert_status: "active" | "acknowledged" | "resolved"
+      alert_type: "team" | "agent"
       app_role:
         | "agent"
         | "supervisor"
@@ -871,6 +1016,8 @@ export const Constants = {
   public: {
     Enums: {
       action_type: ["upload", "call", "feedback", "reassign", "status_change"],
+      alert_status: ["active", "acknowledged", "resolved"],
+      alert_type: ["team", "agent"],
       app_role: [
         "agent",
         "supervisor",

@@ -234,10 +234,14 @@ export const CallListPage: React.FC = () => {
   };
 
   const filteredList = callList.filter(contact => {
+    const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
-      contact.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.contactPersonName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.phoneNumber.includes(searchQuery);
+      contact.companyName.toLowerCase().includes(searchLower) ||
+      contact.contactPersonName.toLowerCase().includes(searchLower) ||
+      contact.phoneNumber.includes(searchQuery) ||
+      (contact.city && contact.city.toLowerCase().includes(searchLower)) ||
+      (contact.area && contact.area.toLowerCase().includes(searchLower)) ||
+      (contact.industry && contact.industry.toLowerCase().includes(searchLower));
 
     const matchesFilter = 
       filterStatus === 'all' || 

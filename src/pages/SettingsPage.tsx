@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -9,11 +9,41 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { Settings, Bell, Volume2, User, Shield, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+
+// Storage keys for notification preferences
+const STORAGE_KEYS = {
+  dailyGoalReminders: 'notification_daily_goal_reminders',
+  streakReminders: 'notification_streak_reminders',
+  performanceAlerts: 'notification_performance_alerts',
+  leaderboardUpdates: 'notification_leaderboard_updates',
+};
 
 export const SettingsPage: React.FC = () => {
   const { profile, userRole } = useAuth();
   const { soundEnabled, toggleSound } = useSoundSettings();
   const { enabled: notificationsEnabled, permission, isSupported, toggleNotifications } = useBrowserNotifications();
+  
+  // Notification preference states
+  const [dailyGoalReminders, setDailyGoalReminders] = useState(() => 
+    localStorage.getItem(STORAGE_KEYS.dailyGoalReminders) !== 'false'
+  );
+  const [streakReminders, setStreakReminders] = useState(() => 
+    localStorage.getItem(STORAGE_KEYS.streakReminders) !== 'false'
+  );
+  const [performanceAlerts, setPerformanceAlerts] = useState(() => 
+    localStorage.getItem(STORAGE_KEYS.performanceAlerts) !== 'false'
+  );
+  const [leaderboardUpdates, setLeaderboardUpdates] = useState(() => 
+    localStorage.getItem(STORAGE_KEYS.leaderboardUpdates) !== 'false'
+  );
+
+  // Save preferences to localStorage
+  const handleToggle = (key: keyof typeof STORAGE_KEYS, value: boolean, setter: React.Dispatch<React.SetStateAction<boolean>>) => {
+    setter(value);
+    localStorage.setItem(STORAGE_KEYS[key], String(value));
+    toast.success(value ? 'Notification enabled' : 'Notification disabled');
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -140,12 +170,27 @@ export const SettingsPage: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
+                <Label>Performance Alerts</Label>
+                <p className="text-sm text-muted-foreground">
+                  Get notified when performance drops below targets
+                </p>
+              </div>
+              <Switch 
+                checked={performanceAlerts} 
+                onCheckedChange={(v) => handleToggle('performanceAlerts', v, setPerformanceAlerts)} 
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
                 <Label>Daily Goal Reminders</Label>
                 <p className="text-sm text-muted-foreground">
                   Get reminded about your daily targets
                 </p>
               </div>
-              <Switch disabled />
+              <Switch 
+                checked={dailyGoalReminders} 
+                onCheckedChange={(v) => handleToggle('dailyGoalReminders', v, setDailyGoalReminders)} 
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -154,7 +199,22 @@ export const SettingsPage: React.FC = () => {
                   Don't lose your login streak
                 </p>
               </div>
-              <Switch disabled />
+              <Switch 
+                checked={streakReminders} 
+                onCheckedChange={(v) => handleToggle('streakReminders', v, setStreakReminders)} 
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Leaderboard Updates</Label>
+                <p className="text-sm text-muted-foreground">
+                  Get notified when your rank changes
+                </p>
+              </div>
+              <Switch 
+                checked={leaderboardUpdates} 
+                onCheckedChange={(v) => handleToggle('leaderboardUpdates', v, setLeaderboardUpdates)} 
+              />
             </div>
           </CardContent>
         </Card>

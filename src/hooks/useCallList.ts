@@ -233,6 +233,25 @@ export const useCallList = (selectedDate?: Date) => {
     },
   });
 
+  // Bulk update area mutation
+  const bulkUpdateArea = useMutation({
+    mutationFn: async ({ contactIds, area }: { contactIds: string[]; area: string }) => {
+      const { error } = await supabase
+        .from('master_contacts')
+        .update({ area })
+        .in('id', contactIds);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`Updated area for ${variables.contactIds.length} contacts`);
+      queryClient.invalidateQueries({ queryKey: ['call-list'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to update area: ${error.message}`);
+    },
+  });
+
   return {
     callList: callList || [],
     stats,
@@ -242,5 +261,7 @@ export const useCallList = (selectedDate?: Date) => {
     isLogging: logFeedback.isPending,
     skipContact: skipContact.mutate,
     isSkipping: skipContact.isPending,
+    bulkUpdateArea: bulkUpdateArea.mutate,
+    isBulkUpdating: bulkUpdateArea.isPending,
   };
 };

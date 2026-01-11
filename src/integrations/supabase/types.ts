@@ -345,9 +345,11 @@ export type Database = {
           first_upload_date: string | null
           first_uploaded_by: string | null
           id: string
+          in_company_pool: boolean | null
           industry: string | null
           ownership_lock_until: string | null
           phone_number: string
+          pool_entry_date: string | null
           status: Database["public"]["Enums"]["contact_status"] | null
           trade_license_number: string
           updated_at: string | null
@@ -362,9 +364,11 @@ export type Database = {
           first_upload_date?: string | null
           first_uploaded_by?: string | null
           id?: string
+          in_company_pool?: boolean | null
           industry?: string | null
           ownership_lock_until?: string | null
           phone_number: string
+          pool_entry_date?: string | null
           status?: Database["public"]["Enums"]["contact_status"] | null
           trade_license_number: string
           updated_at?: string | null
@@ -379,9 +383,11 @@ export type Database = {
           first_upload_date?: string | null
           first_uploaded_by?: string | null
           id?: string
+          in_company_pool?: boolean | null
           industry?: string | null
           ownership_lock_until?: string | null
           phone_number?: string
+          pool_entry_date?: string | null
           status?: Database["public"]["Enums"]["contact_status"] | null
           trade_license_number?: string
           updated_at?: string | null
@@ -648,6 +654,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      move_old_contacts_to_pool: { Args: never; Returns: number }
       update_login_streak: {
         Args: { user_id: string }
         Returns: {

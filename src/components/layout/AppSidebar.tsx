@@ -16,6 +16,7 @@ import {
   UserCircle,
   Headphones,
   Trophy,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -118,6 +119,17 @@ export const AppSidebar: React.FC = () => {
             <NavItem to="/supervisor" icon={<BarChart3 className="w-5 h-5" />} label="Overall View" />
             <NavItem to="/team" icon={<Users className="w-5 h-5" />} label="Agent Management" />
             <NavItem to="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
+          </>
+        )}
+
+        {(userRole === 'admin' || userRole === 'super_admin') && (
+          <>
+            <div className="pt-4 pb-2">
+              <p className="px-4 text-xs font-semibold text-sidebar-muted uppercase tracking-wider">
+                Administration
+              </p>
+            </div>
+            <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
           </>
         )}
 

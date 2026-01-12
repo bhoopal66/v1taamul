@@ -60,6 +60,7 @@ export type Database = {
         Row: {
           agent_id: string
           bank_name: string
+          company_name: string
           created_at: string
           id: string
           notes: string | null
@@ -74,6 +75,7 @@ export type Database = {
         Insert: {
           agent_id: string
           bank_name: string
+          company_name?: string
           created_at?: string
           id?: string
           notes?: string | null
@@ -88,6 +90,7 @@ export type Database = {
         Update: {
           agent_id?: string
           bank_name?: string
+          company_name?: string
           created_at?: string
           id?: string
           notes?: string | null

@@ -60,6 +60,7 @@ export const useAgentSubmissions = (period: SubmissionPeriod = 'weekly') => {
     mutationFn: async (submission: {
       submission_group: SubmissionGroup;
       bank_name: string;
+      company_name: string;
       notes?: string;
     }) => {
       const { data, error } = await supabase
@@ -68,6 +69,7 @@ export const useAgentSubmissions = (period: SubmissionPeriod = 'weekly') => {
           agent_id: user?.id,
           submission_group: submission.submission_group,
           bank_name: submission.bank_name,
+          company_name: submission.company_name,
           notes: submission.notes || null,
         })
         .select()

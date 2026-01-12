@@ -987,6 +987,18 @@ export const LeadsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Decline Reason - Show only for declined leads */}
+                {selectedLead?.leadStatus === 'declined' && (
+                  <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800">
+                    <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 mb-2">
+                      <XCircle className="w-4 h-4" />
+                      <span className="font-medium text-sm">Decline Reason</span>
+                    </div>
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {selectedLead.notes || 'No reason provided'}
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
                   <Textarea

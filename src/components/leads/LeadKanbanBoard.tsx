@@ -396,6 +396,19 @@ export const LeadKanbanBoard = ({
                               )}
                             </div>
 
+                            {/* Decline Reason - Show only for declined leads */}
+                            {lead.leadStatus === 'declined' && lead.notes && (
+                              <div className="mt-2 p-2 rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800">
+                                <p className="text-xs font-medium text-rose-700 dark:text-rose-400 flex items-center gap-1 mb-1">
+                                  <XCircle className="w-3 h-3" />
+                                  Decline Reason
+                                </p>
+                                <p className="text-xs text-rose-600 dark:text-rose-300 line-clamp-2">
+                                  {lead.notes}
+                                </p>
+                              </div>
+                            )}
+
                             {/* Created Date & Time */}
                             <div className="flex items-center gap-1 mt-2 pt-2 border-t text-xs text-muted-foreground">
                               <Calendar className="w-3 h-3" />

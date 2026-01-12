@@ -104,6 +104,12 @@ export const HourlyCallHeatmap: React.FC = () => {
 
   const totalCalls = heatmapData.reduce((sum, cell) => sum + cell.value, 0);
 
+  const getDayTotal = (dayIndex: number): number => {
+    return heatmapData
+      .filter(d => d.day === dayIndex)
+      .reduce((sum, cell) => sum + cell.value, 0);
+  };
+
   const emptyBreakdown: CallOutcomeBreakdown = {
     interested: 0,
     notInterested: 0,
@@ -167,37 +173,47 @@ export const HourlyCallHeatmap: React.FC = () => {
                   {hour > 12 ? `${hour - 12}p` : hour === 12 ? '12p' : `${hour}a`}
                 </div>
               ))}
+              <div className="w-12 text-center text-xs text-muted-foreground font-medium">Total</div>
             </div>
             
             {/* Heatmap grid */}
-            {days.map((day, dayIndex) => (
-              <div key={day} className="flex items-center gap-1 mb-1">
-                <div className="w-10 text-xs text-muted-foreground font-medium">{day}</div>
-                {hours.map(hour => {
-                  const cell = getCell(dayIndex, hour);
-                  const value = cell?.value || 0;
-                  const breakdown = cell?.breakdown || emptyBreakdown;
-                  
-                  return (
-                    <HeatmapCellTooltip
-                      key={`${dayIndex}-${hour}`}
-                      day={day}
-                      hour={hour}
-                      value={value}
-                      breakdown={breakdown}
-                    >
-                      <div
-                        className={`flex-1 h-8 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
+            {days.map((day, dayIndex) => {
+              const dayTotal = getDayTotal(dayIndex);
+              return (
+                <div key={day} className="flex items-center gap-1 mb-1">
+                  <div className="w-10 text-xs text-muted-foreground font-medium">{day}</div>
+                  {hours.map(hour => {
+                    const cell = getCell(dayIndex, hour);
+                    const value = cell?.value || 0;
+                    const breakdown = cell?.breakdown || emptyBreakdown;
+                    
+                    return (
+                      <HeatmapCellTooltip
+                        key={`${dayIndex}-${hour}`}
+                        day={day}
+                        hour={hour}
+                        value={value}
+                        breakdown={breakdown}
                       >
-                        <span className={`text-[11px] font-bold ${getTextColor(value)}`}>
-                          {value > 0 ? value : ''}
-                        </span>
-                      </div>
-                    </HeatmapCellTooltip>
-                  );
-                })}
-              </div>
-            ))}
+                        <div
+                          className={`flex-1 h-8 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
+                        >
+                          <span className={`text-[11px] font-bold ${getTextColor(value)}`}>
+                            {value > 0 ? value : ''}
+                          </span>
+                        </div>
+                      </HeatmapCellTooltip>
+                    );
+                  })}
+                  {/* Daily total */}
+                  <div className="w-12 h-8 rounded-sm bg-secondary flex items-center justify-center">
+                    <span className="text-xs font-bold text-secondary-foreground">
+                      {dayTotal}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             
             {/* Legend */}
             <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">

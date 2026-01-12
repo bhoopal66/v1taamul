@@ -19,15 +19,20 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Install dependencies
-COPY package*.json ./
-RUN npm install
+COPY package*.json bun.lockb* ./
+RUN npm install --legacy-peer-deps
 
 # Copy source files
 COPY . .
 
-# Build arguments
+# Build arguments - provide defaults for Supabase vars to allow build
 ARG VITE_API_URL=/api
+ARG VITE_SUPABASE_URL=http://localhost:8000
+ARG VITE_SUPABASE_PUBLISHABLE_KEY=placeholder-key-for-build
+
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 
 # Build frontend
 RUN npm run build

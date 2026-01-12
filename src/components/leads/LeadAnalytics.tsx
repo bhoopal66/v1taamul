@@ -51,9 +51,9 @@ const STAGE_LABELS: Record<LeadStatus, string> = {
 };
 
 export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
-  // Pipeline funnel data
+  // Pipeline funnel data (excludes Lost)
   const funnelData = useMemo(() => {
-    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted'];
+    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'approved'];
     return stages.map(status => ({
       stage: STAGE_LABELS[status],
       count: leads.filter(l => l.leadStatus === status).length,
@@ -67,23 +67,24 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
     const contactedCount = leads.filter(l => l.leadStatus === 'contacted').length;
     const qualifiedCount = leads.filter(l => l.leadStatus === 'qualified').length;
     const convertedCount = leads.filter(l => l.leadStatus === 'converted').length;
+    const approvedCount = leads.filter(l => l.leadStatus === 'approved').length;
     const lostCount = leads.filter(l => l.leadStatus === 'lost').length;
     
-    const totalProcessed = contactedCount + qualifiedCount + convertedCount + lostCount;
-    const totalQualified = qualifiedCount + convertedCount;
+    const totalProcessed = contactedCount + qualifiedCount + convertedCount + approvedCount + lostCount;
+    const totalCompleted = approvedCount + lostCount;
     
     return {
-      contactRate: totalProcessed > 0 ? ((contactedCount + qualifiedCount + convertedCount) / (totalProcessed + newCount)) * 100 : 0,
-      qualifyRate: totalProcessed > 0 ? (totalQualified / totalProcessed) * 100 : 0,
-      convertRate: totalQualified > 0 ? (convertedCount / totalQualified) * 100 : 0,
+      contactRate: totalProcessed > 0 ? ((contactedCount + qualifiedCount + convertedCount + approvedCount) / (totalProcessed + newCount)) * 100 : 0,
+      qualifyRate: totalProcessed > 0 ? ((qualifiedCount + convertedCount + approvedCount) / totalProcessed) * 100 : 0,
+      approvalRate: totalCompleted > 0 ? (approvedCount / totalCompleted) * 100 : 0,
       lossRate: totalProcessed > 0 ? (lostCount / totalProcessed) * 100 : 0,
-      overallConversion: leads.length > 0 ? (convertedCount / leads.length) * 100 : 0,
+      overallConversion: leads.length > 0 ? (approvedCount / leads.length) * 100 : 0,
     };
   }, [leads]);
 
   // Deal values by stage
   const dealValuesByStage = useMemo(() => {
-    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted'];
+    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'approved'];
     return stages.map(status => ({
       stage: STAGE_LABELS[status],
       value: leads
@@ -93,7 +94,7 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
     }));
   }, [leads]);
 
-  // Deal values over time (last 30 days)
+  // Deal values over time (last 30 days) - tracks approved leads
   const dealValueTrend = useMemo(() => {
     const today = startOfDay(new Date());
     const thirtyDaysAgo = subDays(today, 30);
@@ -102,16 +103,16 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
     
     return days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
-      const convertedOnDay = leads.filter(l => {
-        if (l.leadStatus !== 'converted' || !l.qualifiedDate) return false;
+      const approvedOnDay = leads.filter(l => {
+        if (l.leadStatus !== 'approved' || !l.qualifiedDate) return false;
         const qualifiedDay = format(parseISO(l.qualifiedDate), 'yyyy-MM-dd');
         return qualifiedDay === dayStr;
       });
       
       return {
         date: format(day, 'MMM d'),
-        value: convertedOnDay.reduce((sum, l) => sum + (l.dealValue || 0), 0),
-        count: convertedOnDay.length,
+        value: approvedOnDay.reduce((sum, l) => sum + (l.dealValue || 0), 0),
+        count: approvedOnDay.length,
       };
     });
   }, [leads]);
@@ -134,8 +135,8 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
       return {
         date: format(day, 'MMM d'),
         new: createdOnDay.length,
-        converted: leads.filter(l => {
-          if (l.leadStatus !== 'converted' || !l.qualifiedDate) return false;
+        approved: leads.filter(l => {
+          if (l.leadStatus !== 'approved' || !l.qualifiedDate) return false;
           const qualifiedDay = format(parseISO(l.qualifiedDate), 'yyyy-MM-dd');
           return qualifiedDay === dayStr;
         }).length,
@@ -145,7 +146,7 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
 
   // Pie chart data for status distribution
   const statusDistribution = useMemo(() => {
-    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'lost'];
+    const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'approved', 'lost'];
     return stages.map(status => ({
       name: STAGE_LABELS[status],
       value: leads.filter(l => l.leadStatus === status).length,
@@ -163,8 +164,8 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
   };
 
   const totalPipeline = leads.reduce((sum, l) => sum + (l.dealValue || 0), 0);
-  const convertedValue = leads
-    .filter(l => l.leadStatus === 'converted')
+  const approvedValue = leads
+    .filter(l => l.leadStatus === 'approved')
     .reduce((sum, l) => sum + (l.dealValue || 0), 0);
 
   return (
@@ -189,8 +190,8 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Qualify Rate</p>
-                <p className="text-2xl font-bold">{conversionRates.qualifyRate.toFixed(1)}%</p>
+                <p className="text-sm text-muted-foreground">Approval Rate</p>
+                <p className="text-2xl font-bold">{conversionRates.approvalRate.toFixed(1)}%</p>
               </div>
               <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/30">
                 <Target className="w-5 h-5 text-purple-600" />
@@ -203,8 +204,8 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Won Revenue</p>
-                <p className="text-2xl font-bold">{formatCurrency(convertedValue)}</p>
+                <p className="text-sm text-muted-foreground">Approved Revenue</p>
+                <p className="text-2xl font-bold">{formatCurrency(approvedValue)}</p>
               </div>
               <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30">
                 <DollarSign className="w-5 h-5 text-green-600" />
@@ -401,8 +402,8 @@ export const LeadAnalytics = ({ leads }: LeadAnalyticsProps) => {
               />
               <Line 
                 type="monotone" 
-                dataKey="converted" 
-                name="Conversions"
+                dataKey="approved" 
+                name="Approvals"
                 stroke="#22c55e" 
                 strokeWidth={2}
                 dot={false}

@@ -10,11 +10,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
-import { Download, FileSpreadsheet, CalendarIcon, Filter, Building2, MapPin, Users, User, Package } from 'lucide-react';
+import { Download, FileSpreadsheet, CalendarIcon, Filter, Building2, MapPin, Users, User, Package, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line, Tooltip, Legend, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 import { ACCOUNT_BANKS, LOAN_BANKS, PRODUCT_TYPES, parseLeadSource } from '@/hooks/useLeads';
+
+// Chart colors
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface ApprovedLead {
   id: string;
@@ -862,6 +867,37 @@ export const ApprovedLeadsExport: React.FC = () => {
               ))}
             </div>
             
+            {/* Bank Chart */}
+            <div className="mt-6 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={bankSummary.slice(0, 10)} layout="vertical" margin={{ left: 20, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="bank" type="category" width={80} tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3">
+                            <p className="font-semibold">{data.bank}</p>
+                            <p className="text-sm">Count: {data.count}</p>
+                            <p className="text-sm text-green-600">Deal Value: {data.dealValue.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Count" radius={[0, 4, 4, 0]}>
+                    {bankSummary.slice(0, 10).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
             {/* Summary Table */}
             <div className="mt-6 pt-4 border-t">
               <Table>
@@ -946,6 +982,37 @@ export const ApprovedLeadsExport: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+            
+            {/* Team Chart */}
+            <div className="mt-6 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={teamSummary} margin={{ left: 20, right: 20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="team" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 11 }} />
+                  <YAxis />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3">
+                            <p className="font-semibold">{data.team}</p>
+                            <p className="text-sm">Count: {data.count}</p>
+                            <p className="text-sm text-green-600">Deal Value: {data.dealValue.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Count" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                    {teamSummary.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
             
             <div className="mt-6 pt-4 border-t">
@@ -1037,6 +1104,37 @@ export const ApprovedLeadsExport: React.FC = () => {
                 Showing top 12 agents. See table below for complete list.
               </p>
             )}
+            
+            {/* Agent Chart */}
+            <div className="mt-6 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agentSummary.slice(0, 10)} layout="vertical" margin={{ left: 20, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="agent" type="category" width={100} tick={{ fontSize: 11 }} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3">
+                            <p className="font-semibold">{data.agent}</p>
+                            <p className="text-sm">Count: {data.count}</p>
+                            <p className="text-sm text-green-600">Deal Value: {data.dealValue.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Count" radius={[0, 4, 4, 0]}>
+                    {agentSummary.slice(0, 10).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             
             <div className="mt-6 pt-4 border-t">
               <ScrollArea className="h-[300px]">
@@ -1130,6 +1228,37 @@ export const ApprovedLeadsExport: React.FC = () => {
                 Showing top 12 cities. See table below for complete list.
               </p>
             )}
+            
+            {/* City Chart */}
+            <div className="mt-6 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={citySummary.slice(0, 10)} margin={{ left: 20, right: 20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="city" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 11 }} />
+                  <YAxis />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3">
+                            <p className="font-semibold">{data.city}</p>
+                            <p className="text-sm">Count: {data.count}</p>
+                            <p className="text-sm text-green-600">Deal Value: {data.dealValue.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Count" fill="#10b981" radius={[4, 4, 0, 0]}>
+                    {citySummary.slice(0, 10).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             
             <div className="mt-6 pt-4 border-t">
               <ScrollArea className="h-[300px]">
@@ -1260,8 +1389,65 @@ export const ApprovedLeadsExport: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      )}
-
+            )}
+            
+            {/* Date Chart - Line Chart */}
+            <div className="mt-6 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={[...dateSummary].reverse().slice(-30)} 
+                  margin={{ left: 20, right: 20, bottom: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="displayDate" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={80} 
+                    tick={{ fontSize: 10 }} 
+                  />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-background border rounded-lg shadow-lg p-3">
+                            <p className="font-semibold">{data.displayDate}</p>
+                            <p className="text-sm text-blue-600">Count: {data.count}</p>
+                            <p className="text-sm text-green-600">Deal Value: {data.dealValue.toLocaleString()}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    yAxisId="left"
+                    type="monotone" 
+                    dataKey="count" 
+                    name="Leads Count" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2}
+                    dot={{ fill: '#8b5cf6', r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="dealValue" 
+                    name="Deal Value" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    dot={{ fill: '#10b981', r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            
       {/* Preview Table */}
       <Card>
         <CardHeader>

@@ -36,15 +36,17 @@ const STAGE_COLORS: Record<LeadStatus, string> = {
   new: '#3b82f6',
   contacted: '#eab308',
   qualified: '#a855f7',
-  converted: '#22c55e',
+  converted: '#f97316',
+  approved: '#22c55e',
   lost: '#ef4444',
 };
 
 const STAGE_LABELS: Record<LeadStatus, string> = {
   new: 'New',
-  contacted: 'Contacted',
-  qualified: 'Qualified',
-  converted: 'Converted',
+  contacted: 'In Progress',
+  qualified: 'Submitted',
+  converted: 'Assessing',
+  approved: 'Approved',
   lost: 'Lost',
 };
 

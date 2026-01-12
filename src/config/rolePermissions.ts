@@ -22,13 +22,13 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
   {
     path: '/profile',
     label: 'My Profile',
-    allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
+    allowedRoles: ['agent', 'coordinator', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
     section: 'main',
   },
   {
     path: '/leaderboard',
     label: 'Leaderboard',
-    allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
+    allowedRoles: ['agent', 'coordinator', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
     section: 'main',
   },
   {
@@ -47,6 +47,14 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     path: '/leads',
     label: 'Leads',
     allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
+    section: 'main',
+  },
+  
+  // Case Management - Coordinators
+  {
+    path: '/cases',
+    label: 'Case Management',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
     section: 'main',
   },
   
@@ -76,7 +84,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
   {
     path: '/reports',
     label: 'Reports',
-    allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin'],
+    allowedRoles: ['coordinator', 'supervisor', 'operations_head', 'admin', 'super_admin'],
     section: 'management',
   },
   
@@ -110,7 +118,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
   {
     path: '/settings',
     label: 'Settings',
-    allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
+    allowedRoles: ['agent', 'coordinator', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
     section: 'main',
   },
 ];
@@ -238,6 +246,38 @@ export const FEATURE_PERMISSIONS: FeaturePermission[] = [
     allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
     description: 'View lead stage duration analytics',
   },
+  
+  // Case management features - Coordinators
+  {
+    feature: 'view_cases',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
+    description: 'View case management dashboard',
+  },
+  {
+    feature: 'create_case',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
+    description: 'Create new cases from approved leads',
+  },
+  {
+    feature: 'update_case',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
+    description: 'Update case details and status',
+  },
+  {
+    feature: 'assign_case',
+    allowedRoles: ['admin', 'super_admin'],
+    description: 'Assign cases to coordinators',
+  },
+  {
+    feature: 'upload_case_documents',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
+    description: 'Upload documents to cases',
+  },
+  {
+    feature: 'manage_banker_contacts',
+    allowedRoles: ['coordinator', 'admin', 'super_admin'],
+    description: 'Manage banker contact information',
+  },
 ];
 
 // Helper function to check if a role can access a page
@@ -291,8 +331,11 @@ export function getAccessiblePages(
 export function getDefaultRedirectPath(userRole: AppRole | null | undefined): string {
   if (!userRole) return '/login';
   
-  // Agents go to profile, others go to dashboard
+  // Agents go to profile
   if (userRole === 'agent') return '/profile';
+  
+  // Coordinators go to cases
+  if (userRole === 'coordinator') return '/cases';
   
   return '/dashboard';
 }

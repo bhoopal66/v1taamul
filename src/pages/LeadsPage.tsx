@@ -139,7 +139,8 @@ export const LeadsPage = () => {
       new: 'default',
       contacted: 'secondary',
       qualified: 'default',
-      converted: 'default',
+      converted: 'secondary',
+      approved: 'default',
       lost: 'destructive',
     };
     return variants[status];

@@ -1340,7 +1340,13 @@ export type Database = {
         | "not_interested"
         | "callback"
         | "wrong_number"
-      lead_status: "new" | "contacted" | "qualified" | "converted" | "lost"
+      lead_status:
+        | "new"
+        | "contacted"
+        | "qualified"
+        | "converted"
+        | "lost"
+        | "approved"
       message_direction: "inbound" | "outbound"
       submission_group: "group1" | "group2"
       team_type: "remote" | "office"
@@ -1500,7 +1506,14 @@ export const Constants = {
         "callback",
         "wrong_number",
       ],
-      lead_status: ["new", "contacted", "qualified", "converted", "lost"],
+      lead_status: [
+        "new",
+        "contacted",
+        "qualified",
+        "converted",
+        "lost",
+        "approved",
+      ],
       message_direction: ["inbound", "outbound"],
       submission_group: ["group1", "group2"],
       team_type: ["remote", "office"],

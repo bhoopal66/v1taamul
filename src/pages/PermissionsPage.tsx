@@ -8,10 +8,11 @@ import { Check, X, Shield, FileText, Users, Settings } from 'lucide-react';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
-const ALL_ROLES: AppRole[] = ['agent', 'supervisor', 'operations_head', 'sales_controller', 'admin', 'super_admin'];
+const ALL_ROLES: AppRole[] = ['agent', 'coordinator', 'supervisor', 'operations_head', 'sales_controller', 'admin', 'super_admin'];
 
 const ROLE_LABELS: Record<AppRole, string> = {
   agent: 'Agent',
+  coordinator: 'Coordinator',
   supervisor: 'Supervisor',
   operations_head: 'Ops Head',
   sales_controller: 'Sales Ctrl',

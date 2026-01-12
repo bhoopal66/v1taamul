@@ -66,6 +66,10 @@ export const createLeadSource = (product: ProductType, bank: BankName): LeadSour
 export interface Lead {
   id: string;
   contactId: string;
+  agentId: string;
+  agentName?: string;
+  teamId?: string | null;
+  teamName?: string | null;
   companyName: string;
   contactPersonName: string;
   phoneNumber: string;
@@ -98,12 +102,19 @@ export interface LeadStats {
   totalDealValue: number;
 }
 
-export const useLeads = (statusFilter?: LeadStatus | 'all') => {
-  const { user } = useAuth();
+export interface LeadFilters {
+  agentId?: string | 'all';
+  teamId?: string | 'all';
+}
+
+export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilters) => {
+  const { user, userRole } = useAuth();
   const queryClient = useQueryClient();
 
+  const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor' || userRole === 'operations_head';
+
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, statusFilter],
+    queryKey: ['leads', user?.id, statusFilter, filters?.agentId, filters?.teamId],
     queryFn: async (): Promise<Lead[]> => {
       let query = supabase
         .from('leads')
@@ -116,10 +127,25 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
             trade_license_number,
             city,
             industry
+          ),
+          profiles:agent_id (
+            full_name,
+            team_id
           )
         `)
-        .eq('agent_id', user?.id)
         .order('created_at', { ascending: false });
+
+      // Apply filters based on role
+      if (isAdminOrSuperAdmin) {
+        // Admins can see all, but can filter by agent or team
+        if (filters?.agentId && filters.agentId !== 'all') {
+          query = query.eq('agent_id', filters.agentId);
+        }
+        // Team filter will be applied after fetching since it requires join
+      } else {
+        // Regular agents can only see their own leads
+        query = query.eq('agent_id', user?.id);
+      }
 
       if (statusFilter && statusFilter !== 'all') {
         query = query.eq('lead_status', statusFilter);
@@ -129,11 +155,15 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
 
       if (error) throw error;
 
-      return (data || []).map(item => {
+      let mappedLeads = (data || []).map(item => {
         const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
         return {
           id: item.id,
           contactId: item.contact_id,
+          agentId: item.agent_id,
+          agentName: (item.profiles as any)?.full_name || 'Unknown',
+          teamId: (item.profiles as any)?.team_id || null,
+          teamName: null, // Will be populated if needed
           companyName: item.master_contacts?.company_name || 'Unknown',
           contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
           phoneNumber: item.master_contacts?.phone_number || '',
@@ -149,9 +179,16 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
           notes: item.notes,
           createdAt: item.created_at || '',
           updatedAt: item.updated_at || '',
-          isLead: !!tradeLicenseNumber, // Has TL = Lead, No TL = Opportunity
+          isLead: !!tradeLicenseNumber,
         };
       });
+
+      // Apply team filter if specified
+      if (isAdminOrSuperAdmin && filters?.teamId && filters.teamId !== 'all') {
+        mappedLeads = mappedLeads.filter(lead => lead.teamId === filters.teamId);
+      }
+
+      return mappedLeads;
     },
     enabled: !!user?.id,
   });

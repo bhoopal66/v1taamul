@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { useLeads, Lead, LeadStatus, LeadSource, ProductType, BankName, PRODUCT_TYPES, ACCOUNT_BANKS, LOAN_BANKS, createLeadSource, parseLeadSource, LEAD_SOURCES } from '@/hooks/useLeads';
+import { useState, useEffect } from 'react';
+import { useLeads, Lead, LeadStatus, LeadSource, ProductType, BankName, PRODUCT_TYPES, ACCOUNT_BANKS, LOAN_BANKS, createLeadSource, parseLeadSource, LEAD_SOURCES, LeadFilters } from '@/hooks/useLeads';
 import { LeadTypeFilter } from '@/components/leads/LeadKanbanBoard';
 import { useLeadScoring, getScoreLabel } from '@/hooks/useLeadScoring';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +50,7 @@ import {
   Bell,
   Megaphone,
   History,
+  UserCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -61,13 +64,32 @@ const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon:
   { status: 'lost', label: 'Lost', color: 'bg-red-500', icon: XCircle },
 ];
 
+interface AgentOption {
+  id: string;
+  full_name: string;
+  team_id: string | null;
+}
+
+interface TeamOption {
+  id: string;
+  name: string;
+}
+
 export const LeadsPage = () => {
+  const { userRole } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<LeadTypeFilter>('all');
+  
+  // Admin filters
+  const [agentFilter, setAgentFilter] = useState<string>('all');
+  const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+  
   const [editForm, setEditForm] = useState({
     dealValue: '',
     expectedCloseDate: '',
@@ -77,7 +99,37 @@ export const LeadsPage = () => {
     bankName: 'RAK' as BankName,
   });
 
-  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter);
+  const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor' || userRole === 'operations_head';
+
+  // Fetch agents and teams for admin filters
+  useEffect(() => {
+    if (isAdminOrSuperAdmin) {
+      // Fetch agents
+      supabase
+        .from('profiles')
+        .select('id, full_name, team_id')
+        .order('full_name')
+        .then(({ data }) => {
+          if (data) setAgents(data);
+        });
+
+      // Fetch teams
+      supabase
+        .from('teams')
+        .select('id, name')
+        .order('name')
+        .then(({ data }) => {
+          if (data) setTeams(data);
+        });
+    }
+  }, [isAdminOrSuperAdmin]);
+
+  const filters: LeadFilters = {
+    agentId: agentFilter,
+    teamId: teamFilter,
+  };
+
+  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter, filters);
   const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
@@ -186,9 +238,14 @@ export const LeadsPage = () => {
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Target className="w-8 h-8 text-primary" />
             Sales Pipeline
+            {isAdminOrSuperAdmin && (agentFilter !== 'all' || teamFilter !== 'all') && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                Filtered
+              </Badge>
+            )}
           </h1>
           <p className="text-muted-foreground mt-1 flex items-center gap-3">
-            Track opportunities and leads through the sales funnel
+            {isAdminOrSuperAdmin ? 'View all sales pipeline data' : 'Track opportunities and leads through the sales funnel'}
             <span className="flex items-center gap-2 text-sm">
               <Badge variant="outline" className="text-amber-600 border-amber-400">
                 {stats.opportunities} Opportunities
@@ -199,7 +256,56 @@ export const LeadsPage = () => {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Admin Filters */}
+          {isAdminOrSuperAdmin && (
+            <div className="flex items-center gap-2">
+              <Select value={teamFilter} onValueChange={(v) => {
+                setTeamFilter(v);
+                setAgentFilter('all'); // Reset agent filter when team changes
+              }}>
+                <SelectTrigger className="w-40 h-9">
+                  <Users className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {teams.map(team => (
+                    <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="w-44 h-9">
+                  <UserCircle className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Agents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
+                  {agents
+                    .filter(agent => teamFilter === 'all' || agent.team_id === teamFilter)
+                    .map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+
+              {(agentFilter !== 'all' || teamFilter !== 'all') && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9"
+                  onClick={() => {
+                    setAgentFilter('all');
+                    setTeamFilter('all');
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          )}
           {/* View Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button

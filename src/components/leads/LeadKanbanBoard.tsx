@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Lead, LeadStatus } from '@/hooks/useLeads';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import {
   FileText,
   AlertTriangle,
   ArrowUpCircle,
+  UserCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getScoreLabel } from '@/hooks/useLeadScoring';
@@ -62,10 +64,13 @@ export const LeadKanbanBoard = ({
   typeFilter,
   onTypeFilterChange,
 }: LeadKanbanBoardProps) => {
+  const { userRole } = useAuth();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Lead | null>(null);
+
+  const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor' || userRole === 'operations_head';
 
   // Filter leads based on type filter
   const filteredLeads = leads.filter(lead => {
@@ -247,6 +252,14 @@ export const LeadKanbanBoard = ({
                                 </Tooltip>
                               </TooltipProvider>
                             </div>
+
+                            {/* Agent Name - Show for admins */}
+                            {isAdminOrSuperAdmin && lead.agentName && (
+                              <p className="text-xs text-primary/80 flex items-center gap-1 mt-1 font-medium">
+                                <UserCircle className="w-3 h-3" />
+                                {lead.agentName}
+                              </p>
+                            )}
 
                             {/* Contact */}
                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">

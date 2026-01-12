@@ -631,6 +631,67 @@ export const TeamReportGenerator: React.FC = () => {
                 />
               </div>
 
+              {/* Comparison Chart - Current vs Previous Period */}
+              {showComparison && reportData?.previousTotals && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      Current vs Previous Period
+                    </CardTitle>
+                    <CardDescription>
+                      Side-by-side comparison of key metrics
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart
+                        data={[
+                          {
+                            metric: 'Total Calls',
+                            current: reportData.totals.totalCalls,
+                            previous: reportData.previousTotals.totalCalls,
+                          },
+                          {
+                            metric: 'Interested',
+                            current: reportData.totals.interested,
+                            previous: reportData.previousTotals.interested,
+                          },
+                          {
+                            metric: 'Leads',
+                            current: reportData.totals.leadsGenerated,
+                            previous: reportData.previousTotals.leadsGenerated,
+                          },
+                          {
+                            metric: 'Talk Time (min)',
+                            current: reportData.totals.talkTimeMinutes,
+                            previous: reportData.previousTotals.talkTimeMinutes,
+                          },
+                        ]}
+                        layout="vertical"
+                        margin={{ left: 20, right: 30 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
+                        <XAxis type="number" className="text-xs" />
+                        <YAxis type="category" dataKey="metric" className="text-xs" width={100} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number, name: string) => [value, name === 'current' ? 'Current Period' : 'Previous Period']}
+                        />
+                        <Legend 
+                          formatter={(value) => value === 'current' ? 'Current Period' : 'Previous Period'}
+                        />
+                        <Bar dataKey="current" name="current" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                        <Bar dataKey="previous" name="previous" fill="hsl(var(--muted-foreground))" radius={[0, 4, 4, 0]} barSize={20} opacity={0.5} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Performance Chart */}
               {chartData.length > 0 && (
                 <Card>

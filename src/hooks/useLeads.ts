@@ -105,6 +105,8 @@ export interface LeadStats {
 export interface LeadFilters {
   agentId?: string | 'all';
   teamId?: string | 'all';
+  bankName?: BankName | 'all';
+  productType?: ProductType | 'all';
 }
 
 export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilters) => {
@@ -114,7 +116,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilter
   const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor' || userRole === 'operations_head';
 
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, statusFilter, filters?.agentId, filters?.teamId],
+    queryKey: ['leads', user?.id, statusFilter, filters?.agentId, filters?.teamId, filters?.bankName, filters?.productType],
     queryFn: async (): Promise<Lead[]> => {
       let query = supabase
         .from('leads')
@@ -186,6 +188,22 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilter
       // Apply team filter if specified
       if (isAdminOrSuperAdmin && filters?.teamId && filters.teamId !== 'all') {
         mappedLeads = mappedLeads.filter(lead => lead.teamId === filters.teamId);
+      }
+
+      // Apply bank filter if specified
+      if (filters?.bankName && filters.bankName !== 'all') {
+        mappedLeads = mappedLeads.filter(lead => {
+          const parsed = parseLeadSource(lead.leadSource);
+          return parsed?.bank === filters.bankName;
+        });
+      }
+
+      // Apply product type (group) filter if specified
+      if (filters?.productType && filters.productType !== 'all') {
+        mappedLeads = mappedLeads.filter(lead => {
+          const parsed = parseLeadSource(lead.leadSource);
+          return parsed?.product === filters.productType;
+        });
       }
 
       return mappedLeads;

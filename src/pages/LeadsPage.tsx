@@ -87,6 +87,8 @@ export const LeadsPage = () => {
   // Admin filters
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [bankFilter, setBankFilter] = useState<string>('all');
+  const [groupFilter, setGroupFilter] = useState<string>('all');
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
   
@@ -124,9 +126,20 @@ export const LeadsPage = () => {
     }
   }, [isAdminOrSuperAdmin]);
 
+  // All banks for filter dropdown
+  const allBanks = [...ACCOUNT_BANKS];
+  // Add any banks from LOAN_BANKS that aren't in ACCOUNT_BANKS
+  LOAN_BANKS.forEach(bank => {
+    if (!allBanks.find(b => b.value === bank.value)) {
+      allBanks.push(bank);
+    }
+  });
+
   const filters: LeadFilters = {
     agentId: agentFilter,
     teamId: teamFilter,
+    bankName: bankFilter as BankName | 'all',
+    productType: groupFilter as ProductType | 'all',
   };
 
   const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter, filters);
@@ -306,6 +319,46 @@ export const LeadsPage = () => {
               )}
             </div>
           )}
+
+          {/* Bank & Group Filters - Available for all users */}
+          <div className="flex items-center gap-2">
+            <Select value={bankFilter} onValueChange={setBankFilter}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue placeholder="All Banks" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Banks</SelectItem>
+                {allBanks.map(bank => (
+                  <SelectItem key={bank.value} value={bank.value}>{bank.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={groupFilter} onValueChange={setGroupFilter}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue placeholder="All Groups" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Groups</SelectItem>
+                <SelectItem value="account">Group 1 (Account)</SelectItem>
+                <SelectItem value="loan">Group 2 (Loan)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {(bankFilter !== 'all' || groupFilter !== 'all') && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-9"
+                onClick={() => {
+                  setBankFilter('all');
+                  setGroupFilter('all');
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
           {/* View Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button

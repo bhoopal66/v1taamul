@@ -14,26 +14,39 @@ export interface ContactExportData {
   lastFeedback: string | null;
   lastNotes: string | null;
   calledAt: string | null;
+  agentName?: string;
 }
 
 const formatContactsForExport = (contacts: ContactExportData[]) => {
-  return contacts.map((contact, index) => ({
-    '#': index + 1,
-    'Call Order': contact.callOrder,
-    'Company Name': contact.companyName,
-    'Contact Person': contact.contactPersonName,
-    'Phone Number': contact.phoneNumber,
-    'Trade License': contact.tradeLicenseNumber,
-    'City': contact.city || '-',
-    'Area': contact.area || '-',
-    'Industry': contact.industry || '-',
-    'Call Status': contact.callStatus.charAt(0).toUpperCase() + contact.callStatus.slice(1),
-    'Feedback': contact.lastFeedback 
-      ? contact.lastFeedback.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-      : '-',
-    'Notes': contact.lastNotes || '-',
-    'Called At': contact.calledAt ? format(new Date(contact.calledAt), 'yyyy-MM-dd HH:mm') : '-',
-  }));
+  // Check if any contact has agentName to determine if we should include the column
+  const hasAgentName = contacts.some(c => c.agentName);
+  
+  return contacts.map((contact, index) => {
+    const baseData: Record<string, string | number> = {
+      '#': index + 1,
+      'Call Order': contact.callOrder,
+      'Company Name': contact.companyName,
+      'Contact Person': contact.contactPersonName,
+      'Phone Number': contact.phoneNumber,
+      'Trade License': contact.tradeLicenseNumber,
+      'City': contact.city || '-',
+      'Area': contact.area || '-',
+      'Industry': contact.industry || '-',
+      'Call Status': contact.callStatus.charAt(0).toUpperCase() + contact.callStatus.slice(1),
+      'Feedback': contact.lastFeedback 
+        ? contact.lastFeedback.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        : '-',
+      'Notes': contact.lastNotes || '-',
+      'Called At': contact.calledAt ? format(new Date(contact.calledAt), 'yyyy-MM-dd HH:mm') : '-',
+    };
+    
+    // Add Agent Name column if exporting team data
+    if (hasAgentName) {
+      baseData['Agent Name'] = contact.agentName || '-';
+    }
+    
+    return baseData;
+  });
 };
 
 export const exportContactsToCSV = (contacts: ContactExportData[], filename?: string) => {
@@ -80,6 +93,9 @@ export const exportContactsToExcel = (contacts: ContactExportData[], filename?: 
 
   const worksheet = XLSX.utils.json_to_sheet(data);
   
+  // Check if agent name column is included
+  const hasAgentName = data.length > 0 && 'Agent Name' in data[0];
+  
   // Set column widths
   const columnWidths = [
     { wch: 4 },   // #
@@ -95,6 +111,7 @@ export const exportContactsToExcel = (contacts: ContactExportData[], filename?: 
     { wch: 15 },  // Feedback
     { wch: 40 },  // Notes
     { wch: 18 },  // Called At
+    ...(hasAgentName ? [{ wch: 25 }] : []),  // Agent Name
   ];
   worksheet['!cols'] = columnWidths;
 

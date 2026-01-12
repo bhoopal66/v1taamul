@@ -196,9 +196,9 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
       if (variables.updates.lead_status) {
         const statusLabels: Record<LeadStatus, string> = {
           new: 'Moved to New',
-          contacted: 'Moved to Contacted',
-          qualified: '✅ Lead Qualified!',
-          converted: '🎉 Lead Converted!',
+          contacted: 'Moved to In Progress',
+          qualified: '✅ Lead Submitted!',
+          converted: '📋 Lead Assessing!',
           lost: 'Marked as Lost',
         };
         toast.success(statusLabels[variables.updates.lead_status]);

@@ -32,9 +32,9 @@ import { getScoreLabel } from '@/hooks/useLeadScoring';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; bgColor: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'text-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-950/30', icon: Sparkles },
-  { status: 'contacted', label: 'Contacted', color: 'text-yellow-600', bgColor: 'bg-yellow-50 dark:bg-yellow-950/30', icon: Phone },
-  { status: 'qualified', label: 'Qualified', color: 'text-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-950/30', icon: CheckCircle },
-  { status: 'converted', label: 'Converted', color: 'text-green-600', bgColor: 'bg-green-50 dark:bg-green-950/30', icon: Target },
+  { status: 'contacted', label: 'In Progress', color: 'text-yellow-600', bgColor: 'bg-yellow-50 dark:bg-yellow-950/30', icon: Phone },
+  { status: 'qualified', label: 'Submitted', color: 'text-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-950/30', icon: CheckCircle },
+  { status: 'converted', label: 'Assessing', color: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-950/30', icon: Target },
   { status: 'lost', label: 'Lost', color: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-950/30', icon: XCircle },
 ];
 

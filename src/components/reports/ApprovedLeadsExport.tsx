@@ -203,6 +203,56 @@ export const ApprovedLeadsExport: React.FC = () => {
       .sort((a, b) => b.count - a.count);
   }, [approvedLeads]);
 
+  // Calculate agent-wise summary breakdown
+  const agentSummary = React.useMemo(() => {
+    if (!approvedLeads || approvedLeads.length === 0) return [];
+    
+    const summaryMap = new Map<string, { count: number; dealValue: number }>();
+    
+    approvedLeads.forEach(lead => {
+      const agent = lead.agentName;
+      const existing = summaryMap.get(agent) || { count: 0, dealValue: 0 };
+      summaryMap.set(agent, {
+        count: existing.count + 1,
+        dealValue: existing.dealValue + (lead.dealValue || 0),
+      });
+    });
+    
+    return Array.from(summaryMap.entries())
+      .map(([agent, data]) => ({
+        agent,
+        count: data.count,
+        dealValue: data.dealValue,
+        percentage: ((data.count / approvedLeads.length) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [approvedLeads]);
+
+  // Calculate team-wise summary breakdown
+  const teamSummary = React.useMemo(() => {
+    if (!approvedLeads || approvedLeads.length === 0) return [];
+    
+    const summaryMap = new Map<string, { count: number; dealValue: number }>();
+    
+    approvedLeads.forEach(lead => {
+      const team = lead.teamName || 'Unassigned';
+      const existing = summaryMap.get(team) || { count: 0, dealValue: 0 };
+      summaryMap.set(team, {
+        count: existing.count + 1,
+        dealValue: existing.dealValue + (lead.dealValue || 0),
+      });
+    });
+    
+    return Array.from(summaryMap.entries())
+      .map(([team, data]) => ({
+        team,
+        count: data.count,
+        dealValue: data.dealValue,
+        percentage: ((data.count / approvedLeads.length) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [approvedLeads]);
+
   const exportToExcel = () => {
     if (!approvedLeads || approvedLeads.length === 0) {
       toast.error('No data to export');
@@ -277,6 +327,58 @@ export const ApprovedLeadsExport: React.FC = () => {
           { wch: 12 },  // Percentage
         ];
         XLSX.utils.book_append_sheet(workbook, summarySheet, 'Bank Summary');
+      }
+
+      // Add team summary sheet
+      if (teamSummary.length > 0) {
+        const teamData = [
+          ...teamSummary.map(item => ({
+            'Team': item.team,
+            'Count': item.count,
+            'Deal Value': item.dealValue,
+            'Percentage': `${item.percentage}%`,
+          })),
+          {
+            'Team': 'TOTAL',
+            'Count': approvedLeads.length,
+            'Deal Value': totalDealValue,
+            'Percentage': '100%',
+          }
+        ];
+        const teamSheet = XLSX.utils.json_to_sheet(teamData);
+        teamSheet['!cols'] = [
+          { wch: 25 },  // Team
+          { wch: 10 },  // Count
+          { wch: 15 },  // Deal Value
+          { wch: 12 },  // Percentage
+        ];
+        XLSX.utils.book_append_sheet(workbook, teamSheet, 'Team Summary');
+      }
+
+      // Add agent summary sheet
+      if (agentSummary.length > 0) {
+        const agentData = [
+          ...agentSummary.map(item => ({
+            'Agent': item.agent,
+            'Count': item.count,
+            'Deal Value': item.dealValue,
+            'Percentage': `${item.percentage}%`,
+          })),
+          {
+            'Agent': 'TOTAL',
+            'Count': approvedLeads.length,
+            'Deal Value': totalDealValue,
+            'Percentage': '100%',
+          }
+        ];
+        const agentSheet = XLSX.utils.json_to_sheet(agentData);
+        agentSheet['!cols'] = [
+          { wch: 25 },  // Agent
+          { wch: 10 },  // Count
+          { wch: 15 },  // Deal Value
+          { wch: 12 },  // Percentage
+        ];
+        XLSX.utils.book_append_sheet(workbook, agentSheet, 'Agent Summary');
       }
 
       // Generate filename with filters
@@ -689,6 +791,183 @@ export const ApprovedLeadsExport: React.FC = () => {
                   </TableRow>
                 </TableBody>
               </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Team-wise Summary Breakdown */}
+      {teamSummary.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Team-wise Summary
+            </CardTitle>
+            <CardDescription>
+              Breakdown by team showing count and deal value totals
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teamSummary.map((item) => (
+                <div
+                  key={item.team}
+                  className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="secondary" className="font-semibold">
+                      {item.team}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {item.percentage}%
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Count:</span>
+                      <span className="font-medium">{item.count}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Deal Value:</span>
+                      <span className="font-medium text-green-600">
+                        {item.dealValue.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Team</TableHead>
+                    <TableHead className="text-right">Count</TableHead>
+                    <TableHead className="text-right">Deal Value</TableHead>
+                    <TableHead className="text-right">%</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamSummary.map((item) => (
+                    <TableRow key={item.team}>
+                      <TableCell className="font-medium">{item.team}</TableCell>
+                      <TableCell className="text-right">{item.count}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        {item.dealValue.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">{item.percentage}%</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-bold bg-muted/50">
+                    <TableCell>TOTAL</TableCell>
+                    <TableCell className="text-right">{approvedLeads?.length || 0}</TableCell>
+                    <TableCell className="text-right text-green-600">
+                      {totalDealValue.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">100%</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Agent-wise Summary Breakdown */}
+      {agentSummary.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Agent-wise Summary
+            </CardTitle>
+            <CardDescription>
+              Breakdown by agent showing count and deal value totals
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {agentSummary.slice(0, 12).map((item) => (
+                <div
+                  key={item.agent}
+                  className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge className="font-semibold bg-primary/10 text-primary hover:bg-primary/20">
+                      {item.agent}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {item.percentage}%
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Count:</span>
+                      <span className="font-medium">{item.count}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Deal Value:</span>
+                      <span className="font-medium text-green-600">
+                        {item.dealValue.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {agentSummary.length > 12 && (
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                Showing top 12 agents. See table below for complete list.
+              </p>
+            )}
+            
+            <div className="mt-6 pt-4 border-t">
+              <ScrollArea className="h-[300px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Agent</TableHead>
+                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead className="text-right">Deal Value</TableHead>
+                      <TableHead className="text-right">%</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agentSummary.map((item) => (
+                      <TableRow key={item.agent}>
+                        <TableCell className="font-medium">{item.agent}</TableCell>
+                        <TableCell className="text-right">{item.count}</TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {item.dealValue.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">{item.percentage}%</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell>TOTAL</TableCell>
+                      <TableCell className="text-right">{approvedLeads?.length || 0}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        {totalDealValue.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">100%</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </div>
           </CardContent>
         </Card>

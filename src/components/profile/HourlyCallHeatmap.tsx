@@ -91,6 +91,13 @@ export const HourlyCallHeatmap: React.FC = () => {
     return 'bg-primary/25';
   };
 
+  const getTextColor = (value: number) => {
+    if (value === 0) return '';
+    const intensity = value / maxValue;
+    if (intensity > 0.5) return 'text-primary-foreground';
+    return 'text-primary font-semibold';
+  };
+
   const getCell = (day: number, hour: number): HourlyHeatmapCell | undefined => {
     return heatmapData.find(d => d.day === day && d.hour === hour);
   };
@@ -180,13 +187,11 @@ export const HourlyCallHeatmap: React.FC = () => {
                       breakdown={breakdown}
                     >
                       <div
-                        className={`flex-1 h-7 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
+                        className={`flex-1 h-8 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
                       >
-                        {value > 0 && (
-                          <span className="text-[10px] font-medium text-primary-foreground">
-                            {value}
-                          </span>
-                        )}
+                        <span className={`text-[11px] font-bold ${getTextColor(value)}`}>
+                          {value > 0 ? value : ''}
+                        </span>
                       </div>
                     </HeatmapCellTooltip>
                   );

@@ -972,6 +972,15 @@ export type Database = {
     }
     Functions: {
       get_led_team_id: { Args: { _user_id: string }; Returns: string }
+      get_public_profile_info: {
+        Args: { profile_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          id: string
+          username: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

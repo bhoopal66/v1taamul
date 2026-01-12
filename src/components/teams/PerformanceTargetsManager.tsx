@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePerformanceAlerts, PerformanceTarget } from '@/hooks/usePerformanceAlerts';
 import { useTeamManagement } from '@/hooks/useTeamManagement';
+import { useFeaturePermissions } from '@/hooks/useFeaturePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ const PERIODS = [
 export const PerformanceTargetsManager: React.FC = () => {
   const { targets, isLoading, isAdmin, createTarget, deleteTarget, updateTarget } = usePerformanceAlerts();
   const { teams, agents } = useTeamManagement();
+  const { canCreatePerformanceTarget, canDeletePerformanceTarget } = useFeaturePermissions();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [targetType, setTargetType] = useState<'team' | 'agent'>('team');
@@ -105,13 +107,14 @@ export const PerformanceTargetsManager: React.FC = () => {
           </CardTitle>
           <CardDescription>Set targets for teams and agents to trigger alerts</CardDescription>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add Target
-            </Button>
-          </DialogTrigger>
+        {canCreatePerformanceTarget && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Target
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Performance Target</DialogTitle>
@@ -256,6 +259,7 @@ export const PerformanceTargetsManager: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </CardHeader>
       <CardContent>
         {targets.length === 0 ? (

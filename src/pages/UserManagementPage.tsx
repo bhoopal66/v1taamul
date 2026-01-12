@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { canUseFeature } from '@/config/rolePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -94,7 +95,14 @@ export const UserManagementPage: React.FC = () => {
   } = useUserManagement();
   const { poolContacts, moveOldContactsToPool, isMoving } = useCompanyPool();
   
-  // Check user permissions
+  // Feature-level permissions using the centralized config
+  const canCreateUser = canUseFeature(userRole as AppRole, 'create_user');
+  const canDeleteUser = canUseFeature(userRole as AppRole, 'delete_user');
+  const canChangeRole = canUseFeature(userRole as AppRole, 'change_user_role');
+  const canResetPassword = canUseFeature(userRole as AppRole, 'reset_user_password');
+  const canExportUserData = canUseFeature(userRole as AppRole, 'export_contacts');
+  
+  // Check user permissions for page access
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
   const isSupervisor = userRole === 'supervisor';
@@ -282,7 +290,7 @@ export const UserManagementPage: React.FC = () => {
   };
 
   const canManageRole = (role: AppRole): boolean => {
-    if (!isAdmin) return false; // Supervisors cannot manage roles
+    if (!canChangeRole) return false; // Only super_admin can change roles
     if (isSuperAdmin) return true;
     if (role === 'admin' || role === 'super_admin') return false;
     return true;
@@ -307,7 +315,7 @@ export const UserManagementPage: React.FC = () => {
             </p>
           </div>
         </div>
-        {isAdmin && (
+        {canCreateUser && (
           <div className="flex gap-2">
             <Button 
               onClick={() => setCreateUserDialogOpen(true)}
@@ -411,7 +419,7 @@ export const UserManagementPage: React.FC = () => {
                                   </Badge>
                                 ))
                               )}
-                              {isAdmin && (
+                              {canChangeRole && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -460,7 +468,7 @@ export const UserManagementPage: React.FC = () => {
                                   <Edit2 className="w-4 h-4 mr-2" />
                                   Edit Profile
                                 </DropdownMenuItem>
-                                {isAdmin && (
+                                {canExportUserData && (
                                   <>
                                     <DropdownMenuItem 
                                       onClick={() => setConfirmDialog({ 

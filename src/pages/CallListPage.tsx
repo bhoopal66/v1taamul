@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { canUseFeature } from '@/config/rolePermissions';
+import { Database } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +71,7 @@ import { format, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fn
 import { useCallList, CallListContact, FeedbackStatus } from '@/hooks/useCallList';
 import { cn } from '@/lib/utils';
 
-
+type AppRole = Database['public']['Enums']['app_role'];
 
 const feedbackOptions: { status: FeedbackStatus; label: string; icon: React.ReactNode; color: string; description: string }[] = [
   { 
@@ -113,7 +115,8 @@ export const CallListPage: React.FC = () => {
   const { profile, userRole } = useAuth();
   const { callList, stats, isLoading, refetch, logFeedback, isLogging, skipContact, isSkipping } = useCallList();
   
-  const canExport = userRole === 'super_admin';
+  // Feature-level permissions
+  const canExport = canUseFeature(userRole as AppRole, 'export_call_list');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'called' | 'skipped'>('all');

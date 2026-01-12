@@ -46,6 +46,7 @@ import { StreakMilestones } from '@/components/profile/StreakMilestones';
 import { LoginStreakReminderBanner } from '@/components/profile/LoginStreakReminderBanner';
 import { LoginStreakMilestones } from '@/components/profile/LoginStreakMilestones';
 import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
+import { HourlyCallHeatmap } from '@/components/profile/HourlyCallHeatmap';
 import { TalkTimeProfileCard } from '@/components/profile/TalkTimeProfileCard';
 
 const chartConfig = {
@@ -198,6 +199,9 @@ export const AgentProfile: React.FC = () => {
 
       {/* Performance Alerts */}
       <MyPerformanceAlerts />
+
+      {/* Hourly Call Heatmap */}
+      <HourlyCallHeatmap />
 
       {/* Performance Charts */}
       <Tabs defaultValue="monthly" className="space-y-6">

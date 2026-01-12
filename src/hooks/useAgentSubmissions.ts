@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 export type SubmissionGroup = 'group1' | 'group2';
 export type SubmissionPeriod = 'weekly' | 'monthly';
 
+export type SubmissionStatus = 'pending' | 'approved' | 'rejected';
+
 export interface AgentSubmission {
   id: string;
   agent_id: string;
@@ -14,6 +16,9 @@ export interface AgentSubmission {
   submission_group: SubmissionGroup;
   bank_name: string;
   notes: string | null;
+  status: SubmissionStatus;
+  review_notes: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }

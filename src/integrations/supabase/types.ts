@@ -63,6 +63,10 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
           submission_date: string
           submission_group: Database["public"]["Enums"]["submission_group"]
           updated_at: string
@@ -73,6 +77,10 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           submission_date?: string
           submission_group: Database["public"]["Enums"]["submission_group"]
           updated_at?: string
@@ -83,6 +91,10 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           submission_date?: string
           submission_group?: Database["public"]["Enums"]["submission_group"]
           updated_at?: string

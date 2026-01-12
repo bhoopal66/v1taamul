@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TeamMemberGoalsManager } from '@/components/team-leader/TeamMemberGoalsManager';
 import {
   RefreshCw,
   Users,
@@ -394,6 +395,9 @@ export const TeamLeaderDashboard: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Team Member Goals Manager */}
+      <TeamMemberGoalsManager />
 
       {/* Weekly Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

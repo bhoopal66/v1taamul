@@ -4,13 +4,19 @@
 FROM node:20-alpine AS api-builder
 WORKDIR /app/server
 
+# Build deps for native modules (bcrypt on Alpine)
+RUN apk add --no-cache python3 make g++
+
 # Install dependencies (including devDependencies for build)
 COPY server/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; else npm install --legacy-peer-deps; fi
 
 # Copy source and build
 COPY server/ ./
 RUN npm run build
+
+# Prune dev deps so we can copy node_modules into runtime
+RUN npm prune --omit=dev
 
 # ===========================================
 # Stage 2: Build Frontend
@@ -18,9 +24,9 @@ RUN npm run build
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (scripts required for Vite/esbuild)
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --ignore-scripts
+RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; else npm install --legacy-peer-deps; fi
 
 # Copy source files (exclude server folder)
 COPY src/ ./src/
@@ -46,11 +52,9 @@ RUN npm run build
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Install production dependencies for API
-COPY server/package*.json ./server/
-RUN cd server && npm install --production --legacy-peer-deps
-
-# Copy API build
+# Copy API build + prod deps from builder (avoids recompiling bcrypt)
+COPY --from=api-builder /app/server/package*.json ./server/
+COPY --from=api-builder /app/server/node_modules ./server/node_modules
 COPY --from=api-builder /app/server/dist ./server/dist
 
 # Copy frontend build

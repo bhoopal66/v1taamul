@@ -562,51 +562,106 @@ export const UploadPage: React.FC = () => {
                           <TableRow>
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Company</TableHead>
-                            <TableHead>Contact Person</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>License #</TableHead>
-                            <TableHead>City</TableHead>
-                            <TableHead>Area</TableHead>
+                            <TableHead>Contact Number</TableHead>
                             <TableHead>Industry</TableHead>
+                            <TableHead>Address</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Emirate</TableHead>
                             <TableHead className="w-24">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredContacts.slice(0, 100).map((contact) => (
-                            <TableRow 
-                              key={contact.rowNumber}
-                              className={cn(!contact.isValid && "bg-destructive/5")}
-                            >
-                              <TableCell className="text-muted-foreground">{contact.rowNumber}</TableCell>
-                              <TableCell className="font-medium">{contact.companyName || '-'}</TableCell>
-                              <TableCell>{contact.contactPersonName || '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{contact.phoneNumber || '-'}</TableCell>
-                              <TableCell>{contact.tradeLicenseNumber || '-'}</TableCell>
-                              <TableCell>{contact.city || '-'}</TableCell>
-                              <TableCell>{contact.area || '-'}</TableCell>
-                              <TableCell>{contact.industry || '-'}</TableCell>
-                              <TableCell>
-                                {contact.isValid ? (
-                                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                                ) : (
+                          {filteredContacts.slice(0, 100).map((contact) => {
+                            // Helper to check if a specific field has an error
+                            const hasFieldError = (fieldName: string) => 
+                              contact.errors.some(err => err.toLowerCase().includes(fieldName.toLowerCase()));
+                            
+                            // Helper to get error message for a field
+                            const getFieldErrors = (fieldName: string) => 
+                              contact.errors.filter(err => err.toLowerCase().includes(fieldName.toLowerCase()));
+
+                            const renderCell = (value: string | undefined, fieldName: string, isMono?: boolean) => {
+                              const fieldErrors = getFieldErrors(fieldName);
+                              const hasError = fieldErrors.length > 0;
+                              
+                              if (hasError) {
+                                return (
                                   <TooltipProvider>
                                     <Tooltip>
-                                      <TooltipTrigger>
-                                        <XCircle className="w-4 h-4 text-destructive" />
+                                      <TooltipTrigger asChild>
+                                        <div className={cn(
+                                          "flex items-center gap-1 px-1.5 py-0.5 -mx-1.5 rounded bg-destructive/10 border border-destructive/30 cursor-help",
+                                          isMono && "font-mono text-sm"
+                                        )}>
+                                          <AlertTriangle className="w-3 h-3 text-destructive shrink-0" />
+                                          <span className="text-destructive truncate">{value || '-'}</span>
+                                        </div>
                                       </TooltipTrigger>
-                                      <TooltipContent>
-                                        <ul className="text-xs space-y-1">
-                                          {contact.errors.map((err, i) => (
-                                            <li key={i}>• {err}</li>
-                                          ))}
-                                        </ul>
+                                      <TooltipContent side="top" className="max-w-xs">
+                                        <div className="space-y-1">
+                                          <p className="font-semibold text-xs text-destructive">Validation Error</p>
+                                          <ul className="text-xs space-y-0.5">
+                                            {fieldErrors.map((err, i) => (
+                                              <li key={i}>• {err}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                );
+                              }
+                              
+                              return <span className={cn(isMono && "font-mono text-sm")}>{value || '-'}</span>;
+                            };
+
+                            // Check for general errors not tied to specific fields
+                            const generalErrors = contact.errors.filter(err => 
+                              !['company', 'contact', 'phone', 'industry', 'address', 'area', 'emirate', 'number']
+                                .some(field => err.toLowerCase().includes(field))
+                            );
+
+                            return (
+                              <TableRow 
+                                key={contact.rowNumber}
+                                className={cn(!contact.isValid && "bg-destructive/5")}
+                              >
+                                <TableCell className="text-muted-foreground">{contact.rowNumber}</TableCell>
+                                <TableCell className="font-medium">{renderCell(contact.companyName, 'company')}</TableCell>
+                                <TableCell>{renderCell(contact.phoneNumber, 'contact number', true)}</TableCell>
+                                <TableCell>{renderCell(contact.industry, 'industry')}</TableCell>
+                                <TableCell>{renderCell(contact.city, 'address')}</TableCell>
+                                <TableCell>{renderCell(contact.area, 'area')}</TableCell>
+                                <TableCell>{renderCell(contact.city, 'emirate')}</TableCell>
+                                <TableCell>
+                                  {contact.isValid ? (
+                                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <div className="flex items-center gap-1">
+                                            <XCircle className="w-4 h-4 text-destructive" />
+                                            <span className="text-xs text-destructive">{contact.errors.length}</span>
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="left" className="max-w-xs">
+                                          <div className="space-y-1">
+                                            <p className="font-semibold text-xs">All Errors ({contact.errors.length})</p>
+                                            <ul className="text-xs space-y-0.5">
+                                              {contact.errors.map((err, i) => (
+                                                <li key={i}>• {err}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                       {filteredContacts.length > 100 && (

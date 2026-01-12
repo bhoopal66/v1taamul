@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import { Dashboard } from "./pages/Dashboard";
 import { SupervisorDashboard } from "./pages/SupervisorDashboard";
 import { AgentProfile } from "./pages/AgentProfile";
+import { TeamLeaderDashboard } from "./pages/TeamLeaderDashboard";
 import { Leaderboard } from "./pages/Leaderboard";
 import { UploadPage } from "./pages/UploadPage";
 import { CallListPage } from "./pages/CallListPage";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/contacts" element={<Dashboard />} />
               <Route path="/supervisor" element={<SupervisorDashboard />} />
+              <Route path="/my-team" element={<TeamLeaderDashboard />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/messages" element={<Dashboard />} />
               <Route path="/settings" element={<SettingsPage />} />

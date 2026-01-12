@@ -268,6 +268,17 @@ export const AppSidebar: React.FC = () => {
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
         
+        {/* Team Leader Section - Show only for team leaders who are not supervisors */}
+        {isTeamLeader && !['supervisor', 'operations_head', 'admin', 'super_admin'].includes(userRole || '') && (
+          <>
+            <div className="pt-4 pb-2">
+              <p className="px-4 text-xs font-bold text-sidebar-muted uppercase tracking-wider">
+                My Team
+              </p>
+            </div>
+            <NavItem to="/my-team" icon={<Users className="w-5 h-5" />} label="Team Dashboard" />
+          </>
+        )}
         
         {(userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin') && (
           <>
@@ -276,6 +287,9 @@ export const AppSidebar: React.FC = () => {
                 Management
               </p>
             </div>
+            {isTeamLeader && (
+              <NavItem to="/my-team" icon={<Users className="w-5 h-5" />} label="My Team" />
+            )}
             <NavItem to="/supervisor" icon={<BarChart3 className="w-5 h-5" />} label="Team Overview" />
             <NavItem to="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
           </>

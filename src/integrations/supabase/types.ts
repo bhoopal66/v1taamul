@@ -1217,12 +1217,36 @@ export type Database = {
       encrypt_sensitive_data: { Args: { plain_text: string }; Returns: string }
       get_encryption_key: { Args: never; Returns: string }
       get_led_team_id: { Args: { _user_id: string }; Returns: string }
+      get_own_profile: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_date: string
+          login_streak_current: number
+          login_streak_longest: number
+          phone_number: string
+          supervisor_id: string
+          team_id: string
+          updated_at: string
+          username: string
+          whatsapp_number: string
+        }[]
+      }
       get_public_profile_info: {
         Args: { profile_id: string }
         Returns: {
           avatar_url: string
+          created_at: string
           full_name: string
           id: string
+          is_active: boolean
+          supervisor_id: string
+          team_id: string
           username: string
         }[]
       }

@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useHourlyCallHeatmap, HeatmapPeriod, HourlyHeatmapCell, CallOutcomeBreakdown } from '@/hooks/useHourlyCallHeatmap';
-import { Calendar, Grid3X3, ThumbsUp, ThumbsDown, PhoneMissed, Phone, PhoneOff } from 'lucide-react';
+import { Calendar, Grid3X3, ThumbsUp, ThumbsDown, PhoneMissed, Phone, PhoneOff, Trophy } from 'lucide-react';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
@@ -110,6 +110,11 @@ export const HourlyCallHeatmap: React.FC = () => {
       .reduce((sum, cell) => sum + cell.value, 0);
   };
 
+  // Find best performing day
+  const dayTotals = days.map((_, idx) => getDayTotal(idx));
+  const maxDayTotal = Math.max(...dayTotals);
+  const bestDayIndex = maxDayTotal > 0 ? dayTotals.indexOf(maxDayTotal) : -1;
+
   const emptyBreakdown: CallOutcomeBreakdown = {
     interested: 0,
     notInterested: 0,
@@ -179,9 +184,13 @@ export const HourlyCallHeatmap: React.FC = () => {
             {/* Heatmap grid */}
             {days.map((day, dayIndex) => {
               const dayTotal = getDayTotal(dayIndex);
+              const isBestDay = dayIndex === bestDayIndex && dayTotal > 0;
               return (
-                <div key={day} className="flex items-center gap-1 mb-1">
-                  <div className="w-10 text-xs text-muted-foreground font-medium">{day}</div>
+                <div key={day} className={`flex items-center gap-1 mb-1 ${isBestDay ? 'relative' : ''}`}>
+                  <div className="w-10 text-xs text-muted-foreground font-medium flex items-center gap-1">
+                    {isBestDay && <Trophy className="w-3 h-3 text-yellow-500" />}
+                    <span className={isBestDay ? 'text-yellow-600 dark:text-yellow-400 font-semibold' : ''}>{day}</span>
+                  </div>
                   {hours.map(hour => {
                     const cell = getCell(dayIndex, hour);
                     const value = cell?.value || 0;
@@ -196,7 +205,7 @@ export const HourlyCallHeatmap: React.FC = () => {
                         breakdown={breakdown}
                       >
                         <div
-                          className={`flex-1 h-8 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
+                          className={`flex-1 h-8 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center ${isBestDay ? 'ring-1 ring-yellow-500/30' : ''}`}
                         >
                           <span className={`text-[11px] font-bold ${getTextColor(value)}`}>
                             {value > 0 ? value : ''}
@@ -206,11 +215,21 @@ export const HourlyCallHeatmap: React.FC = () => {
                     );
                   })}
                   {/* Daily total */}
-                  <div className="w-12 h-8 rounded-sm bg-secondary flex items-center justify-center">
-                    <span className="text-xs font-bold text-secondary-foreground">
-                      {dayTotal}
-                    </span>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={`w-12 h-8 rounded-sm flex items-center justify-center gap-1 ${isBestDay ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : 'bg-secondary'}`}>
+                        {isBestDay && <Trophy className="w-3 h-3 text-yellow-500" />}
+                        <span className={`text-xs font-bold ${isBestDay ? 'text-yellow-600 dark:text-yellow-400' : 'text-secondary-foreground'}`}>
+                          {dayTotal}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    {isBestDay && (
+                      <TooltipContent side="right">
+                        <p className="text-xs font-medium">🏆 Best performing day!</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 </div>
               );
             })}

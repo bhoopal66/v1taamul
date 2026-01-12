@@ -17,6 +17,7 @@ import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
 import { LeadActivityTimeline } from '@/components/leads/LeadActivityTimeline';
 import { LeadSourceAnalytics } from '@/components/leads/LeadSourceAnalytics';
+import { LeadTransitionsFeed } from '@/components/leads/LeadTransitionsFeed';
 import { BulkLeadImport } from '@/components/leads/BulkLeadImport';
 import { 
   Target, 
@@ -43,10 +44,11 @@ import {
   Zap,
   Bell,
   Megaphone,
+  History,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup' | 'sources';
+type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup' | 'sources' | 'history';
 
 const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon: React.ElementType }[] = [
   { status: 'new', label: 'New', color: 'bg-blue-500', icon: Sparkles },
@@ -242,6 +244,15 @@ export const LeadsPage = () => {
               <Megaphone className="w-4 h-4 mr-1" />
               Sources
             </Button>
+            <Button
+              variant={viewMode === 'history' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => setViewMode('history')}
+            >
+              <History className="w-4 h-4 mr-1" />
+              History
+            </Button>
           </div>
           <BulkLeadImport onImportComplete={() => refetch()} />
           <TooltipProvider>
@@ -368,6 +379,57 @@ export const LeadsPage = () => {
       {/* Lead Source Analytics View */}
       {viewMode === 'sources' && (
         <LeadSourceAnalytics leads={leads} />
+      )}
+
+      {/* Pipeline History View */}
+      {viewMode === 'history' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LeadTransitionsFeed />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Stage Transition Summary</CardTitle>
+              <CardDescription>How leads moved through the pipeline</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {['new', 'contacted', 'qualified', 'converted', 'approved', 'lost'].map((status) => {
+                  const count = leads.filter(l => l.leadStatus === status).length;
+                  const percentage = leads.length > 0 ? (count / leads.length) * 100 : 0;
+                  const statusLabels: Record<string, string> = {
+                    new: 'New',
+                    contacted: 'In Progress',
+                    qualified: 'Submitted',
+                    converted: 'Assessing',
+                    approved: 'Approved',
+                    lost: 'Lost',
+                  };
+                  const statusColors: Record<string, string> = {
+                    new: 'bg-blue-500',
+                    contacted: 'bg-yellow-500',
+                    qualified: 'bg-purple-500',
+                    converted: 'bg-orange-500',
+                    approved: 'bg-green-500',
+                    lost: 'bg-red-500',
+                  };
+                  return (
+                    <div key={status}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">{statusLabels[status]}</span>
+                        <span className="text-sm text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${statusColors[status]} transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Leads List - Only show in list view */}

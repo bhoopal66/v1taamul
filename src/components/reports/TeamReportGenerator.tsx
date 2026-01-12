@@ -721,6 +721,71 @@ export const TeamReportGenerator: React.FC = () => {
                 </Card>
               )}
 
+              {/* Agent-Level Comparison Chart */}
+              {showComparison && reportData?.previousMembers && reportData.members.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Agent Performance Comparison</CardTitle>
+                    <CardDescription>
+                      Each agent's current vs previous period calls
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={Math.max(280, reportData.members.length * 50)}>
+                      <BarChart
+                        data={reportData.members.slice(0, 10).map(member => {
+                          const prevMember = reportData.previousMembers?.find(p => p.agentId === member.agentId);
+                          return {
+                            name: member.agentName.split(' ')[0],
+                            currentCalls: member.totalCalls,
+                            previousCalls: prevMember?.totalCalls || 0,
+                            currentInterested: member.interested,
+                            previousInterested: prevMember?.interested || 0,
+                          };
+                        })}
+                        layout="vertical"
+                        margin={{ left: 10, right: 30 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
+                        <XAxis type="number" className="text-xs" />
+                        <YAxis type="category" dataKey="name" className="text-xs" width={80} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number, name: string) => {
+                            const labels: Record<string, string> = {
+                              currentCalls: 'Current Calls',
+                              previousCalls: 'Previous Calls',
+                              currentInterested: 'Current Interested',
+                              previousInterested: 'Previous Interested',
+                            };
+                            return [value, labels[name] || name];
+                          }}
+                        />
+                        <Legend 
+                          formatter={(value) => {
+                            const labels: Record<string, string> = {
+                              currentCalls: 'Current Calls',
+                              previousCalls: 'Previous Calls',
+                              currentInterested: 'Current Interested',
+                              previousInterested: 'Previous Interested',
+                            };
+                            return labels[value] || value;
+                          }}
+                        />
+                        <Bar dataKey="currentCalls" name="currentCalls" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={12} />
+                        <Bar dataKey="previousCalls" name="previousCalls" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={12} opacity={0.3} />
+                        <Bar dataKey="currentInterested" name="currentInterested" fill="hsl(142, 76%, 36%)" radius={[0, 4, 4, 0]} barSize={12} />
+                        <Bar dataKey="previousInterested" name="previousInterested" fill="hsl(142, 76%, 36%)" radius={[0, 4, 4, 0]} barSize={12} opacity={0.3} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Members Table */}
               <Card>
                 <CardHeader className="pb-2">

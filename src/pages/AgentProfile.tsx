@@ -48,6 +48,8 @@ import { LoginStreakMilestones } from '@/components/profile/LoginStreakMilestone
 import { MyPerformanceAlerts } from '@/components/profile/MyPerformanceAlerts';
 import { HourlyCallHeatmap } from '@/components/profile/HourlyCallHeatmap';
 import { TalkTimeProfileCard } from '@/components/profile/TalkTimeProfileCard';
+import { SubmissionForm } from '@/components/profile/SubmissionForm';
+import { SubmissionsTable } from '@/components/profile/SubmissionsTable';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -199,6 +201,14 @@ export const AgentProfile: React.FC = () => {
 
       {/* Performance Alerts */}
       <MyPerformanceAlerts />
+
+      {/* Daily Submissions Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <SubmissionForm />
+        <div className="lg:col-span-2">
+          <SubmissionsTable />
+        </div>
+      </div>
 
       {/* Hourly Call Heatmap */}
       <HourlyCallHeatmap />

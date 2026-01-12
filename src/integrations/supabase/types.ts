@@ -56,6 +56,39 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_submissions: {
+        Row: {
+          agent_id: string
+          bank_name: string
+          created_at: string
+          id: string
+          notes: string | null
+          submission_date: string
+          submission_group: Database["public"]["Enums"]["submission_group"]
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          bank_name: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          submission_date?: string
+          submission_group: Database["public"]["Enums"]["submission_group"]
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          bank_name?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          submission_date?: string
+          submission_group?: Database["public"]["Enums"]["submission_group"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_talk_time: {
         Row: {
           agent_id: string
@@ -1308,6 +1341,7 @@ export type Database = {
         | "wrong_number"
       lead_status: "new" | "contacted" | "qualified" | "converted" | "lost"
       message_direction: "inbound" | "outbound"
+      submission_group: "group1" | "group2"
       team_type: "remote" | "office"
       upload_status: "pending" | "approved" | "rejected" | "supplemented"
     }
@@ -1467,6 +1501,7 @@ export const Constants = {
       ],
       lead_status: ["new", "contacted", "qualified", "converted", "lost"],
       message_direction: ["inbound", "outbound"],
+      submission_group: ["group1", "group2"],
       team_type: ["remote", "office"],
       upload_status: ["pending", "approved", "rejected", "supplemented"],
     },

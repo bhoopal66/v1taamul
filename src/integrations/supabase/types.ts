@@ -547,6 +547,13 @@ export type Database = {
             foreignKeyName: "performance_alerts_acknowledged_by_fkey"
             columns: ["acknowledged_by"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
             referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
@@ -555,6 +562,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -674,6 +688,13 @@ export type Database = {
             foreignKeyName: "performance_targets_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_targets_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
             referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
@@ -756,6 +777,13 @@ export type Database = {
             columns: ["supervisor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -856,6 +884,13 @@ export type Database = {
             columns: ["leader_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1012,6 +1047,80 @@ export type Database = {
       }
     }
     Views: {
+      profiles_public: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          last_login_date: string | null
+          login_streak_current: number | null
+          login_streak_longest: number | null
+          supervisor_id: string | null
+          team_id: string | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
+          supervisor_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
+          supervisor_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles_secure: {
         Row: {
           avatar_url: string | null
@@ -1034,7 +1143,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: never
+          email?: string | null
           full_name?: string | null
           id?: string | null
           is_active?: boolean | null
@@ -1042,17 +1151,17 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
-          phone_number?: never
+          phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
           updated_at?: string | null
           username?: string | null
-          whatsapp_number?: never
+          whatsapp_number?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: never
+          email?: string | null
           full_name?: string | null
           id?: string | null
           is_active?: boolean | null
@@ -1060,12 +1169,12 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
-          phone_number?: never
+          phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
           updated_at?: string | null
           username?: string | null
-          whatsapp_number?: never
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
@@ -1073,6 +1182,13 @@ export type Database = {
             columns: ["supervisor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {

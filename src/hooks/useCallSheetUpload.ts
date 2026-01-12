@@ -63,6 +63,15 @@ export interface RejectionDetail {
   rejectionReason: string;
 }
 
+export interface UploadProgress {
+  stage: 'reading' | 'parsing' | 'validating' | 'uploading' | 'creating_contacts' | 'creating_call_list' | 'complete';
+  percentage: number;
+  currentItem?: number;
+  totalItems?: number;
+  estimatedTimeRemaining?: number; // in seconds
+  startTime?: number;
+}
+
 // Required columns in EXACT order - all are compulsory
 const REQUIRED_COLUMNS_IN_ORDER = [
   'name_of_the_company',
@@ -221,6 +230,16 @@ export const useCallSheetUpload = () => {
   const queryClient = useQueryClient();
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+
+  // Helper to calculate ETA
+  const calculateETA = (startTime: number, currentItem: number, totalItems: number): number => {
+    if (currentItem === 0) return 0;
+    const elapsed = (Date.now() - startTime) / 1000;
+    const itemsPerSecond = currentItem / elapsed;
+    const remainingItems = totalItems - currentItem;
+    return Math.ceil(remainingItems / itemsPerSecond);
+  };
 
   // Subscribe to realtime updates for upload status changes
   useEffect(() => {
@@ -483,16 +502,48 @@ export const useCallSheetUpload = () => {
     });
   }, []);
 
-  // Process file upload
+  // Process file upload with progress tracking
   const processFile = useCallback(async (file: File) => {
     setIsProcessing(true);
     setParsedData(null);
+    const startTime = Date.now();
 
     try {
+      // Stage 1: Reading file
+      setUploadProgress({
+        stage: 'reading',
+        percentage: 10,
+        startTime,
+      });
+
+      // Stage 2: Parsing
+      setUploadProgress({
+        stage: 'parsing',
+        percentage: 30,
+        startTime,
+      });
+
       const result = await parseFile(file);
+
+      // Stage 3: Validation complete
+      setUploadProgress({
+        stage: 'validating',
+        percentage: 50,
+        currentItem: result.totalEntries,
+        totalItems: result.totalEntries,
+        startTime,
+      });
+
       setParsedData(result);
+      
+      // Reset progress after a brief delay
+      setTimeout(() => {
+        setUploadProgress(null);
+      }, 500);
+      
       return result;
     } catch (error) {
+      setUploadProgress(null);
       toast.error(error instanceof Error ? error.message : 'Failed to process file');
       throw error;
     } finally {
@@ -505,7 +556,19 @@ export const useCallSheetUpload = () => {
     mutationFn: async ({ file, validationResult }: { file: File; validationResult: UploadValidationResult }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      const startTime = Date.now();
       const today = new Date().toISOString().split('T')[0];
+      const validContacts = validationResult.contacts.filter(c => c.isValid);
+      const totalSteps = 3 + (validContacts.length > 0 ? 2 : 0); // upload record + contacts + call list + rejections
+
+      // Stage 1: Creating upload record
+      setUploadProgress({
+        stage: 'uploading',
+        percentage: 10,
+        currentItem: 1,
+        totalItems: totalSteps,
+        startTime,
+      });
 
       // Create upload record - auto-approved
       const { data: upload, error: uploadError } = await supabase
@@ -528,15 +591,23 @@ export const useCallSheetUpload = () => {
       if (uploadError) throw uploadError;
 
       // Insert valid contacts and get their IDs
-      const validContacts = validationResult.contacts.filter(c => c.isValid);
-      
       if (validContacts.length > 0) {
+        // Stage 2: Creating contacts
+        setUploadProgress({
+          stage: 'creating_contacts',
+          percentage: 40,
+          currentItem: 0,
+          totalItems: validContacts.length,
+          startTime,
+          estimatedTimeRemaining: calculateETA(startTime, 1, validContacts.length),
+        });
+
         const contactsToInsert = validContacts.map(c => ({
           company_name: c.companyName,
-          contact_person_name: c.contactPersonName || c.companyName, // Use company name if no contact person
+          contact_person_name: c.contactPersonName || c.companyName,
           phone_number: c.phoneNumber,
           trade_license_number: c.tradeLicenseNumber || 'PENDING',
-          city: c.city || null, // This now holds emirate value
+          city: c.city || null,
           industry: c.industry || null,
           area: c.area || null,
           first_uploaded_by: user.id,
@@ -544,42 +615,78 @@ export const useCallSheetUpload = () => {
           status: 'new' as const,
         }));
 
-        // Insert contacts
-        const { error: contactsError } = await supabase
-          .from('master_contacts')
-          .insert(contactsToInsert);
-
-        if (contactsError) {
-          console.error('Error inserting contacts:', contactsError);
-        } else {
-          // Fetch the inserted contacts by phone numbers (agent owns them now)
-          const phoneNumbers = validContacts.map(c => c.phoneNumber);
-          const { data: insertedContacts, error: fetchError } = await supabase
+        // Insert contacts in batches for progress tracking
+        const batchSize = 50;
+        for (let i = 0; i < contactsToInsert.length; i += batchSize) {
+          const batch = contactsToInsert.slice(i, i + batchSize);
+          const { error: contactsError } = await supabase
             .from('master_contacts')
-            .select('id')
-            .eq('current_owner_agent_id', user.id)
-            .in('phone_number', phoneNumbers);
+            .insert(batch);
 
-          if (fetchError) {
-            console.error('Error fetching inserted contacts:', fetchError);
-          } else if (insertedContacts && insertedContacts.length > 0) {
-            // Create approved call list entries immediately
-            const callListEntries = insertedContacts.map((contact, index) => ({
-              agent_id: user.id,
-              contact_id: contact.id,
-              upload_id: upload.id,
-              list_date: today,
-              call_order: index + 1,
-              call_status: 'pending' as const,
-            }));
+          if (contactsError) {
+            console.error('Error inserting contacts batch:', contactsError);
+          }
 
+          const processed = Math.min(i + batchSize, contactsToInsert.length);
+          setUploadProgress({
+            stage: 'creating_contacts',
+            percentage: 40 + Math.round((processed / contactsToInsert.length) * 30),
+            currentItem: processed,
+            totalItems: validContacts.length,
+            startTime,
+            estimatedTimeRemaining: calculateETA(startTime, processed, validContacts.length),
+          });
+        }
+
+        // Stage 3: Creating call list
+        setUploadProgress({
+          stage: 'creating_call_list',
+          percentage: 75,
+          currentItem: 0,
+          totalItems: validContacts.length,
+          startTime,
+        });
+
+        // Fetch the inserted contacts by phone numbers
+        const phoneNumbers = validContacts.map(c => c.phoneNumber);
+        const { data: insertedContacts, error: fetchError } = await supabase
+          .from('master_contacts')
+          .select('id')
+          .eq('current_owner_agent_id', user.id)
+          .in('phone_number', phoneNumbers);
+
+        if (fetchError) {
+          console.error('Error fetching inserted contacts:', fetchError);
+        } else if (insertedContacts && insertedContacts.length > 0) {
+          const callListEntries = insertedContacts.map((contact, index) => ({
+            agent_id: user.id,
+            contact_id: contact.id,
+            upload_id: upload.id,
+            list_date: today,
+            call_order: index + 1,
+            call_status: 'pending' as const,
+          }));
+
+          // Insert call list in batches
+          for (let i = 0; i < callListEntries.length; i += batchSize) {
+            const batch = callListEntries.slice(i, i + batchSize);
             const { error: callListError } = await supabase
               .from('approved_call_list')
-              .insert(callListEntries);
+              .insert(batch);
 
             if (callListError) {
-              console.error('Error creating call list:', callListError);
+              console.error('Error creating call list batch:', callListError);
             }
+
+            const processed = Math.min(i + batchSize, callListEntries.length);
+            setUploadProgress({
+              stage: 'creating_call_list',
+              percentage: 75 + Math.round((processed / callListEntries.length) * 20),
+              currentItem: processed,
+              totalItems: callListEntries.length,
+              startTime,
+              estimatedTimeRemaining: calculateETA(startTime, processed, callListEntries.length),
+            });
           }
         }
       }
@@ -601,15 +708,24 @@ export const useCallSheetUpload = () => {
           .insert(rejectionsToInsert);
       }
 
+      // Complete
+      setUploadProgress({
+        stage: 'complete',
+        percentage: 100,
+        startTime,
+      });
+
       return upload;
     },
     onSuccess: (data) => {
       toast.success(`Call sheet uploaded and approved! ${data.approved_count || 0} contacts added to your call list.`);
       setParsedData(null);
+      setUploadProgress(null);
       queryClient.invalidateQueries({ queryKey: ['upload-history'] });
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
     onError: (error) => {
+      setUploadProgress(null);
       toast.error(`Upload failed: ${error.message}`);
     },
   });
@@ -663,6 +779,7 @@ export const useCallSheetUpload = () => {
   return {
     parsedData,
     isProcessing,
+    uploadProgress,
     processFile,
     submitUpload: submitUpload.mutate,
     isSubmitting: submitUpload.isPending,

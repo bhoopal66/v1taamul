@@ -47,7 +47,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
-import { useCallSheetUpload, RejectionDetail, UploadHistory, ColumnAnalysis } from '@/hooks/useCallSheetUpload';
+import { useCallSheetUpload, RejectionDetail, UploadHistory, ColumnAnalysis, UploadProgress } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
 
@@ -83,6 +83,7 @@ export const UploadPage: React.FC = () => {
   const {
     parsedData,
     isProcessing,
+    uploadProgress,
     processFile,
     submitUpload,
     isSubmitting,
@@ -93,6 +94,29 @@ export const UploadPage: React.FC = () => {
     resubmitUpload,
     isResubmitting,
   } = useCallSheetUpload();
+
+  // Helper to format time remaining
+  const formatTimeRemaining = (seconds: number | undefined): string => {
+    if (!seconds || seconds <= 0) return '';
+    if (seconds < 60) return `${seconds}s remaining`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSecs = seconds % 60;
+    return `${minutes}m ${remainingSecs}s remaining`;
+  };
+
+  // Get stage display name
+  const getStageDisplayName = (stage: UploadProgress['stage']): string => {
+    switch (stage) {
+      case 'reading': return 'Reading file...';
+      case 'parsing': return 'Parsing data...';
+      case 'validating': return 'Validating entries...';
+      case 'uploading': return 'Creating upload record...';
+      case 'creating_contacts': return 'Adding contacts...';
+      case 'creating_call_list': return 'Creating call list...';
+      case 'complete': return 'Complete!';
+      default: return 'Processing...';
+    }
+  };
 
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -409,7 +433,99 @@ export const UploadPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!parsedData ? (
+              {/* Progress Indicator */}
+              {(uploadProgress || isSubmitting) && (
+                <div className="mb-6 p-6 rounded-xl border-2 border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="relative">
+                      <div className="w-14 h-14 rounded-full border-4 border-primary/20 flex items-center justify-center">
+                        {uploadProgress?.stage === 'complete' ? (
+                          <CheckCircle2 className="w-7 h-7 text-green-600" />
+                        ) : (
+                          <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                        )}
+                      </div>
+                      <div 
+                        className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"
+                        style={{ 
+                          animationDuration: '1s',
+                          display: uploadProgress?.stage === 'complete' ? 'none' : 'block'
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-lg">
+                        {uploadProgress ? getStageDisplayName(uploadProgress.stage) : 'Uploading...'}
+                      </p>
+                      {uploadProgress?.currentItem !== undefined && uploadProgress?.totalItems && (
+                        <p className="text-sm text-muted-foreground">
+                          {uploadProgress.currentItem} of {uploadProgress.totalItems} items
+                          {uploadProgress.estimatedTimeRemaining && uploadProgress.estimatedTimeRemaining > 0 && (
+                            <span className="ml-2 text-primary">
+                              • {formatTimeRemaining(uploadProgress.estimatedTimeRemaining)}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-bold text-primary">
+                        {uploadProgress?.percentage || 0}%
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <Progress 
+                      value={uploadProgress?.percentage || 0} 
+                      className="h-3"
+                    />
+                    
+                    {/* Stage Indicators */}
+                    <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                      <span className={cn(
+                        "flex items-center gap-1",
+                        ['reading', 'parsing', 'validating', 'uploading', 'creating_contacts', 'creating_call_list', 'complete'].includes(uploadProgress?.stage || '') && "text-primary font-medium"
+                      )}>
+                        {['validating', 'uploading', 'creating_contacts', 'creating_call_list', 'complete'].includes(uploadProgress?.stage || '') ? (
+                          <Check className="w-3 h-3" />
+                        ) : null}
+                        Parse
+                      </span>
+                      <span className={cn(
+                        "flex items-center gap-1",
+                        ['uploading', 'creating_contacts', 'creating_call_list', 'complete'].includes(uploadProgress?.stage || '') && "text-primary font-medium"
+                      )}>
+                        {['creating_contacts', 'creating_call_list', 'complete'].includes(uploadProgress?.stage || '') ? (
+                          <Check className="w-3 h-3" />
+                        ) : null}
+                        Upload
+                      </span>
+                      <span className={cn(
+                        "flex items-center gap-1",
+                        ['creating_contacts', 'creating_call_list', 'complete'].includes(uploadProgress?.stage || '') && "text-primary font-medium"
+                      )}>
+                        {['creating_call_list', 'complete'].includes(uploadProgress?.stage || '') ? (
+                          <Check className="w-3 h-3" />
+                        ) : null}
+                        Contacts
+                      </span>
+                      <span className={cn(
+                        "flex items-center gap-1",
+                        uploadProgress?.stage === 'complete' && "text-green-600 font-medium"
+                      )}>
+                        {uploadProgress?.stage === 'complete' ? (
+                          <Check className="w-3 h-3" />
+                        ) : null}
+                        Complete
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!parsedData && !uploadProgress && !isSubmitting ? (
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -458,7 +574,9 @@ export const UploadPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : null}
+              
+              {parsedData && (
                 <div className="space-y-6">
                   {/* File Info */}
                   <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">

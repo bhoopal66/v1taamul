@@ -25,7 +25,7 @@ export interface AgentSubmission {
 
 export const BANK_GROUPS = {
   group1: ['NBF', 'UBL'],
-  group2: ['RAK', 'Mashreq', 'Wioriya'],
+  group2: ['RAK', 'Mashreq', 'Wio', 'Ruya'],
 } as const;
 
 export const useAgentSubmissions = (period: SubmissionPeriod = 'weekly') => {

@@ -15,6 +15,7 @@ import { AgentProfile } from "./pages/AgentProfile";
 import { TeamLeaderDashboard } from "./pages/TeamLeaderDashboard";
 import { Leaderboard } from "./pages/Leaderboard";
 import { UploadPage } from "./pages/UploadPage";
+import UploadHistoryPage from "./pages/UploadHistoryPage";
 import { CallListPage } from "./pages/CallListPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -54,6 +55,7 @@ const App = () => (
               {/* Core agent features - All authenticated users */}
               <Route path="/call-list" element={<CallListPage />} />
               <Route path="/upload" element={<UploadPage />} />
+              <Route path="/upload-history" element={<UploadHistoryPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/contacts" element={<Dashboard />} />
               

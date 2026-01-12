@@ -282,6 +282,7 @@ export const AppSidebar: React.FC = () => {
         <NavItem to="/leaderboard" icon={<Trophy className="w-5 h-5" />} label="Leaderboard" />
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
+        <NavItem to="/upload-history" icon={<History className="w-5 h-5" />} label="Upload History" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
         
         {/* Team Leader Section - Show only for team leaders who are not supervisors */}

@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { ConvertToLeadDialog } from './ConvertToLeadDialog';
 import { toast } from 'sonner';
 import { 
@@ -62,7 +65,7 @@ export type LeadTypeFilter = 'all' | 'leads' | 'opportunities';
 
 interface LeadKanbanBoardProps {
   leads: Lead[];
-  onUpdateStatus: (leadId: string, status: LeadStatus) => void;
+  onUpdateStatus: (leadId: string, status: LeadStatus, notes?: string) => void;
   onEditLead: (lead: Lead) => void;
   onConvertToLead: (contactId: string, tradeLicenseNumber: string) => void;
   isUpdating: boolean;
@@ -86,6 +89,11 @@ export const LeadKanbanBoard = ({
   const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Lead | null>(null);
+  
+  // Decline dialog state
+  const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [leadToDecline, setLeadToDecline] = useState<Lead | null>(null);
 
   const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor' || userRole === 'operations_head';
 
@@ -156,9 +164,37 @@ export const LeadKanbanBoard = ({
         setDraggedLead(null);
         return;
       }
+      
+      // If declining, show the decline dialog
+      if (targetStatus === 'declined') {
+        setLeadToDecline(draggedLead);
+        setDeclineReason('');
+        setDeclineDialogOpen(true);
+        setDraggedLead(null);
+        return;
+      }
+      
       onUpdateStatus(draggedLead.id, targetStatus);
     }
     setDraggedLead(null);
+  };
+
+  const handleDeclineConfirm = () => {
+    if (!leadToDecline || !declineReason.trim()) {
+      toast.error('Please provide a reason for declining');
+      return;
+    }
+    
+    onUpdateStatus(leadToDecline.id, 'declined', declineReason.trim());
+    setDeclineDialogOpen(false);
+    setLeadToDecline(null);
+    setDeclineReason('');
+  };
+
+  const handleDeclineCancel = () => {
+    setDeclineDialogOpen(false);
+    setLeadToDecline(null);
+    setDeclineReason('');
   };
 
   return (
@@ -420,6 +456,56 @@ export const LeadKanbanBoard = ({
         onConvert={onConvertToLead}
         isConverting={isConverting}
       />
+
+      {/* Decline Lead Dialog */}
+      <Dialog open={declineDialogOpen} onOpenChange={setDeclineDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <XCircle className="w-5 h-5" />
+              Decline Lead
+            </DialogTitle>
+            <DialogDescription>
+              {leadToDecline && (
+                <span>
+                  You are about to decline <strong>{leadToDecline.companyName}</strong>. 
+                  Please provide a reason for declining this lead.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="decline-reason" className="text-sm font-medium">
+                Reason for Declining <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="decline-reason"
+                placeholder="Enter the reason for declining this lead..."
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                className="min-h-[100px]"
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {declineReason.length}/500 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleDeclineCancel}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeclineConfirm}
+              disabled={!declineReason.trim()}
+            >
+              Decline Lead
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

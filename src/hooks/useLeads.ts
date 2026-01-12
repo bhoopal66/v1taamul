@@ -98,6 +98,7 @@ export interface LeadStats {
   qualified: number;
   converted: number;
   approved: number;
+  declined: number;
   lost: number;
   totalDealValue: number;
 }
@@ -220,6 +221,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilter
     qualified: leads?.filter(l => l.leadStatus === 'qualified').length || 0,
     converted: leads?.filter(l => l.leadStatus === 'converted').length || 0,
     approved: leads?.filter(l => l.leadStatus === 'approved').length || 0,
+    declined: leads?.filter(l => l.leadStatus === 'declined').length || 0,
     lost: leads?.filter(l => l.leadStatus === 'lost').length || 0,
     totalDealValue: leads?.reduce((sum, l) => sum + (l.dealValue || 0), 0) || 0,
   };
@@ -271,8 +273,12 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilter
     },
   });
 
-  const updateLeadStatus = (leadId: string, status: LeadStatus) => {
-    updateLead.mutate({ leadId, updates: { lead_status: status } });
+  const updateLeadStatus = (leadId: string, status: LeadStatus, notes?: string) => {
+    const updates: { lead_status: LeadStatus; notes?: string } = { lead_status: status };
+    if (notes) {
+      updates.notes = notes;
+    }
+    updateLead.mutate({ leadId, updates });
   };
 
   const updateLeadDetails = (

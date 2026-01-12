@@ -1209,6 +1209,7 @@ export type Database = {
       }
     }
     Functions: {
+      check_dnc: { Args: { phone_to_check: string }; Returns: boolean }
       decrypt_sensitive_data: {
         Args: { encrypted_data: string }
         Returns: string

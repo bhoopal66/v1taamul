@@ -544,10 +544,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "performance_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "performance_alerts_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_alerts_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
           {
@@ -657,6 +671,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "performance_targets_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "performance_targets_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
@@ -670,6 +691,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           email: string
+          email_encrypted: string | null
           full_name: string | null
           id: string
           is_active: boolean | null
@@ -677,17 +699,20 @@ export type Database = {
           last_login_date: string | null
           login_streak_current: number | null
           login_streak_longest: number | null
+          phone_encrypted: string | null
           phone_number: string | null
           supervisor_id: string | null
           team_id: string | null
           updated_at: string | null
           username: string
+          whatsapp_encrypted: string | null
           whatsapp_number: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           email: string
+          email_encrypted?: string | null
           full_name?: string | null
           id: string
           is_active?: boolean | null
@@ -695,17 +720,20 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
+          phone_encrypted?: string | null
           phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
           updated_at?: string | null
           username: string
+          whatsapp_encrypted?: string | null
           whatsapp_number?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           email?: string
+          email_encrypted?: string | null
           full_name?: string | null
           id?: string
           is_active?: boolean | null
@@ -713,11 +741,13 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
+          phone_encrypted?: string | null
           phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
           updated_at?: string | null
           username?: string
+          whatsapp_encrypted?: string | null
           whatsapp_number?: string | null
         }
         Relationships: [
@@ -726,6 +756,13 @@ export type Database = {
             columns: ["supervisor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
           {
@@ -819,6 +856,13 @@ export type Database = {
             columns: ["leader_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -968,9 +1012,93 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_secure: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          last_login: string | null
+          last_login_date: string | null
+          login_streak_current: number | null
+          login_streak_longest: number | null
+          phone_number: string | null
+          supervisor_id: string | null
+          team_id: string | null
+          updated_at: string | null
+          username: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: never
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_login?: string | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
+          phone_number?: never
+          supervisor_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          username?: string | null
+          whatsapp_number?: never
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: never
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_login?: string | null
+          last_login_date?: string | null
+          login_streak_current?: number | null
+          login_streak_longest?: number | null
+          phone_number?: never
+          supervisor_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+          username?: string | null
+          whatsapp_number?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      decrypt_sensitive_data: {
+        Args: { encrypted_data: string }
+        Returns: string
+      }
+      encrypt_sensitive_data: { Args: { plain_text: string }; Returns: string }
+      get_encryption_key: { Args: never; Returns: string }
       get_led_team_id: { Args: { _user_id: string }; Returns: string }
       get_public_profile_info: {
         Args: { profile_id: string }
@@ -997,6 +1125,8 @@ export type Database = {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
+      mask_email: { Args: { email_text: string }; Returns: string }
+      mask_phone: { Args: { phone_text: string }; Returns: string }
       move_old_contacts_to_pool: { Args: never; Returns: number }
       trigger_performance_check: { Args: never; Returns: undefined }
       update_login_streak: {

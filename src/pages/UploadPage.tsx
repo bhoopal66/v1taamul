@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Upload,
@@ -36,12 +37,40 @@ import {
   Map,
   Landmark,
   ArrowRight,
+  ChevronDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
 import { useCallSheetUpload, RejectionDetail, UploadHistory } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
+
+const SAMPLE_DATA = [
+  {
+    company: 'ABC Trading LLC',
+    contact: '+971501234567',
+    industry: 'Trading',
+    address: 'Building 5, Office 201',
+    area: 'Business Bay',
+    emirate: 'Dubai',
+  },
+  {
+    company: 'XYZ Services',
+    contact: '+971502345678',
+    industry: 'Services',
+    address: 'Tower A, Floor 10',
+    area: 'Khalifa City',
+    emirate: 'Abu Dhabi',
+  },
+  {
+    company: 'Global Tech FZE',
+    contact: '+971503456789',
+    industry: 'Technology',
+    address: 'Warehouse 15',
+    area: 'JAFZA',
+    emirate: 'Dubai',
+  },
+];
 
 export const UploadPage: React.FC = () => {
   const { profile } = useAuth();
@@ -69,6 +98,7 @@ export const UploadPage: React.FC = () => {
   const [selectedUploadForRejections, setSelectedUploadForRejections] = useState<UploadHistory | null>(null);
   const [rejectionDetails, setRejectionDetails] = useState<RejectionDetail[]>([]);
   const [loadingRejections, setLoadingRejections] = useState(false);
+  const [isExampleOpen, setIsExampleOpen] = useState(false);
 
   const handleViewRejections = async (upload: UploadHistory) => {
     setSelectedUploadForRejections(upload);
@@ -261,6 +291,52 @@ export const UploadPage: React.FC = () => {
               <span className="text-sm font-medium">6. Emirate</span>
             </div>
           </div>
+
+          {/* Collapsible Example Preview */}
+          <Collapsible open={isExampleOpen} onOpenChange={setIsExampleOpen} className="mt-4">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between hover:bg-background/50">
+                <span className="flex items-center gap-2 text-sm">
+                  <Eye className="w-4 h-4" />
+                  View Example Data
+                </span>
+                <ChevronDown className={cn("w-4 h-4 transition-transform", isExampleOpen && "rotate-180")} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="rounded-lg border bg-background overflow-hidden">
+                <ScrollArea className="w-full">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Name of the Company</TableHead>
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Contact Number</TableHead>
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Industry</TableHead>
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Address</TableHead>
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Area</TableHead>
+                        <TableHead className="font-semibold text-xs whitespace-nowrap">Emirate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {SAMPLE_DATA.map((row, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="text-sm">{row.company}</TableCell>
+                          <TableCell className="text-sm font-mono">{row.contact}</TableCell>
+                          <TableCell className="text-sm">{row.industry}</TableCell>
+                          <TableCell className="text-sm">{row.address}</TableCell>
+                          <TableCell className="text-sm">{row.area}</TableCell>
+                          <TableCell className="text-sm">{row.emirate}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                This is how your data should look. Download the template for a ready-to-use file.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 

@@ -13,6 +13,7 @@ import submissionsRoutes from './routes/submissions.js';
 import talktimeRoutes from './routes/talktime.js';
 import goalsRoutes from './routes/goals.js';
 import teamsRoutes from './routes/teams.js';
+import coachRoutes from './routes/coach.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '4000');
@@ -59,6 +60,7 @@ app.use('/api/submissions', submissionsRoutes);
 app.use('/api/talktime', talktimeRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/teams', teamsRoutes);
+app.use('/api/coach', coachRoutes);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

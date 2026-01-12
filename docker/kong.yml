@@ -1,0 +1,95 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  # Auth Service
+  - name: auth-v1
+    url: http://auth:9999/
+    routes:
+      - name: auth-v1-route
+        strip_path: true
+        paths:
+          - /auth/v1/
+    plugins:
+      - name: cors
+
+  # REST API
+  - name: rest-v1
+    url: http://rest:3000/
+    routes:
+      - name: rest-v1-route
+        strip_path: true
+        paths:
+          - /rest/v1/
+    plugins:
+      - name: cors
+
+  # Realtime
+  - name: realtime-v1
+    url: http://realtime:4000/socket/
+    routes:
+      - name: realtime-v1-route
+        strip_path: true
+        paths:
+          - /realtime/v1/
+    plugins:
+      - name: cors
+
+  # Storage
+  - name: storage-v1
+    url: http://storage:5000/
+    routes:
+      - name: storage-v1-route
+        strip_path: true
+        paths:
+          - /storage/v1/
+    plugins:
+      - name: cors
+
+  # Edge Functions
+  - name: functions-v1
+    url: http://functions:9000/
+    routes:
+      - name: functions-v1-route
+        strip_path: true
+        paths:
+          - /functions/v1/
+    plugins:
+      - name: cors
+
+  # Postgres Meta (for Studio)
+  - name: meta
+    url: http://meta:8080/
+    routes:
+      - name: meta-route
+        strip_path: true
+        paths:
+          - /pg/
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - X-Auth-Token
+        - Authorization
+        - apikey
+        - x-client-info
+      exposed_headers:
+        - X-Auth-Token
+      credentials: true
+      max_age: 3600

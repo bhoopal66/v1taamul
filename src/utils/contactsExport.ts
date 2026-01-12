@@ -15,11 +15,13 @@ export interface ContactExportData {
   lastNotes: string | null;
   calledAt: string | null;
   agentName?: string;
+  teamName?: string;
 }
 
 const formatContactsForExport = (contacts: ContactExportData[]) => {
-  // Check if any contact has agentName to determine if we should include the column
+  // Check if any contact has agentName or teamName to determine if we should include the columns
   const hasAgentName = contacts.some(c => c.agentName);
+  const hasTeamName = contacts.some(c => c.teamName);
   
   return contacts.map((contact, index) => {
     const baseData: Record<string, string | number> = {
@@ -39,6 +41,11 @@ const formatContactsForExport = (contacts: ContactExportData[]) => {
       'Notes': contact.lastNotes || '-',
       'Called At': contact.calledAt ? format(new Date(contact.calledAt), 'yyyy-MM-dd HH:mm') : '-',
     };
+    
+    // Add Team Name column if exporting all teams data
+    if (hasTeamName) {
+      baseData['Team Name'] = contact.teamName || '-';
+    }
     
     // Add Agent Name column if exporting team data
     if (hasAgentName) {
@@ -93,7 +100,8 @@ export const exportContactsToExcel = (contacts: ContactExportData[], filename?: 
 
   const worksheet = XLSX.utils.json_to_sheet(data);
   
-  // Check if agent name column is included
+  // Check if team name and agent name columns are included
+  const hasTeamName = data.length > 0 && 'Team Name' in data[0];
   const hasAgentName = data.length > 0 && 'Agent Name' in data[0];
   
   // Set column widths
@@ -111,6 +119,7 @@ export const exportContactsToExcel = (contacts: ContactExportData[], filename?: 
     { wch: 15 },  // Feedback
     { wch: 40 },  // Notes
     { wch: 18 },  // Called At
+    ...(hasTeamName ? [{ wch: 20 }] : []),  // Team Name
     ...(hasAgentName ? [{ wch: 25 }] : []),  // Agent Name
   ];
   worksheet['!cols'] = columnWidths;

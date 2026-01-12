@@ -195,115 +195,213 @@ export const CallListPage: React.FC = () => {
     setExportFormat(format);
     setExportStartDate(undefined);
     setExportEndDate(undefined);
-    setExportTeamId('all');
+    setExportTeamId('my_list');
     setTeamCallList([]);
     setExportDialogOpen(true);
   };
 
   // Fetch team call list when team is selected
   const fetchTeamCallList = async (teamId: string) => {
-    if (teamId === 'all') {
+    if (teamId === 'my_list') {
       setTeamCallList([]);
       return;
     }
 
     setIsLoadingTeamData(true);
     try {
-      // Get team members
-      const { data: teamMembers, error: membersError } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .eq('team_id', teamId);
-
-      if (membersError) throw membersError;
-      if (!teamMembers || teamMembers.length === 0) {
-        setTeamCallList([]);
-        setIsLoadingTeamData(false);
-        return;
-      }
-
-      const memberIds = teamMembers.map(m => m.id);
       const today = new Date().toISOString().split('T')[0];
-
-      // Fetch call lists for all team members
-      const { data: callListData, error: callListError } = await supabase
-        .from('approved_call_list')
-        .select('*')
-        .in('agent_id', memberIds)
-        .eq('list_date', today)
-        .order('call_order', { ascending: true });
-
-      if (callListError) throw callListError;
-
-      if (!callListData || callListData.length === 0) {
-        setTeamCallList([]);
-        setIsLoadingTeamData(false);
-        return;
-      }
-
-      // Get contact IDs
-      const contactIds = callListData.map(c => c.contact_id);
-
-      // Fetch contact details
-      const { data: contacts, error: contactsError } = await supabase
-        .from('master_contacts')
-        .select('*')
-        .in('id', contactIds);
-
-      if (contactsError) throw contactsError;
-
-      // Fetch feedback
       const dayStart = startOfDay(new Date()).toISOString();
       const dayEnd = endOfDay(new Date()).toISOString();
 
-      const { data: feedback } = await supabase
-        .from('call_feedback')
-        .select('*')
-        .in('agent_id', memberIds)
-        .in('contact_id', contactIds)
-        .gte('call_timestamp', dayStart)
-        .lte('call_timestamp', dayEnd)
-        .order('call_timestamp', { ascending: false });
+      // If "all_teams" is selected, fetch data for all teams
+      if (teamId === 'all_teams') {
+        // Get all team members with their team info
+        const { data: allMembers, error: membersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, team_id')
+          .not('team_id', 'is', null);
 
-      // Create maps
-      const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
-      const feedbackMap = new Map<string, { status: FeedbackStatus; notes: string | null }>();
-      const agentMap = new Map(teamMembers.map(m => [m.id, m.full_name || m.username]));
-
-      feedback?.forEach(f => {
-        if (!feedbackMap.has(f.contact_id)) {
-          feedbackMap.set(f.contact_id, {
-            status: f.feedback_status as FeedbackStatus,
-            notes: f.notes
-          });
+        if (membersError) throw membersError;
+        if (!allMembers || allMembers.length === 0) {
+          setTeamCallList([]);
+          setIsLoadingTeamData(false);
+          return;
         }
-      });
 
-      const result: (CallListContact & { agentName?: string })[] = callListData.map(item => {
-        const contact = contactMap.get(item.contact_id);
-        const fb = feedbackMap.get(item.contact_id);
+        const memberIds = allMembers.map(m => m.id);
 
-        return {
-          id: item.id,
-          callListId: item.id,
-          contactId: item.contact_id,
-          companyName: contact?.company_name || 'Unknown',
-          contactPersonName: contact?.contact_person_name || 'Unknown',
-          phoneNumber: contact?.phone_number || '',
-          tradeLicenseNumber: contact?.trade_license_number || '',
-          city: contact?.city || null,
-          industry: contact?.industry || null,
-          area: (contact as { area?: string | null })?.area || null,
-          callOrder: item.call_order,
-          callStatus: item.call_status as 'pending' | 'called' | 'skipped',
-          calledAt: item.called_at,
-          lastFeedback: fb?.status || null,
-          lastNotes: fb?.notes || null,
-          agentName: agentMap.get(item.agent_id) || 'Unknown Agent',
-        };
-      });
+        // Fetch call lists for all members
+        const { data: callListData, error: callListError } = await supabase
+          .from('approved_call_list')
+          .select('*')
+          .in('agent_id', memberIds)
+          .eq('list_date', today)
+          .order('call_order', { ascending: true });
 
-      setTeamCallList(result);
+        if (callListError) throw callListError;
+
+        if (!callListData || callListData.length === 0) {
+          setTeamCallList([]);
+          setIsLoadingTeamData(false);
+          return;
+        }
+
+        // Get contact IDs
+        const contactIds = callListData.map(c => c.contact_id);
+
+        // Fetch contact details
+        const { data: contacts, error: contactsError } = await supabase
+          .from('master_contacts')
+          .select('*')
+          .in('id', contactIds);
+
+        if (contactsError) throw contactsError;
+
+        // Fetch feedback
+        const { data: feedback } = await supabase
+          .from('call_feedback')
+          .select('*')
+          .in('agent_id', memberIds)
+          .in('contact_id', contactIds)
+          .gte('call_timestamp', dayStart)
+          .lte('call_timestamp', dayEnd)
+          .order('call_timestamp', { ascending: false });
+
+        // Create maps
+        const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
+        const feedbackMap = new Map<string, { status: FeedbackStatus; notes: string | null }>();
+        const agentMap = new Map(allMembers.map(m => [m.id, { name: m.full_name || m.username, teamId: m.team_id }]));
+        const teamMap = new Map(teams.map(t => [t.id, t.name]));
+
+        feedback?.forEach(f => {
+          if (!feedbackMap.has(f.contact_id)) {
+            feedbackMap.set(f.contact_id, {
+              status: f.feedback_status as FeedbackStatus,
+              notes: f.notes
+            });
+          }
+        });
+
+        const result: (CallListContact & { agentName?: string; teamName?: string })[] = callListData.map(item => {
+          const contact = contactMap.get(item.contact_id);
+          const fb = feedbackMap.get(item.contact_id);
+          const agentInfo = agentMap.get(item.agent_id);
+
+          return {
+            id: item.id,
+            callListId: item.id,
+            contactId: item.contact_id,
+            companyName: contact?.company_name || 'Unknown',
+            contactPersonName: contact?.contact_person_name || 'Unknown',
+            phoneNumber: contact?.phone_number || '',
+            tradeLicenseNumber: contact?.trade_license_number || '',
+            city: contact?.city || null,
+            industry: contact?.industry || null,
+            area: (contact as { area?: string | null })?.area || null,
+            callOrder: item.call_order,
+            callStatus: item.call_status as 'pending' | 'called' | 'skipped',
+            calledAt: item.called_at,
+            lastFeedback: fb?.status || null,
+            lastNotes: fb?.notes || null,
+            agentName: agentInfo?.name || 'Unknown Agent',
+            teamName: agentInfo?.teamId ? teamMap.get(agentInfo.teamId) || 'Unknown Team' : 'No Team',
+          };
+        });
+
+        setTeamCallList(result);
+      } else {
+        // Fetch for specific team
+        const { data: teamMembers, error: membersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .eq('team_id', teamId);
+
+        if (membersError) throw membersError;
+        if (!teamMembers || teamMembers.length === 0) {
+          setTeamCallList([]);
+          setIsLoadingTeamData(false);
+          return;
+        }
+
+        const memberIds = teamMembers.map(m => m.id);
+
+        // Fetch call lists for all team members
+        const { data: callListData, error: callListError } = await supabase
+          .from('approved_call_list')
+          .select('*')
+          .in('agent_id', memberIds)
+          .eq('list_date', today)
+          .order('call_order', { ascending: true });
+
+        if (callListError) throw callListError;
+
+        if (!callListData || callListData.length === 0) {
+          setTeamCallList([]);
+          setIsLoadingTeamData(false);
+          return;
+        }
+
+        // Get contact IDs
+        const contactIds = callListData.map(c => c.contact_id);
+
+        // Fetch contact details
+        const { data: contacts, error: contactsError } = await supabase
+          .from('master_contacts')
+          .select('*')
+          .in('id', contactIds);
+
+        if (contactsError) throw contactsError;
+
+        // Fetch feedback
+        const { data: feedback } = await supabase
+          .from('call_feedback')
+          .select('*')
+          .in('agent_id', memberIds)
+          .in('contact_id', contactIds)
+          .gte('call_timestamp', dayStart)
+          .lte('call_timestamp', dayEnd)
+          .order('call_timestamp', { ascending: false });
+
+        // Create maps
+        const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
+        const feedbackMap = new Map<string, { status: FeedbackStatus; notes: string | null }>();
+        const agentMap = new Map(teamMembers.map(m => [m.id, m.full_name || m.username]));
+
+        feedback?.forEach(f => {
+          if (!feedbackMap.has(f.contact_id)) {
+            feedbackMap.set(f.contact_id, {
+              status: f.feedback_status as FeedbackStatus,
+              notes: f.notes
+            });
+          }
+        });
+
+        const result: (CallListContact & { agentName?: string })[] = callListData.map(item => {
+          const contact = contactMap.get(item.contact_id);
+          const fb = feedbackMap.get(item.contact_id);
+
+          return {
+            id: item.id,
+            callListId: item.id,
+            contactId: item.contact_id,
+            companyName: contact?.company_name || 'Unknown',
+            contactPersonName: contact?.contact_person_name || 'Unknown',
+            phoneNumber: contact?.phone_number || '',
+            tradeLicenseNumber: contact?.trade_license_number || '',
+            city: contact?.city || null,
+            industry: contact?.industry || null,
+            area: (contact as { area?: string | null })?.area || null,
+            callOrder: item.call_order,
+            callStatus: item.call_status as 'pending' | 'called' | 'skipped',
+            calledAt: item.called_at,
+            lastFeedback: fb?.status || null,
+            lastNotes: fb?.notes || null,
+            agentName: agentMap.get(item.agent_id) || 'Unknown Agent',
+          };
+        });
+
+        setTeamCallList(result);
+      }
     } catch (error) {
       console.error('Error fetching team call list:', error);
       toast.error('Failed to fetch team data');
@@ -314,7 +412,7 @@ export const CallListPage: React.FC = () => {
 
   const handleExport = () => {
     // Use team call list if a team is selected, otherwise use filtered list
-    const sourceList = exportTeamId !== 'all' ? teamCallList : filteredList;
+    const sourceList = exportTeamId !== 'my_list' ? teamCallList : filteredList;
     
     // Filter contacts by date range if specified
     let contactsToExport = sourceList;
@@ -352,6 +450,7 @@ export const CallListPage: React.FC = () => {
       lastNotes: contact.lastNotes,
       calledAt: contact.calledAt,
       agentName: (contact as any).agentName,
+      teamName: (contact as any).teamName,
     }));
 
     if (exportData.length === 0) {
@@ -360,7 +459,9 @@ export const CallListPage: React.FC = () => {
     }
 
     try {
-      const teamName = exportTeamId !== 'all' 
+      const teamName = exportTeamId === 'all_teams' 
+        ? 'all_teams'
+        : exportTeamId !== 'my_list' 
         ? teams.find(t => t.id === exportTeamId)?.name || 'team'
         : '';
       const teamSuffix = teamName ? `_${teamName.replace(/\s+/g, '_')}` : '';
@@ -862,7 +963,8 @@ export const CallListPage: React.FC = () => {
                     <SelectValue placeholder="Select a team" />
                   </SelectTrigger>
                   <SelectContent className="bg-background">
-                    <SelectItem value="all">My Call List</SelectItem>
+                    <SelectItem value="my_list">My Call List</SelectItem>
+                    <SelectItem value="all_teams">All Teams</SelectItem>
                     {teams.map(team => (
                       <SelectItem key={team.id} value={team.id}>
                         {team.name}
@@ -876,9 +978,9 @@ export const CallListPage: React.FC = () => {
                     Loading team data...
                   </div>
                 )}
-                {exportTeamId !== 'all' && !isLoadingTeamData && (
+                {exportTeamId !== 'my_list' && !isLoadingTeamData && (
                   <div className="text-sm text-muted-foreground">
-                    {teamCallList.length} contacts found for this team
+                    {teamCallList.length} contacts found {exportTeamId === 'all_teams' ? 'across all teams' : 'for this team'}
                   </div>
                 )}
               </div>

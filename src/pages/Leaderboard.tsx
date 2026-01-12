@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,6 +54,7 @@ import { TalkTimeLeaderboard } from '@/components/dashboard/TalkTimeLeaderboard'
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   if (rank === 1) {
@@ -232,6 +233,8 @@ const TeamComparisonCard: React.FC<{ teams: TeamStats[] }> = ({ teams }) => {
 };
 
 export const Leaderboard: React.FC = () => {
+  const { user, profile, userRole } = useAuth();
+  
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => {
     const saved = localStorage.getItem('leaderboard-time-period');
     return (saved as TimePeriod) || 'this_week';
@@ -332,6 +335,40 @@ export const Leaderboard: React.FC = () => {
     leadStatusFilter,
   });
 
+  // Filter teams to only show user's respective team(s) based on role
+  const userAccessibleTeams = useMemo(() => {
+    // Admins and super_admins can see all teams
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      return teamStats;
+    }
+    
+    // Supervisors can see their own team
+    if (userRole === 'supervisor' && user?.id) {
+      return teamStats.filter(t => t.supervisorId === user.id);
+    }
+    
+    // Operations heads can see teams they oversee
+    if (userRole === 'operations_head' && user?.id) {
+      return teamStats.filter(t => t.supervisorId === user.id);
+    }
+    
+    // Regular agents can only see their own team (via supervisor_id on profile)
+    if (profile?.supervisor_id) {
+      return teamStats.filter(t => t.supervisorId === profile.supervisor_id);
+    }
+    
+    // If user is on a team (has team_id), find that team
+    if (profile?.team_id) {
+      // Try to find the team by matching agents in that team
+      return teamStats.filter(t => 
+        agents.some(a => a.supervisorId === t.supervisorId && a.id === user?.id)
+      );
+    }
+    
+    // Default: no team access, show empty
+    return [];
+  }, [teamStats, userRole, user?.id, profile?.supervisor_id, profile?.team_id, agents]);
+
   const getTimePeriodLabel = (period: TimePeriod) => {
     const labels: Record<TimePeriod, string> = {
       today: 'Today',
@@ -359,6 +396,9 @@ export const Leaderboard: React.FC = () => {
     const team = teamStats.find(t => t.supervisorId === teamFilter);
     return team ? `${team.teamName}'s Team` : null;
   };
+
+  // Determine if user can see "All Teams" option
+  const canSeeAllTeams = userRole === 'admin' || userRole === 'super_admin';
 
   const hasActiveFilters = timePeriod !== 'this_week' || leadStatusFilter !== 'all' || teamFilter !== 'all';
 
@@ -987,15 +1027,15 @@ export const Leaderboard: React.FC = () => {
             </SelectContent>
           </Select>
           
-          {teamStats.length > 0 && (
+          {userAccessibleTeams.length > 0 && (
             <Select value={teamFilter} onValueChange={handleTeamFilterChange}>
               <SelectTrigger className="w-[160px]">
                 <Users className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Filter by team" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {teamStats.map(team => (
+                {canSeeAllTeams && <SelectItem value="all">All Teams</SelectItem>}
+                {userAccessibleTeams.map(team => (
                   <SelectItem key={team.supervisorId} value={team.supervisorId}>
                     {team.teamName}'s Team
                   </SelectItem>
@@ -1110,7 +1150,7 @@ export const Leaderboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="teams">
-          <TeamComparisonCard teams={teamStats} />
+          <TeamComparisonCard teams={canSeeAllTeams ? teamStats : userAccessibleTeams} />
         </TabsContent>
 
         <TabsContent value="talk-time">

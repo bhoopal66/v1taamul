@@ -333,6 +333,9 @@ export const AppSidebar: React.FC = () => {
             {hasPageAccess('/user-management') && (
               <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
             )}
+            {hasPageAccess('/permissions') && (
+              <NavItem to="/permissions" icon={<Shield className="w-5 h-5" />} label="Permissions" />
+            )}
           </>
         )}
 

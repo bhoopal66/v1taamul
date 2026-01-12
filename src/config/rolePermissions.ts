@@ -99,6 +99,12 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
     allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'],
     section: 'admin',
   },
+  {
+    path: '/permissions',
+    label: 'Permissions',
+    allowedRoles: ['admin', 'super_admin'],
+    section: 'admin',
+  },
   
   // Settings - available to all authenticated users
   {

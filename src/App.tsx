@@ -23,6 +23,7 @@ import TeamManagementPage from "./pages/TeamManagementPage";
 import AlertHistoryPage from "./pages/AlertHistoryPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfileVisibilityTest from "./pages/ProfileVisibilityTest";
+import PermissionsPage from "./pages/PermissionsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -98,6 +99,13 @@ const App = () => (
               <Route path="/alert-history" element={
                 <ProtectedRoute allowedRoles={['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller']}>
                   <AlertHistoryPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Permissions Overview - Admins only */}
+              <Route path="/permissions" element={
+                <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+                  <PermissionsPage />
                 </ProtectedRoute>
               } />
               

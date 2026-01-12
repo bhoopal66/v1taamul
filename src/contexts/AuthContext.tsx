@@ -1,15 +1,41 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string | null;
+  username: string;
+}
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  username: string;
+  avatar_url: string | null;
+  team_id: string | null;
+  supervisor_id: string | null;
+  is_active: boolean;
+  login_streak_current: number;
+  login_streak_longest: number;
+  phone_number: string | null;
+  whatsapp_number: string | null;
+  created_at: string | null;
+  last_login_date: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  session: { user: User } | null;
   loading: boolean;
   userRole: string | null;
-  profile: any | null;
+  profile: Profile | null;
   ledTeamId: string | null;
   refreshProfile: () => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +46,9 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   ledTeamId: null,
   refreshProfile: async () => {},
+  login: async () => ({ success: false }),
+  signup: async () => ({ success: false }),
+  logout: async () => {},
 });
 
 export const useAuth = () => {
@@ -32,97 +61,113 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [ledTeamId, setLedTeamId] = useState<string | null>(null);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchCurrentUser = async () => {
     try {
-      // Fetch user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (roleData) {
-        setUserRole(roleData.role);
-      }
+      const response = await api.get<{
+        user: User | null;
+        role: string | null;
+        profile: Profile | null;
+        ledTeamId: string | null;
+      }>('/auth/me');
 
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (profileData) {
-        setProfile(profileData);
-      }
-
-      // Check if user leads a team
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('leader_id', userId)
-        .maybeSingle();
-      
-      if (teamData) {
-        setLedTeamId(teamData.id);
+      if (response.user) {
+        setUser(response.user);
+        setUserRole(response.role);
+        setProfile(response.profile);
+        setLedTeamId(response.ledTeamId);
       } else {
+        setUser(null);
+        setUserRole(null);
+        setProfile(null);
         setLedTeamId(null);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      setUser(null);
+      setUserRole(null);
+      setProfile(null);
+      setLedTeamId(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const refreshProfile = async () => {
-    if (user?.id) {
-      await fetchUserData(user.id);
+    await fetchCurrentUser();
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await api.post<{
+        user: User;
+        role: string | null;
+        profile: Profile | null;
+        ledTeamId: string | null;
+      }>('/auth/login', { email, password });
+
+      setUser(response.user);
+      setUserRole(response.role);
+      setProfile(response.profile);
+      setLedTeamId(response.ledTeamId);
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Login failed' };
+    }
+  };
+
+  const signup = async (email: string, password: string, fullName: string) => {
+    try {
+      const response = await api.post<{
+        user: User;
+        role: string | null;
+        profile: Profile | null;
+      }>('/auth/signup', { email, password, fullName });
+
+      setUser(response.user);
+      setUserRole(response.role);
+      setProfile(response.profile);
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Signup failed' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout', {});
+    } catch (error) {
+      // Ignore logout errors
+    } finally {
+      setUser(null);
+      setUserRole(null);
+      setProfile(null);
+      setLedTeamId(null);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Use setTimeout to avoid race conditions with database triggers
-          setTimeout(() => fetchUserData(session.user.id), 100);
-        } else {
-          setUserRole(null);
-          setProfile(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // THEN get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      }
-      
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    fetchCurrentUser();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, profile, ledTeamId, refreshProfile }}>
+    <AuthContext.Provider value={{
+      user,
+      session: user ? { user } : null,
+      loading,
+      userRole,
+      profile,
+      ledTeamId,
+      refreshProfile,
+      login,
+      signup,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );

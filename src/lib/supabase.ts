@@ -1,42 +1,49 @@
-import { supabase } from "@/integrations/supabase/client";
+// Legacy compatibility layer - redirects to new API-based auth
+// This file exists for backwards compatibility with components still importing from here
 
-export { supabase };
+import { api } from '@/lib/api';
 
-// Auth helpers
 export const signUp = async (email: string, password: string, fullName: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: window.location.origin,
-      data: {
-        full_name: fullName,
-        username: email.split('@')[0],
-      },
-    },
-  });
-  return { data, error };
+  try {
+    const data = await api.post<{ user: any }>('/auth/signup', { email, password, fullName });
+    return { data, error: null };
+  } catch (error: any) {
+    return { data: null, error: { message: error.message || 'Signup failed' } };
+  }
 };
 
 export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  return { data, error };
+  try {
+    const data = await api.post<{ user: any }>('/auth/login', { email, password });
+    return { data, error: null };
+  } catch (error: any) {
+    return { data: null, error: { message: error.message || 'Login failed' } };
+  }
 };
 
 export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
+  try {
+    await api.post('/auth/logout', {});
+    return { error: null };
+  } catch (error: any) {
+    return { error: { message: error.message || 'Logout failed' } };
+  }
 };
 
 export const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  return { user, error };
+  try {
+    const data = await api.get<{ user: any }>('/auth/me');
+    return { user: data.user, error: null };
+  } catch (error: any) {
+    return { user: null, error: { message: error.message || 'Failed to get user' } };
+  }
 };
 
 export const getSession = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  return { session, error };
+  try {
+    const data = await api.get<{ user: any }>('/auth/me');
+    return { session: data.user ? { user: data.user } : null, error: null };
+  } catch (error: any) {
+    return { session: null, error: { message: error.message || 'Failed to get session' } };
+  }
 };

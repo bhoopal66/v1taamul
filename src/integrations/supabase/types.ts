@@ -1370,6 +1370,7 @@ export type Database = {
         | "admin"
         | "super_admin"
         | "sales_controller"
+        | "coordinator"
       call_status: "pending" | "called" | "skipped"
       contact_status:
         | "new"
@@ -1534,6 +1535,7 @@ export const Constants = {
         "admin",
         "super_admin",
         "sales_controller",
+        "coordinator",
       ],
       call_status: ["pending", "called", "skipped"],
       contact_status: [

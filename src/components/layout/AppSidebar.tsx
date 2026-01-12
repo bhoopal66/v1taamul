@@ -77,6 +77,9 @@ export const AppSidebar: React.FC = () => {
   
   const isSupervisor = userRole === 'supervisor';
   const isTeamLeader = !!ledTeamId;
+  
+  // Dashboard access is restricted to supervisors, admins, and management
+  const canAccessDashboard = ['admin', 'super_admin', 'operations_head', 'supervisor', 'sales_controller'].includes(userRole || '');
 
   // Fetch user's team name
   const { data: userTeam } = useQuery({
@@ -261,7 +264,9 @@ export const AppSidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        <NavItem to="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" />
+        {canAccessDashboard && (
+          <NavItem to="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" />
+        )}
         <NavItem to="/profile" icon={<UserCircle className="w-5 h-5" />} label="My Profile" />
         <NavItem to="/leaderboard" icon={<Trophy className="w-5 h-5" />} label="Leaderboard" />
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />

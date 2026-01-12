@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users, RefreshCw } from 'lucide-react';
+import { Phone, Upload, ArrowRight, Sparkles, Calendar, Filter, X, Zap, Save, Trash2, Star, Download, UploadCloud, Link2, Check, BarChart3, RotateCcw, Tag, Plus, Pencil, Palette, Copy, Users, RefreshCw, ShieldAlert } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDistanceToNow, startOfMonth, endOfMonth, format, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,12 @@ const filterPresets: FilterPreset[] = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { profile, userRole, ledTeamId } = useAuth();
+  const navigate = useNavigate();
+  const { profile, userRole, ledTeamId, loading: authLoading } = useAuth();
+  
+  // Allowed roles for dashboard access
+  const allowedRoles = ['admin', 'super_admin', 'operations_head', 'supervisor', 'sales_controller'];
+  const hasAccess = allowedRoles.includes(userRole || '');
   
   // Check if user can see all agents
   const canSeeAllAgents = ['admin', 'super_admin', 'operations_head', 'supervisor'].includes(userRole || '');
@@ -339,6 +345,45 @@ export const Dashboard: React.FC = () => {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   };
+
+  // Redirect agents to their profile page
+  useEffect(() => {
+    if (!authLoading && userRole && !hasAccess) {
+      navigate('/profile', { replace: true });
+    }
+  }, [authLoading, userRole, hasAccess, navigate]);
+
+  // Show loading while checking access
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if user doesn't have permission (before redirect happens)
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <ShieldAlert className="w-12 h-12 mx-auto text-destructive mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground mb-4">
+              This dashboard is only available for supervisors, admins, and management roles.
+            </p>
+            <Button onClick={() => navigate('/profile')}>
+              Go to My Profile
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">

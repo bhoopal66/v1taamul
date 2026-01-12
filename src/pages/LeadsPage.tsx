@@ -19,6 +19,7 @@ import { LeadActivityTimeline } from '@/components/leads/LeadActivityTimeline';
 import { LeadSourceAnalytics } from '@/components/leads/LeadSourceAnalytics';
 import { LeadTransitionsFeed } from '@/components/leads/LeadTransitionsFeed';
 import { LeadTransitionHistory } from '@/components/leads/LeadTransitionHistory';
+import { StageDurationWidget } from '@/components/leads/StageDurationWidget';
 import { BulkLeadImport } from '@/components/leads/BulkLeadImport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -385,15 +386,20 @@ export const LeadsPage = () => {
 
       {/* Pipeline History View */}
       {viewMode === 'history' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LeadTransitionsFeed />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <LeadTransitionsFeed />
+            </div>
+            <StageDurationWidget />
+          </div>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Stage Transition Summary</CardTitle>
-              <CardDescription>How leads moved through the pipeline</CardDescription>
+              <CardTitle className="text-base">Current Stage Distribution</CardTitle>
+              <CardDescription>How leads are distributed across the pipeline</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {['new', 'contacted', 'qualified', 'converted', 'approved', 'lost'].map((status) => {
                   const count = leads.filter(l => l.leadStatus === status).length;
                   const percentage = leads.length > 0 ? (count / leads.length) * 100 : 0;
@@ -413,13 +419,26 @@ export const LeadsPage = () => {
                     approved: 'bg-green-500',
                     lost: 'bg-red-500',
                   };
+                  const statusTextColors: Record<string, string> = {
+                    new: 'text-blue-600',
+                    contacted: 'text-yellow-600',
+                    qualified: 'text-purple-600',
+                    converted: 'text-orange-600',
+                    approved: 'text-green-600',
+                    lost: 'text-red-600',
+                  };
                   return (
-                    <div key={status}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium">{statusLabels[status]}</span>
-                        <span className="text-sm text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
+                    <div key={status} className="text-center p-3 rounded-lg bg-muted/50">
+                      <div className={`text-2xl font-bold ${statusTextColors[status]}`}>
+                        {count}
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {statusLabels[status]}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {percentage.toFixed(0)}%
+                      </div>
+                      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div 
                           className={`h-full ${statusColors[status]} transition-all duration-500`}
                           style={{ width: `${percentage}%` }}

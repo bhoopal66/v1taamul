@@ -308,12 +308,14 @@ export const useCallSheetUpload = () => {
     }
   }, [parseFile]);
 
-  // Submit upload mutation
+  // Submit upload mutation - auto-approves and creates call list immediately
   const submitUpload = useMutation({
     mutationFn: async ({ file, validationResult }: { file: File; validationResult: UploadValidationResult }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      // Create upload record
+      const today = new Date().toISOString().split('T')[0];
+
+      // Create upload record - auto-approved
       const { data: upload, error: uploadError } = await supabase
         .from('call_sheet_uploads')
         .insert({
@@ -324,14 +326,16 @@ export const useCallSheetUpload = () => {
           valid_entries: validationResult.validEntries,
           invalid_entries: validationResult.invalidEntries,
           duplicate_entries: validationResult.duplicateEntries,
-          status: 'pending',
+          status: 'approved',
+          approval_timestamp: new Date().toISOString(),
+          approved_count: validationResult.validEntries,
         })
         .select()
         .single();
 
       if (uploadError) throw uploadError;
 
-      // Insert valid contacts
+      // Insert valid contacts and get their IDs
       const validContacts = validationResult.contacts.filter(c => c.isValid);
       
       if (validContacts.length > 0) {
@@ -348,13 +352,31 @@ export const useCallSheetUpload = () => {
           status: 'new' as const,
         }));
 
-        const { error: contactsError } = await supabase
+        const { data: insertedContacts, error: contactsError } = await supabase
           .from('master_contacts')
-          .insert(contactsToInsert);
+          .insert(contactsToInsert)
+          .select('id');
 
         if (contactsError) {
           console.error('Error inserting contacts:', contactsError);
-          // Don't fail the whole upload, just log the error
+        } else if (insertedContacts && insertedContacts.length > 0) {
+          // Create approved call list entries immediately
+          const callListEntries = insertedContacts.map((contact, index) => ({
+            agent_id: user.id,
+            contact_id: contact.id,
+            upload_id: upload.id,
+            list_date: today,
+            call_order: index + 1,
+            call_status: 'pending' as const,
+          }));
+
+          const { error: callListError } = await supabase
+            .from('approved_call_list')
+            .insert(callListEntries);
+
+          if (callListError) {
+            console.error('Error creating call list:', callListError);
+          }
         }
       }
 
@@ -377,10 +399,11 @@ export const useCallSheetUpload = () => {
 
       return upload;
     },
-    onSuccess: () => {
-      toast.success('Call sheet uploaded successfully! Pending supervisor approval.');
+    onSuccess: (data) => {
+      toast.success(`Call sheet uploaded and approved! ${data.approved_count || 0} contacts added to your call list.`);
       setParsedData(null);
       queryClient.invalidateQueries({ queryKey: ['upload-history'] });
+      queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
     onError: (error) => {
       toast.error(`Upload failed: ${error.message}`);

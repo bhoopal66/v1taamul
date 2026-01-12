@@ -107,8 +107,10 @@ const feedbackOptions: { status: FeedbackStatus; label: string; icon: React.Reac
 ];
 
 export const CallListPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, userRole } = useAuth();
   const { callList, stats, isLoading, refetch, logFeedback, isLogging, skipContact, isSkipping } = useCallList();
+  
+  const canExport = userRole === 'super_admin';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'called' | 'skipped'>('all');
@@ -316,24 +318,26 @@ export const CallListPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2" disabled={callList.length === 0}>
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background">
-              <DropdownMenuItem onClick={() => openExportDialog('csv')}>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openExportDialog('excel')}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canExport && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" disabled={callList.length === 0}>
+                  <Download className="w-4 h-4" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background">
+                <DropdownMenuItem onClick={() => openExportDialog('csv')}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openExportDialog('excel')}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="gap-2">
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
             Refresh

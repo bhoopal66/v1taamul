@@ -1,33 +1,22 @@
 #!/bin/bash
 set -e
 
+# This script sets up role passwords using the POSTGRES_PASSWORD environment variable.
+# It runs after 01-init.sql has created the roles.
+
 if [ -z "${POSTGRES_PASSWORD:-}" ]; then
-  echo "ERROR: POSTGRES_PASSWORD is not set (required to set role passwords)" >&2
+  echo "ERROR: POSTGRES_PASSWORD is not set" >&2
   exit 1
 fi
 
-# This script sets up role passwords using the POSTGRES_PASSWORD environment variable.
-# It is executed during first DB initialization by the postgres image.
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -v db_pass="$POSTGRES_PASSWORD" <<'EOSQL'
-  DO $$
-  BEGIN
-    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-      ALTER ROLE supabase_admin WITH PASSWORD :'db_pass';
-    END IF;
+echo "Setting up role passwords..."
 
-    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-      ALTER ROLE authenticator WITH PASSWORD :'db_pass';
-    END IF;
-
-    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
-      ALTER ROLE supabase_auth_admin WITH PASSWORD :'db_pass';
-    END IF;
-
-    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN
-      ALTER ROLE supabase_storage_admin WITH PASSWORD :'db_pass';
-    END IF;
-  END
-  $$;
+# Set passwords for all login roles
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    ALTER ROLE authenticator WITH PASSWORD '$POSTGRES_PASSWORD';
+    ALTER ROLE supabase_admin WITH PASSWORD '$POSTGRES_PASSWORD';
+    ALTER ROLE supabase_auth_admin WITH PASSWORD '$POSTGRES_PASSWORD';
+    ALTER ROLE supabase_storage_admin WITH PASSWORD '$POSTGRES_PASSWORD';
 EOSQL
 
 echo "Role passwords configured successfully"

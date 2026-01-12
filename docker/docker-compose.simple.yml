@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: salestracker
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "salestracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ===========================================
+  # Full Application (API + Frontend)
+  # ===========================================
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.fullstack
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    ports:
+      - "3000:3000"
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/salestracker
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-secret-in-production}
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

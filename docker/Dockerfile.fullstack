@@ -1,36 +1,69 @@
+# ===========================================
+# Stage 1: Build API Server
+# ===========================================
 FROM node:20-alpine AS api-builder
 WORKDIR /app/server
+
+# Install dependencies
 COPY server/package*.json ./
 RUN npm install
+
+# Copy source and build
 COPY server/ ./
 RUN npm run build
 
+# ===========================================
+# Stage 2: Build Frontend
+# ===========================================
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
+
+# Install dependencies
 COPY package*.json ./
 RUN npm install
+
+# Copy source files
 COPY . .
-ARG VITE_API_URL
+
+# Build arguments
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+
+# Build frontend
 RUN npm run build
 
-FROM node:20-alpine
+# ===========================================
+# Stage 3: Production Runtime
+# ===========================================
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Copy API server
+# Install production dependencies for API
+COPY server/package*.json ./server/
+RUN cd server && npm install --production
+
+# Copy API build
 COPY --from=api-builder /app/server/dist ./server/dist
-COPY --from=api-builder /app/server/node_modules ./server/node_modules
-COPY --from=api-builder /app/server/package.json ./server/
 
 # Copy frontend build
 COPY --from=frontend-builder /app/dist ./public
 
-# Install serve for static files
-RUN npm install -g serve
+# Install nginx for serving static files
+RUN apk add --no-cache nginx
 
-# Start script
-COPY docker/start.sh ./start.sh
+# Copy nginx config
+COPY docker/nginx-app.conf /etc/nginx/http.d/default.conf
+
+# Copy start script
+COPY docker/start-app.sh ./start.sh
 RUN chmod +x ./start.sh
 
+# Expose ports
 EXPOSE 3000 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+
+# Start application
 CMD ["./start.sh"]

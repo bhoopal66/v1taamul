@@ -51,7 +51,7 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
     queryKey: ['all-agents-list', ledTeamId, canSeeAllAgents],
     queryFn: async (): Promise<AgentOption[]> => {
       let query = supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username, team_id')
         .eq('is_active', true)
         .order('full_name');
@@ -84,7 +84,7 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
       let agentIds: string[] | null = null;
       if (ledTeamId && !canSeeAllAgents) {
         const { data: teamProfiles } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id')
           .eq('team_id', ledTeamId)
           .eq('is_active', true);
@@ -123,9 +123,9 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
       const { data: leads, error: leadsError } = await leadsQuery;
       if (leadsError) throw leadsError;
 
-      // Get profiles for agent names (filtered by team if needed)
+      // Get profiles for agent names (filtered by team if needed) - using profiles_public
       let profilesQuery = supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username');
       
       if (agentIds && agentIds.length > 0) {

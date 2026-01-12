@@ -114,9 +114,9 @@ export const useTalkTimeLeaderboard = ({ timePeriod, teamFilter }: UseTalkTimeLe
       const { start, end } = getDateRange(timePeriod);
       const previousRange = getPreviousDateRange(timePeriod);
 
-      // Fetch all active agents with their profiles and team info
+      // Fetch all active agents with their profiles and team info (using profiles_public for non-sensitive data)
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username, avatar_url, team_id, teams:team_id(id, name)')
         .eq('is_active', true);
 

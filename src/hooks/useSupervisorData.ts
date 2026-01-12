@@ -134,7 +134,7 @@ export const useSupervisorData = (teamId?: string) => {
       // Get agent names
       const agentIds = [...new Set(uploads?.map(u => u.agent_id) || [])];
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username')
         .in('id', agentIds);
 

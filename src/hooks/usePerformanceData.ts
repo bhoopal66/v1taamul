@@ -263,9 +263,9 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
 
       if (error) throw error;
 
-      // Get all profiles
+      // Get all profiles (using profiles_public for non-sensitive data)
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username');
 
       // Get leads for period to filter by lead status

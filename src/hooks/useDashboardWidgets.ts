@@ -189,7 +189,7 @@ export const useDashboardWidgets = () => {
         .limit(20);
 
       const { data: profiles } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username');
 
       const activities: TimelineActivity[] = [];

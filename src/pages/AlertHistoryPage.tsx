@@ -132,7 +132,7 @@ export const AlertHistoryPage: React.FC = () => {
     queryKey: ['agents-filter'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username')
         .eq('is_active', true)
         .order('full_name');

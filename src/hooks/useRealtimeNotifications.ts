@@ -19,11 +19,11 @@ export const useRealtimeNotifications = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
 
-  // Fetch all profiles for agent names
+  // Fetch all profiles for agent names (using profiles_public for non-sensitive data)
   useEffect(() => {
     const fetchProfiles = async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username');
       
       if (data) {

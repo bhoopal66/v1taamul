@@ -31,7 +31,6 @@ export interface AgentTrendSummary {
 export interface AgentOption {
   id: string;
   name: string;
-  email: string;
 }
 
 interface UseAgentPerformanceTrendsOptions {
@@ -50,8 +49,8 @@ export const useAgentPerformanceTrends = (options: UseAgentPerformanceTrendsOpti
     queryKey: ['agent-list-for-trends'],
     queryFn: async (): Promise<AgentOption[]> => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, email')
+        .from('profiles_public')
+        .select('id, full_name, username')
         .eq('is_active', true)
         .order('full_name', { ascending: true });
 
@@ -60,7 +59,6 @@ export const useAgentPerformanceTrends = (options: UseAgentPerformanceTrendsOpti
       return (data || []).map(p => ({
         id: p.id,
         name: p.full_name || p.username || 'Unknown',
-        email: p.email,
       }));
     },
     enabled: !!user && isSupervisor,
@@ -75,9 +73,9 @@ export const useAgentPerformanceTrends = (options: UseAgentPerformanceTrendsOpti
       const endDate = new Date();
       const startDate = subDays(endDate, days - 1);
 
-      // Get agent profile
+      // Get agent profile (using profiles_public for non-sensitive data)
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username')
         .eq('id', agentId)
         .single();

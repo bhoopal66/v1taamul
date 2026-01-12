@@ -48,9 +48,9 @@ export const useTeamPerformance = (options: UseTeamPerformanceOptions = {}) => {
 
       if (teamsError) throw teamsError;
 
-      // Get all profiles with team assignments
+      // Get all profiles with team assignments (using profiles_public for non-sensitive data)
       const { data: profilesData } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, team_id')
         .not('team_id', 'is', null);
 

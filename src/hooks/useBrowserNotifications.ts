@@ -50,11 +50,11 @@ export const useBrowserNotifications = () => {
   }));
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
 
-  // Fetch profiles for agent names
+  // Fetch profiles for agent names (using profiles_public for non-sensitive data)
   useEffect(() => {
     const fetchProfiles = async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username');
       
       if (data) {

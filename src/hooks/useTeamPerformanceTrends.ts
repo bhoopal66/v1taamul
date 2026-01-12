@@ -47,7 +47,7 @@ export const useTeamPerformanceTrends = (options: UseTeamPerformanceTrendsOption
       let agentIds: string[] | null = null;
       if (teamId) {
         const { data: profiles } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id')
           .eq('team_id', teamId);
         agentIds = profiles?.map(p => p.id) || [];

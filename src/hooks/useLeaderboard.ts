@@ -87,9 +87,9 @@ export const useLeaderboard = ({ timePeriod, teamFilter, leadStatusFilter = 'all
     queryFn: async () => {
       const { start, end } = getDateRange(timePeriod);
       
-      // Fetch all agents with their profiles
+      // Fetch all agents with their profiles (using profiles_public for non-sensitive data)
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username, avatar_url, supervisor_id')
         .eq('is_active', true);
 
@@ -98,7 +98,7 @@ export const useLeaderboard = ({ timePeriod, teamFilter, leadStatusFilter = 'all
       // Fetch supervisors for team names
       const supervisorIds = [...new Set(profiles?.map(p => p.supervisor_id).filter(Boolean))];
       const { data: supervisors } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name')
         .in('id', supervisorIds);
 

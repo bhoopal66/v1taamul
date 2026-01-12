@@ -118,10 +118,7 @@ export const AgentDrillDownChart: React.FC<AgentDrillDownChartProps> = ({ classN
                 <SelectContent>
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
-                      <div className="flex flex-col">
-                        <span>{agent.name}</span>
-                        <span className="text-xs text-muted-foreground">{agent.email}</span>
-                      </div>
+                      <span>{agent.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

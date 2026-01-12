@@ -46,15 +46,15 @@ export const useTeamManagement = () => {
       
       if (leaderIds.length > 0) {
         const { data } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id, full_name, username')
           .in('id', leaderIds);
         leaderProfiles = data || [];
       }
 
-      // Get member counts
+      // Get member counts (using profiles_public for non-sensitive data)
       const { data: memberCounts } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('team_id')
         .not('team_id', 'is', null);
 

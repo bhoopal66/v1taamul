@@ -29,6 +29,13 @@ import {
   MoreVertical,
   RotateCcw,
   Eye,
+  Building2,
+  Phone,
+  Factory,
+  MapPin,
+  Map,
+  Landmark,
+  ArrowRight,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -215,6 +222,48 @@ export const UploadPage: React.FC = () => {
         </Button>
       </div>
 
+      {/* Required Format Guide */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Info className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">Required Column Format</span>
+            <Badge variant="secondary" className="ml-auto text-xs">All fields required</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <Building2 className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">1. Name of the Company</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <Phone className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">2. Contact Number</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <Factory className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">3. Industry</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <MapPin className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">4. Address</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <Map className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">5. Area</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border">
+              <Landmark className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">6. Emirate</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Upload Section */}
         <div className="lg:col-span-2 space-y-6">
@@ -226,8 +275,7 @@ export const UploadPage: React.FC = () => {
                 Upload File
               </CardTitle>
               <CardDescription>
-                Upload an Excel (.xlsx, .xls) or CSV file with columns in this exact order:
-                <span className="font-medium text-foreground"> Name of the Company, Contact Number, Industry, Address, Area, Emirate</span>
+                Upload an Excel (.xlsx, .xls) or CSV file matching the format above. Files with incorrect column order will be rejected.
               </CardDescription>
             </CardHeader>
             <CardContent>

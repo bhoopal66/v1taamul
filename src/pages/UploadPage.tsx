@@ -41,10 +41,13 @@ import {
   ChevronDown,
   Copy,
   Check,
+  Shuffle,
+  FileWarning,
+  RefreshCw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
-import { useCallSheetUpload, RejectionDetail, UploadHistory } from '@/hooks/useCallSheetUpload';
+import { useCallSheetUpload, RejectionDetail, UploadHistory, ColumnAnalysis } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
 
@@ -502,8 +505,108 @@ export const UploadPage: React.FC = () => {
                     <Progress value={validPercentage} className="h-2" />
                   </div>
 
-                  {/* Alerts */}
-                  {parsedData.invalidEntries > 0 && (
+                  {/* Column Mismatch Alert with Suggestions */}
+                  {parsedData.columnAnalysis && !parsedData.columnAnalysis.isValid && (
+                    <Alert variant="destructive" className="border-orange-500/50 bg-orange-500/10">
+                      <FileWarning className="h-4 w-4 text-orange-600" />
+                      <AlertTitle className="text-orange-700">Column Format Issue Detected</AlertTitle>
+                      <AlertDescription className="mt-3 space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          Your file columns don't match the required format. Here's how to fix it:
+                        </p>
+                        
+                        {/* Column Comparison Table */}
+                        <div className="rounded-lg border bg-background overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="w-16 text-xs">Position</TableHead>
+                                <TableHead className="text-xs">Expected Column</TableHead>
+                                <TableHead className="text-xs">Your Column</TableHead>
+                                <TableHead className="text-xs">Fix</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {parsedData.columnAnalysis.mismatches.map((mismatch) => (
+                                <TableRow key={mismatch.position}>
+                                  <TableCell className="font-mono text-sm">{mismatch.position}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
+                                      {mismatch.expected}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-red-500/10 text-red-700 border-red-500/30">
+                                      {mismatch.found}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {mismatch.suggestedFix === 'reorder' && mismatch.matchedAt && (
+                                      <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                                        <Shuffle className="w-3 h-3" />
+                                        <span>Move from position {mismatch.matchedAt}</span>
+                                      </div>
+                                    )}
+                                    {mismatch.suggestedFix === 'rename' && (
+                                      <div className="flex items-center gap-1.5 text-xs text-orange-600">
+                                        <RefreshCw className="w-3 h-3" />
+                                        <span>Rename to "{mismatch.expected}"</span>
+                                      </div>
+                                    )}
+                                    {mismatch.suggestedFix === 'missing' && (
+                                      <div className="flex items-center gap-1.5 text-xs text-red-600">
+                                        <AlertCircle className="w-3 h-3" />
+                                        <span>Add this column</span>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {/* Suggested Order */}
+                        <div className="p-3 rounded-lg bg-muted/50 border">
+                          <p className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                            <Info className="w-3 h-3" />
+                            Correct column order:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {parsedData.columnAnalysis.suggestedOrder.map((col, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {i + 1}. {col}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Can Auto-Fix Notice */}
+                        {parsedData.columnAnalysis.canAutoFix && (
+                          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                            <p className="text-xs text-blue-700 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <strong>Good news!</strong> All required columns are present. You just need to reorder them in your spreadsheet.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 pt-2">
+                          <Button variant="outline" size="sm" onClick={handleClear} className="gap-1.5">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Clear & Try Again
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={downloadTemplate} className="gap-1.5">
+                            <Download className="w-3.5 h-3.5" />
+                            Download Template
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Regular Alerts for row-level issues */}
+                  {parsedData.columnAnalysis?.isValid && parsedData.invalidEntries > 0 && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Some entries have issues</AlertTitle>
@@ -514,7 +617,7 @@ export const UploadPage: React.FC = () => {
                     </Alert>
                   )}
 
-                  {parsedData.validEntries === 0 && (
+                  {parsedData.columnAnalysis?.isValid && parsedData.validEntries === 0 && parsedData.totalEntries > 0 && (
                     <Alert variant="destructive">
                       <XCircle className="h-4 w-4" />
                       <AlertTitle>No valid entries</AlertTitle>
@@ -524,7 +627,8 @@ export const UploadPage: React.FC = () => {
                     </Alert>
                   )}
 
-                  {/* Preview Table */}
+                  {/* Preview Table - only show when columns are valid */}
+                  {parsedData.columnAnalysis?.isValid !== false && parsedData.contacts.length > 0 && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold flex items-center gap-2">
@@ -671,6 +775,7 @@ export const UploadPage: React.FC = () => {
                       )}
                     </ScrollArea>
                   </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-3 justify-end">

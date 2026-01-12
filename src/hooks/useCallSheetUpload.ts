@@ -19,12 +19,29 @@ export interface ParsedContact {
   errors: string[];
 }
 
+export interface ColumnMismatch {
+  position: number;
+  expected: string;
+  found: string;
+  suggestedFix: 'rename' | 'reorder' | 'missing';
+  matchedAt?: number; // If found at wrong position
+}
+
+export interface ColumnAnalysis {
+  isValid: boolean;
+  mismatches: ColumnMismatch[];
+  detectedColumns: string[];
+  suggestedOrder: string[];
+  canAutoFix: boolean;
+}
+
 export interface UploadValidationResult {
   totalEntries: number;
   validEntries: number;
   invalidEntries: number;
   duplicateEntries: number;
   contacts: ParsedContact[];
+  columnAnalysis?: ColumnAnalysis;
 }
 
 export interface UploadHistory {
@@ -72,6 +89,122 @@ const normalizeColumnName = (name: string): string => {
     .trim()
     .replace(/[\s-]+/g, '_')
     .replace(/[^a-z0-9_]/g, '');
+};
+
+// Analyze column structure and provide fix suggestions
+const analyzeColumns = (originalColumns: string[]): ColumnAnalysis => {
+  const normalizedColumns = originalColumns.map(col => normalizeColumnName(col));
+  const mismatches: ColumnMismatch[] = [];
+  const suggestedOrder: string[] = [];
+  
+  // Check each expected column position
+  REQUIRED_COLUMNS_IN_ORDER.forEach((expectedCol, expectedIndex) => {
+    const actualCol = normalizedColumns[expectedIndex];
+    const expectedDisplayName = COLUMN_DISPLAY_NAMES[expectedIndex];
+    const actualDisplayName = originalColumns[expectedIndex] || '(empty)';
+    
+    if (actualCol === expectedCol) {
+      // Column is in correct position
+      suggestedOrder.push(originalColumns[expectedIndex]);
+      return;
+    }
+    
+    // Check if expected column exists elsewhere in the file
+    const foundAtIndex = normalizedColumns.findIndex(col => col === expectedCol);
+    
+    if (foundAtIndex !== -1) {
+      // Column exists but in wrong position - suggest reorder
+      mismatches.push({
+        position: expectedIndex + 1,
+        expected: expectedDisplayName,
+        found: actualDisplayName,
+        suggestedFix: 'reorder',
+        matchedAt: foundAtIndex + 1,
+      });
+      suggestedOrder.push(originalColumns[foundAtIndex]);
+    } else {
+      // Check if current column might be a renamed version (fuzzy match)
+      const isSimilar = actualCol && (
+        actualCol.includes(expectedCol.split('_')[0]) ||
+        expectedCol.includes(actualCol.split('_')[0]) ||
+        levenshteinDistance(actualCol, expectedCol) <= 3
+      );
+      
+      if (isSimilar) {
+        // Column might be misspelled - suggest rename
+        mismatches.push({
+          position: expectedIndex + 1,
+          expected: expectedDisplayName,
+          found: actualDisplayName,
+          suggestedFix: 'rename',
+        });
+        suggestedOrder.push(expectedDisplayName);
+      } else if (!actualCol || actualCol === '') {
+        // Column is missing
+        mismatches.push({
+          position: expectedIndex + 1,
+          expected: expectedDisplayName,
+          found: '(missing)',
+          suggestedFix: 'missing',
+        });
+        suggestedOrder.push(expectedDisplayName);
+      } else {
+        // Column is completely different
+        mismatches.push({
+          position: expectedIndex + 1,
+          expected: expectedDisplayName,
+          found: actualDisplayName,
+          suggestedFix: 'rename',
+        });
+        suggestedOrder.push(expectedDisplayName);
+      }
+    }
+  });
+  
+  // Check if all required columns exist somewhere (can be auto-fixed by reordering)
+  const allColumnsExist = REQUIRED_COLUMNS_IN_ORDER.every(reqCol => 
+    normalizedColumns.includes(reqCol)
+  );
+  
+  return {
+    isValid: mismatches.length === 0,
+    mismatches,
+    detectedColumns: originalColumns.slice(0, 6),
+    suggestedOrder,
+    canAutoFix: allColumnsExist && mismatches.every(m => m.suggestedFix === 'reorder'),
+  };
+};
+
+// Simple Levenshtein distance for fuzzy matching
+const levenshteinDistance = (a: string, b: string): number => {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[b.length][a.length];
 };
 
 const validatePhoneNumber = (phone: string): boolean => {
@@ -190,34 +323,47 @@ export const useCallSheetUpload = () => {
           const firstRow = jsonData[0];
           const originalColumnNames = Object.keys(firstRow);
           
-          // Normalize column names for comparison
-          const normalizedColumns = originalColumnNames.map(col => normalizeColumnName(col));
+          // Analyze column structure
+          const columnAnalysis = analyzeColumns(originalColumnNames);
           
           // Validate exact column count
-          if (normalizedColumns.length < REQUIRED_COLUMNS_IN_ORDER.length) {
-            reject(new Error(
-              `Invalid file format. Expected ${REQUIRED_COLUMNS_IN_ORDER.length} columns in this exact order: ${COLUMN_DISPLAY_NAMES.join(', ')}`
-            ));
+          if (originalColumnNames.length < REQUIRED_COLUMNS_IN_ORDER.length) {
+            // Return analysis with empty data so UI can show suggestions
+            resolve({
+              totalEntries: 0,
+              validEntries: 0,
+              invalidEntries: 0,
+              duplicateEntries: 0,
+              contacts: [],
+              columnAnalysis: {
+                ...columnAnalysis,
+                isValid: false,
+                mismatches: REQUIRED_COLUMNS_IN_ORDER.map((col, i) => ({
+                  position: i + 1,
+                  expected: COLUMN_DISPLAY_NAMES[i],
+                  found: originalColumnNames[i] || '(missing)',
+                  suggestedFix: originalColumnNames[i] ? 'rename' : 'missing' as const,
+                })),
+              },
+            });
             return;
           }
 
-          // Validate columns are in exact order
-          const columnErrors: string[] = [];
-          REQUIRED_COLUMNS_IN_ORDER.forEach((expectedCol, index) => {
-            const actualCol = normalizedColumns[index];
-            if (actualCol !== expectedCol) {
-              columnErrors.push(
-                `Column ${index + 1}: Expected "${COLUMN_DISPLAY_NAMES[index]}" but found "${originalColumnNames[index]}"`
-              );
-            }
-          });
-
-          if (columnErrors.length > 0) {
-            reject(new Error(
-              `Invalid column order. Columns must be in this exact order: ${COLUMN_DISPLAY_NAMES.join(', ')}.\n\nErrors found:\n${columnErrors.join('\n')}`
-            ));
+          // If columns are not valid, return analysis with suggestions
+          if (!columnAnalysis.isValid) {
+            resolve({
+              totalEntries: jsonData.length,
+              validEntries: 0,
+              invalidEntries: jsonData.length,
+              duplicateEntries: 0,
+              contacts: [],
+              columnAnalysis,
+            });
             return;
           }
+          
+          // Normalize column names for validation
+          const normalizedColumns = originalColumnNames.map(col => normalizeColumnName(col));
 
           // Create column map using original names at correct positions
           const columnMap: Record<string, string> = {

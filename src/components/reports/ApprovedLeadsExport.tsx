@@ -178,6 +178,31 @@ export const ApprovedLeadsExport: React.FC = () => {
   // Get unique cities from leads for filter
   const uniqueCities = [...new Set((approvedLeads || []).map(l => l.city).filter(Boolean))] as string[];
 
+  // Calculate bank-wise summary breakdown
+  const bankSummary = React.useMemo(() => {
+    if (!approvedLeads || approvedLeads.length === 0) return [];
+    
+    const summaryMap = new Map<string, { count: number; dealValue: number }>();
+    
+    approvedLeads.forEach(lead => {
+      const bank = lead.bankName;
+      const existing = summaryMap.get(bank) || { count: 0, dealValue: 0 };
+      summaryMap.set(bank, {
+        count: existing.count + 1,
+        dealValue: existing.dealValue + (lead.dealValue || 0),
+      });
+    });
+    
+    return Array.from(summaryMap.entries())
+      .map(([bank, data]) => ({
+        bank,
+        count: data.count,
+        dealValue: data.dealValue,
+        percentage: ((data.count / approvedLeads.length) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [approvedLeads]);
+
   const exportToExcel = () => {
     if (!approvedLeads || approvedLeads.length === 0) {
       toast.error('No data to export');
@@ -227,6 +252,32 @@ export const ApprovedLeadsExport: React.FC = () => {
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Approved Leads');
+
+      // Add bank summary sheet
+      if (bankSummary.length > 0) {
+        const summaryData = [
+          ...bankSummary.map(item => ({
+            'Bank': item.bank,
+            'Count': item.count,
+            'Deal Value': item.dealValue,
+            'Percentage': `${item.percentage}%`,
+          })),
+          {
+            'Bank': 'TOTAL',
+            'Count': approvedLeads.length,
+            'Deal Value': totalDealValue,
+            'Percentage': '100%',
+          }
+        ];
+        const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+        summarySheet['!cols'] = [
+          { wch: 15 },  // Bank
+          { wch: 10 },  // Count
+          { wch: 15 },  // Deal Value
+          { wch: 12 },  // Percentage
+        ];
+        XLSX.utils.book_append_sheet(workbook, summarySheet, 'Bank Summary');
+      }
 
       // Generate filename with filters
       const filterParts = [];
@@ -555,6 +606,93 @@ export const ApprovedLeadsExport: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bank-wise Summary Breakdown */}
+      {bankSummary.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Bank-wise Summary
+            </CardTitle>
+            <CardDescription>
+              Breakdown by bank showing count and deal value totals
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bankSummary.map((item) => (
+                <div
+                  key={item.bank}
+                  className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className="font-semibold">
+                      {item.bank}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {item.percentage}%
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Count:</span>
+                      <span className="font-medium">{item.count}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Deal Value:</span>
+                      <span className="font-medium text-green-600">
+                        {item.dealValue.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Summary Table */}
+            <div className="mt-6 pt-4 border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bank</TableHead>
+                    <TableHead className="text-right">Count</TableHead>
+                    <TableHead className="text-right">Deal Value</TableHead>
+                    <TableHead className="text-right">%</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bankSummary.map((item) => (
+                    <TableRow key={item.bank}>
+                      <TableCell className="font-medium">{item.bank}</TableCell>
+                      <TableCell className="text-right">{item.count}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        {item.dealValue.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">{item.percentage}%</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-bold bg-muted/50">
+                    <TableCell>TOTAL</TableCell>
+                    <TableCell className="text-right">{approvedLeads?.length || 0}</TableCell>
+                    <TableCell className="text-right text-green-600">
+                      {totalDealValue.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">100%</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Preview Table */}
       <Card>

@@ -556,6 +556,19 @@ export const Leaderboard: React.FC = () => {
           <p className="text-muted-foreground mt-1">
             {totalAgents} agents ranked · {periodLabel}
           </p>
+          
+          {/* User's Team Indicator */}
+          {userAccessibleTeams.length > 0 && !canSeeAllTeams && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="gap-1.5 px-3 py-1 bg-primary/5 border-primary/20">
+                <Users className="w-3.5 h-3.5 text-primary" />
+                <span className="text-sm font-medium">
+                  Your Team: {userAccessibleTeams[0]?.teamName}'s Team
+                </span>
+              </Badge>
+            </div>
+          )}
+          
           {/* Active Filter Badges */}
           {hasActiveFilters && (
             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -588,12 +601,14 @@ export const Leaderboard: React.FC = () => {
                 <Badge variant="secondary" className="gap-1 text-xs">
                   <Users className="w-3 h-3" />
                   {getTeamName()}
-                  <button
-                    onClick={() => handleTeamFilterChange('all')}
-                    className="ml-1 hover:text-destructive"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  {canSeeAllTeams && (
+                    <button
+                      onClick={() => handleTeamFilterChange('all')}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </Badge>
               )}
             </div>

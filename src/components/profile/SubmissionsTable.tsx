@@ -114,6 +114,7 @@ export const SubmissionsTable: React.FC = () => {
                   <TableHead>Date</TableHead>
                   <TableHead>Group</TableHead>
                   <TableHead>Bank</TableHead>
+                  <TableHead>Company Name</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -131,6 +132,9 @@ export const SubmissionsTable: React.FC = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>{submission.bank_name}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {(submission as any).company_name || '-'}
+                    </TableCell>
                     <TableCell>
                       {getStatusBadge(submission.status, submission.review_notes)}
                     </TableCell>

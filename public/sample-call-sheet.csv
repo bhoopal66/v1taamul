@@ -1,6 +1,6 @@
-company_name,contact_person_name,phone_number,trade_license_number,city,area,industry
-ABC Trading LLC,John Smith,+971501234567,TL-12345,Dubai,Business Bay,Trading
-XYZ Services,Sarah Johnson,+971502345678,TL-23456,Abu Dhabi,Khalifa City,Services
-Global Tech FZE,Mike Chen,+971503456789,TL-34567,Dubai,JAFZA,Technology
-Prime Logistics,Emma Wilson,+971504567890,TL-45678,Sharjah,Industrial Area,Logistics
-Star Electronics,Ahmed Hassan,+971505678901,TL-56789,Dubai,Deira,Electronics
+Name of the Company,Contact Number,Industry,Address,Area,Emirate
+ABC Trading LLC,+971501234567,Trading,Building 5 Office 201,Business Bay,Dubai
+XYZ Services,+971502345678,Services,Tower A Floor 10,Khalifa City,Abu Dhabi
+Global Tech FZE,+971503456789,Technology,Warehouse 15,JAFZA,Dubai
+Prime Logistics,+971504567890,Logistics,Unit 8 Industrial Zone,Industrial Area,Sharjah
+Star Electronics,+971505678901,Electronics,Shop 42 Main Street,Deira,Dubai

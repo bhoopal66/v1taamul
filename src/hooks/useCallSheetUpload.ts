@@ -46,7 +46,25 @@ export interface RejectionDetail {
   rejectionReason: string;
 }
 
-const REQUIRED_COLUMNS = ['company_name', 'contact_person_name', 'phone_number'];
+// Required columns in EXACT order - all are compulsory
+const REQUIRED_COLUMNS_IN_ORDER = [
+  'name_of_the_company',
+  'contact_number',
+  'industry',
+  'address',
+  'area',
+  'emirate',
+];
+
+// Human-readable column names for error messages
+const COLUMN_DISPLAY_NAMES = [
+  'Name of the Company',
+  'Contact Number',
+  'Industry',
+  'Address',
+  'Area',
+  'Emirate',
+];
 
 const normalizeColumnName = (name: string): string => {
   return name
@@ -168,22 +186,48 @@ export const useCallSheetUpload = () => {
             return;
           }
 
-          // Normalize column names
+          // Get the original column names in order from the first row
           const firstRow = jsonData[0];
-          const columnMap: Record<string, string> = {};
-          Object.keys(firstRow).forEach(col => {
-            columnMap[normalizeColumnName(col)] = col;
-          });
-
-          // Check required columns
-          const missingColumns = REQUIRED_COLUMNS.filter(
-            required => !Object.keys(columnMap).includes(required)
-          );
-
-          if (missingColumns.length > 0) {
-            reject(new Error(`Missing required columns: ${missingColumns.join(', ')}`));
+          const originalColumnNames = Object.keys(firstRow);
+          
+          // Normalize column names for comparison
+          const normalizedColumns = originalColumnNames.map(col => normalizeColumnName(col));
+          
+          // Validate exact column count
+          if (normalizedColumns.length < REQUIRED_COLUMNS_IN_ORDER.length) {
+            reject(new Error(
+              `Invalid file format. Expected ${REQUIRED_COLUMNS_IN_ORDER.length} columns in this exact order: ${COLUMN_DISPLAY_NAMES.join(', ')}`
+            ));
             return;
           }
+
+          // Validate columns are in exact order
+          const columnErrors: string[] = [];
+          REQUIRED_COLUMNS_IN_ORDER.forEach((expectedCol, index) => {
+            const actualCol = normalizedColumns[index];
+            if (actualCol !== expectedCol) {
+              columnErrors.push(
+                `Column ${index + 1}: Expected "${COLUMN_DISPLAY_NAMES[index]}" but found "${originalColumnNames[index]}"`
+              );
+            }
+          });
+
+          if (columnErrors.length > 0) {
+            reject(new Error(
+              `Invalid column order. Columns must be in this exact order: ${COLUMN_DISPLAY_NAMES.join(', ')}.\n\nErrors found:\n${columnErrors.join('\n')}`
+            ));
+            return;
+          }
+
+          // Create column map using original names at correct positions
+          const columnMap: Record<string, string> = {
+            'name_of_the_company': originalColumnNames[0],
+            'contact_number': originalColumnNames[1],
+            'industry': originalColumnNames[2],
+            'address': originalColumnNames[3],
+            'area': originalColumnNames[4],
+            'emirate': originalColumnNames[5],
+          };
 
           // Fetch existing phone numbers to check duplicates
           const { data: existingContacts } = await supabase
@@ -213,19 +257,21 @@ export const useCallSheetUpload = () => {
           jsonData.forEach((row, index) => {
             const errors: string[] = [];
             
-            const companyName = String(row[columnMap['company_name']] || '').trim();
-            const contactPersonName = String(row[columnMap['contact_person_name']] || '').trim();
-            const phoneNumber = String(row[columnMap['phone_number']] || '').trim();
-            const tradeLicenseNumber = String(row[columnMap['trade_license_number']] || '').trim();
-            const city = columnMap['city'] ? String(row[columnMap['city']] || '').trim() : undefined;
-            const industry = columnMap['industry'] ? String(row[columnMap['industry']] || '').trim() : undefined;
-            const area = columnMap['area'] ? String(row[columnMap['area']] || '').trim() : undefined;
+            // Map to new column structure
+            const companyName = String(row[columnMap['name_of_the_company']] || '').trim();
+            const phoneNumber = String(row[columnMap['contact_number']] || '').trim();
+            const industry = String(row[columnMap['industry']] || '').trim();
+            const address = String(row[columnMap['address']] || '').trim();
+            const area = String(row[columnMap['area']] || '').trim();
+            const emirate = String(row[columnMap['emirate']] || '').trim();
 
-            // Validate required fields
-            if (!companyName) errors.push('Company name is required');
-            if (!contactPersonName) errors.push('Contact person name is required');
-            if (!phoneNumber) errors.push('Phone number is required');
-            // trade_license_number is optional during upload, required when lead is qualified
+            // Validate ALL required fields (all 6 columns are compulsory)
+            if (!companyName) errors.push('Name of the Company is required');
+            if (!phoneNumber) errors.push('Contact Number is required');
+            if (!industry) errors.push('Industry is required');
+            if (!address) errors.push('Address is required');
+            if (!area) errors.push('Area is required');
+            if (!emirate) errors.push('Emirate is required');
 
             // Validate phone format
             if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
@@ -263,10 +309,10 @@ export const useCallSheetUpload = () => {
             contacts.push({
               rowNumber: index + 2, // +2 for header row and 1-indexing
               companyName,
-              contactPersonName,
+              contactPersonName: '', // Not in new template, set empty
               phoneNumber: cleanedPhone || phoneNumber,
-              tradeLicenseNumber,
-              city,
+              tradeLicenseNumber: '', // Not in new template, set empty
+              city: emirate, // Map emirate to city field
               industry,
               area,
               isValid,
@@ -341,10 +387,10 @@ export const useCallSheetUpload = () => {
       if (validContacts.length > 0) {
         const contactsToInsert = validContacts.map(c => ({
           company_name: c.companyName,
-          contact_person_name: c.contactPersonName,
+          contact_person_name: c.contactPersonName || c.companyName, // Use company name if no contact person
           phone_number: c.phoneNumber,
           trade_license_number: c.tradeLicenseNumber || 'PENDING',
-          city: c.city || null,
+          city: c.city || null, // This now holds emirate value
           industry: c.industry || null,
           area: c.area || null,
           first_uploaded_by: user.id,

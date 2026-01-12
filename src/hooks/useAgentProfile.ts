@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, subDays, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 export interface MonthlyPerformance {
   month: string;
@@ -46,207 +45,34 @@ export interface DailyPerformance {
 export const useAgentProfile = (agentId?: string) => {
   const { user, profile } = useAuth();
   const targetUserId = agentId || user?.id;
-  const today = new Date();
 
-  // Fetch all-time stats
   const { data: profileStats, isLoading: statsLoading } = useQuery({
     queryKey: ['agent-profile-stats', targetUserId],
     queryFn: async (): Promise<ProfileStats> => {
-      if (!targetUserId) throw new Error('No user');
-
-      // Get all feedback for this agent
-      const { data: allFeedback, error } = await supabase
-        .from('call_feedback')
-        .select('feedback_status, call_timestamp')
-        .eq('agent_id', targetUserId)
-        .order('call_timestamp', { ascending: true });
-
-      if (error) throw error;
-
-      // Get all leads
-      const { data: allLeads } = await supabase
-        .from('leads')
-        .select('id, created_at')
-        .eq('agent_id', targetUserId);
-
-      const totalCalls = allFeedback?.length || 0;
-      const interested = allFeedback?.filter(f => f.feedback_status === 'interested').length || 0;
-      const totalLeads = allLeads?.length || 0;
-
-      // Calculate best day
-      const dailyMap = new Map<string, number>();
-      allFeedback?.forEach(f => {
-        if (f.call_timestamp) {
-          const day = format(new Date(f.call_timestamp), 'yyyy-MM-dd');
-          dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
-        }
-      });
-
-      let bestDay: { date: string; calls: number } | null = null;
-      dailyMap.forEach((calls, date) => {
-        if (!bestDay || calls > bestDay.calls) {
-          bestDay = { date, calls };
-        }
-      });
-
-      // Calculate streaks (days with at least 1 call)
-      const uniqueDays = Array.from(dailyMap.keys()).sort();
-      let currentStreak = 0;
-      let longestStreak = 0;
-      let tempStreak = 0;
-
-      for (let i = 0; i < uniqueDays.length; i++) {
-        if (i === 0) {
-          tempStreak = 1;
-        } else {
-          const prevDate = new Date(uniqueDays[i - 1]);
-          const currDate = new Date(uniqueDays[i]);
-          const diffDays = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (diffDays === 1) {
-            tempStreak++;
-          } else {
-            tempStreak = 1;
-          }
-        }
-        longestStreak = Math.max(longestStreak, tempStreak);
-      }
-
-      // Check if today or yesterday is in the streak
-      const todayStr = format(today, 'yyyy-MM-dd');
-      const yesterdayStr = format(subDays(today, 1), 'yyyy-MM-dd');
-      
-      if (dailyMap.has(todayStr) || dailyMap.has(yesterdayStr)) {
-        currentStreak = tempStreak;
-      }
-
-      // Get ranking
-      const { data: allAgentsFeedback } = await supabase
-        .from('call_feedback')
-        .select('agent_id');
-
-      const agentCallCounts = new Map<string, number>();
-      allAgentsFeedback?.forEach(f => {
-        agentCallCounts.set(f.agent_id, (agentCallCounts.get(f.agent_id) || 0) + 1);
-      });
-
-      const sortedAgents = Array.from(agentCallCounts.entries())
-        .sort((a, b) => b[1] - a[1]);
-      
-      const rank = sortedAgents.findIndex(([id]) => id === targetUserId) + 1;
-
-      return {
-        totalCallsAllTime: totalCalls,
-        totalInterestedAllTime: interested,
-        totalLeadsAllTime: totalLeads,
-        averageConversionRate: totalCalls > 0 ? Math.round((interested / totalCalls) * 100) : 0,
-        bestDay,
-        currentStreak,
-        longestStreak,
-        daysActive: uniqueDays.length,
-        rank: rank || sortedAgents.length + 1,
-        totalAgents: sortedAgents.length || 1,
-      };
+      const params = agentId ? { agentId } : {};
+      return api.get<ProfileStats>('/performance/profile-stats', params);
     },
     enabled: !!targetUserId,
   });
 
-  // Fetch monthly performance (last 6 months)
   const { data: monthlyPerformance, isLoading: monthlyLoading } = useQuery({
     queryKey: ['agent-monthly-performance', targetUserId],
     queryFn: async (): Promise<MonthlyPerformance[]> => {
-      if (!targetUserId) throw new Error('No user');
-
-      const months: MonthlyPerformance[] = [];
-
-      for (let i = 5; i >= 0; i--) {
-        const monthDate = subMonths(today, i);
-        const monthStart = startOfMonth(monthDate).toISOString();
-        const monthEnd = endOfMonth(monthDate).toISOString();
-
-        const { data: feedback } = await supabase
-          .from('call_feedback')
-          .select('feedback_status')
-          .eq('agent_id', targetUserId)
-          .gte('call_timestamp', monthStart)
-          .lte('call_timestamp', monthEnd);
-
-        const { data: leads } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('agent_id', targetUserId)
-          .gte('created_at', monthStart)
-          .lte('created_at', monthEnd);
-
-        const calls = feedback?.length || 0;
-        const interested = feedback?.filter(f => f.feedback_status === 'interested').length || 0;
-
-        months.push({
-          month: format(monthDate, 'MMM'),
-          calls,
-          interested,
-          leads: leads?.length || 0,
-          conversionRate: calls > 0 ? Math.round((interested / calls) * 100) : 0,
-        });
-      }
-
-      return months;
+      const params = agentId ? { agentId } : {};
+      return api.get<MonthlyPerformance[]>('/performance/monthly', params);
     },
     enabled: !!targetUserId,
   });
 
-  // Fetch daily performance (last 30 days)
   const { data: dailyPerformance, isLoading: dailyLoading } = useQuery({
     queryKey: ['agent-daily-performance', targetUserId],
     queryFn: async (): Promise<DailyPerformance[]> => {
-      if (!targetUserId) throw new Error('No user');
-
-      const thirtyDaysAgo = subDays(today, 30);
-      
-      const { data: feedback, error } = await supabase
-        .from('call_feedback')
-        .select('feedback_status, call_timestamp')
-        .eq('agent_id', targetUserId)
-        .gte('call_timestamp', startOfDay(thirtyDaysAgo).toISOString())
-        .order('call_timestamp', { ascending: true });
-
-      if (error) throw error;
-
-      // Group by day
-      const dailyMap = new Map<string, DailyPerformance>();
-
-      // Initialize all 30 days
-      for (let i = 29; i >= 0; i--) {
-        const day = subDays(today, i);
-        const dateStr = format(day, 'MMM d');
-        dailyMap.set(dateStr, {
-          date: dateStr,
-          calls: 0,
-          interested: 0,
-          notInterested: 0,
-          notAnswered: 0,
-        });
-      }
-
-      feedback?.forEach(f => {
-        if (f.call_timestamp) {
-          const dateStr = format(new Date(f.call_timestamp), 'MMM d');
-          const current = dailyMap.get(dateStr);
-          if (current) {
-            current.calls++;
-            if (f.feedback_status === 'interested') current.interested++;
-            if (f.feedback_status === 'not_interested') current.notInterested++;
-            if (f.feedback_status === 'not_answered') current.notAnswered++;
-          }
-        }
-      });
-
-      return Array.from(dailyMap.values());
+      const params = agentId ? { agentId } : {};
+      return api.get<DailyPerformance[]>('/performance/daily', params);
     },
     enabled: !!targetUserId,
   });
 
-  // Calculate achievements
   const achievements: Achievement[] = profileStats ? [
     {
       id: 'first-call',

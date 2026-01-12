@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -81,14 +81,13 @@ export interface Lead {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  // Derived field: true if has trade license (Lead), false if no trade license (Opportunity)
   isLead: boolean;
 }
 
 export interface LeadStats {
   total: number;
-  leads: number; // With trade license
-  opportunities: number; // Without trade license
+  leads: number;
+  opportunities: number;
   new: number;
   contacted: number;
   qualified: number;
@@ -104,53 +103,11 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
   const { data: leads, isLoading, refetch } = useQuery({
     queryKey: ['leads', user?.id, statusFilter],
     queryFn: async (): Promise<Lead[]> => {
-      let query = supabase
-        .from('leads')
-        .select(`
-          *,
-          master_contacts (
-            company_name,
-            contact_person_name,
-            phone_number,
-            trade_license_number,
-            city,
-            industry
-          )
-        `)
-        .eq('agent_id', user?.id)
-        .order('created_at', { ascending: false });
-
+      const params: Record<string, string> = {};
       if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('lead_status', statusFilter);
+        params.status = statusFilter;
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      return (data || []).map(item => {
-        const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
-        return {
-          id: item.id,
-          contactId: item.contact_id,
-          companyName: item.master_contacts?.company_name || 'Unknown',
-          contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
-          phoneNumber: item.master_contacts?.phone_number || '',
-          tradeLicenseNumber,
-          city: item.master_contacts?.city || null,
-          industry: item.master_contacts?.industry || null,
-          leadStatus: (item.lead_status || 'new') as LeadStatus,
-          leadScore: item.lead_score || 0,
-          leadSource: ((item as any).lead_source || 'account_RAK') as LeadSource,
-          dealValue: item.deal_value,
-          expectedCloseDate: item.expected_close_date,
-          qualifiedDate: item.qualified_date,
-          notes: item.notes,
-          createdAt: item.created_at || '',
-          updatedAt: item.updated_at || '',
-          isLead: !!tradeLicenseNumber, // Has TL = Lead, No TL = Opportunity
-        };
-      });
+      return api.get<Lead[]>('/leads', params);
     },
     enabled: !!user?.id,
   });
@@ -182,15 +139,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         notes?: string | null;
       };
     }) => {
-      const { error } = await supabase
-        .from('leads')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', leadId);
-
-      if (error) throw error;
+      return api.put(`/leads/${leadId}`, updates);
     },
     onSuccess: (_, variables) => {
       if (variables.updates.lead_status) {
@@ -207,7 +156,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
       }
       queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to update lead: ${error.message}`);
     },
   });
@@ -229,7 +178,6 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
     updateLead.mutate({ leadId, updates: details });
   };
 
-  // Mutation to update trade license on master_contacts (convert Opportunity to Lead)
   const updateTradeLicense = useMutation({
     mutationFn: async ({
       contactId,
@@ -238,15 +186,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
       contactId: string;
       tradeLicenseNumber: string;
     }) => {
-      const { error } = await supabase
-        .from('master_contacts')
-        .update({
-          trade_license_number: tradeLicenseNumber,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', contactId);
-
-      if (error) throw error;
+      return api.put(`/leads/contact/${contactId}/trade-license`, { tradeLicenseNumber });
     },
     onSuccess: () => {
       toast.success('🎉 Opportunity converted to Lead!', {
@@ -254,7 +194,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
       });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to update trade license: ${error.message}`);
     },
   });

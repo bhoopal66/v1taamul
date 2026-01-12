@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { signIn } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Eye, EyeOff, LogIn, Phone } from 'lucide-react';
 
@@ -14,23 +14,22 @@ export const LoginForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { data, error } = await signIn(email, password);
+      const { success, error } = await login(email, password);
       
-      if (error) {
-        toast.error(error.message);
+      if (!success) {
+        toast.error(error || 'Login failed');
         return;
       }
 
-      if (data.user) {
-        toast.success('Welcome back!');
-        navigate('/dashboard');
-      }
+      toast.success('Welcome back!');
+      navigate('/dashboard');
     } catch (error) {
       toast.error('An unexpected error occurred');
     } finally {

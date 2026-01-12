@@ -1,9 +1,7 @@
-import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { startOfDay, endOfDay } from 'date-fns';
 
 export type FeedbackStatus = 'not_answered' | 'interested' | 'not_interested' | 'callback' | 'wrong_number';
 export type CallStatus = 'pending' | 'called' | 'skipped';
@@ -42,91 +40,15 @@ export const useCallList = (selectedDate?: Date) => {
   const queryClient = useQueryClient();
   const today = selectedDate || new Date();
 
-  // Fetch today's call list with contact details
   const { data: callList, isLoading, refetch } = useQuery({
     queryKey: ['call-list', user?.id, today.toDateString()],
     queryFn: async (): Promise<CallListContact[]> => {
       const dateStr = today.toISOString().split('T')[0];
-
-      // Fetch call list for today
-      const { data: callListData, error: callListError } = await supabase
-        .from('approved_call_list')
-        .select('*')
-        .eq('agent_id', user?.id)
-        .eq('list_date', dateStr)
-        .order('call_order', { ascending: true });
-
-      if (callListError) throw callListError;
-
-      if (!callListData || callListData.length === 0) {
-        return [];
-      }
-
-      // Get contact IDs
-      const contactIds = callListData.map(c => c.contact_id);
-
-      // Fetch contact details
-      const { data: contacts, error: contactsError } = await supabase
-        .from('master_contacts')
-        .select('*')
-        .in('id', contactIds);
-
-      if (contactsError) throw contactsError;
-
-      // Fetch today's feedback for these contacts
-      const dayStart = startOfDay(today).toISOString();
-      const dayEnd = endOfDay(today).toISOString();
-
-      const { data: feedback } = await supabase
-        .from('call_feedback')
-        .select('*')
-        .eq('agent_id', user?.id)
-        .in('contact_id', contactIds)
-        .gte('call_timestamp', dayStart)
-        .lte('call_timestamp', dayEnd)
-        .order('call_timestamp', { ascending: false });
-
-      // Create a map for quick lookup
-      const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
-      const feedbackMap = new Map<string, { status: FeedbackStatus; notes: string | null }>();
-      
-      // Get the latest feedback for each contact
-      feedback?.forEach(f => {
-        if (!feedbackMap.has(f.contact_id)) {
-          feedbackMap.set(f.contact_id, { 
-            status: f.feedback_status as FeedbackStatus, 
-            notes: f.notes 
-          });
-        }
-      });
-
-      return callListData.map(item => {
-        const contact = contactMap.get(item.contact_id);
-        const fb = feedbackMap.get(item.contact_id);
-
-        return {
-          id: item.id,
-          callListId: item.id,
-          contactId: item.contact_id,
-          companyName: contact?.company_name || 'Unknown',
-          contactPersonName: contact?.contact_person_name || 'Unknown',
-          phoneNumber: contact?.phone_number || '',
-          tradeLicenseNumber: contact?.trade_license_number || '',
-          city: contact?.city || null,
-          industry: contact?.industry || null,
-          area: (contact as { area?: string | null })?.area || null,
-          callOrder: item.call_order,
-          callStatus: item.call_status as CallStatus,
-          calledAt: item.called_at,
-          lastFeedback: fb?.status || null,
-          lastNotes: fb?.notes || null,
-        };
-      });
+      return api.get<CallListContact[]>('/calls/list', { date: dateStr });
     },
     enabled: !!user?.id,
   });
 
-  // Calculate stats
   const stats: CallListStats = {
     total: callList?.length || 0,
     pending: callList?.filter(c => c.callStatus === 'pending').length || 0,
@@ -138,7 +60,6 @@ export const useCallList = (selectedDate?: Date) => {
     callback: callList?.filter(c => c.lastFeedback === 'callback').length || 0,
   };
 
-  // Log call feedback mutation
   const logFeedback = useMutation({
     mutationFn: async ({ 
       callListId, 
@@ -151,52 +72,7 @@ export const useCallList = (selectedDate?: Date) => {
       status: FeedbackStatus; 
       notes?: string;
     }) => {
-      // Insert feedback
-      const { error: feedbackError } = await supabase
-        .from('call_feedback')
-        .insert({
-          agent_id: user?.id,
-          contact_id: contactId,
-          call_list_id: callListId,
-          feedback_status: status,
-          notes: notes || null,
-          call_timestamp: new Date().toISOString(),
-        });
-
-      if (feedbackError) throw feedbackError;
-
-      // Update call list item status
-      const { error: updateError } = await supabase
-        .from('approved_call_list')
-        .update({
-          call_status: 'called',
-          called_at: new Date().toISOString(),
-        })
-        .eq('id', callListId);
-
-      if (updateError) throw updateError;
-
-      // Update contact status based on feedback
-      let contactStatus: 'contacted' | 'interested' | 'not_interested' = 'contacted';
-      if (status === 'interested') contactStatus = 'interested';
-      if (status === 'not_interested') contactStatus = 'not_interested';
-
-      await supabase
-        .from('master_contacts')
-        .update({ status: contactStatus })
-        .eq('id', contactId);
-
-      // If interested, create a lead
-      if (status === 'interested') {
-        await supabase
-          .from('leads')
-          .insert({
-            agent_id: user?.id,
-            contact_id: contactId,
-            lead_status: 'new',
-            notes: notes || null,
-          });
-      }
+      return api.post('/calls/feedback', { callListId, contactId, status, notes });
     },
     onSuccess: (_, variables) => {
       const statusLabels: Record<FeedbackStatus, string> = {
@@ -209,45 +85,33 @@ export const useCallList = (selectedDate?: Date) => {
       toast.success(statusLabels[variables.status]);
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to log call: ${error.message}`);
     },
   });
 
-  // Skip contact mutation
   const skipContact = useMutation({
     mutationFn: async (callListId: string) => {
-      const { error } = await supabase
-        .from('approved_call_list')
-        .update({ call_status: 'skipped' })
-        .eq('id', callListId);
-
-      if (error) throw error;
+      return api.post(`/calls/${callListId}/skip`, {});
     },
     onSuccess: () => {
       toast.success('Contact skipped');
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to skip: ${error.message}`);
     },
   });
 
-  // Bulk update area mutation
   const bulkUpdateArea = useMutation({
     mutationFn: async ({ contactIds, area }: { contactIds: string[]; area: string }) => {
-      const { error } = await supabase
-        .from('master_contacts')
-        .update({ area } as any)
-        .in('id', contactIds);
-
-      if (error) throw error;
+      return api.post('/calls/bulk-update-area', { contactIds, area });
     },
     onSuccess: (_, variables) => {
       toast.success(`Updated area for ${variables.contactIds.length} contacts`);
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to update area: ${error.message}`);
     },
   });

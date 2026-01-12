@@ -13,6 +13,7 @@ import { TeamConversionAreaChart } from '@/components/supervisor/TeamConversionA
 import { TeamTrendsSummaryCards } from '@/components/supervisor/TeamTrendsSummaryCards';
 import { PerformanceComparisonView } from '@/components/supervisor/PerformanceComparisonView';
 import { AgentDrillDownChart } from '@/components/supervisor/AgentDrillDownChart';
+import { TeamSubmissionsView } from '@/components/supervisor/TeamSubmissionsView';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -138,6 +139,7 @@ export const SupervisorDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList className="flex-wrap">
             <TabsTrigger value="trends">Team Trends</TabsTrigger>
+            <TabsTrigger value="submissions">Submissions</TabsTrigger>
             <TabsTrigger value="agents">Agent Drill-Down</TabsTrigger>
             <TabsTrigger value="comparison">Compare Periods</TabsTrigger>
             <TabsTrigger value="today">Today's Activity</TabsTrigger>
@@ -169,6 +171,10 @@ export const SupervisorDashboard: React.FC = () => {
             />
             <TeamConversionAreaChart data={dailyTrends} isLoading={trendsLoading} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="submissions" className="space-y-6">
+          <TeamSubmissionsView />
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6">

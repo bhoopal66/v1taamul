@@ -7,6 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -32,13 +38,14 @@ import {
   Loader2,
   AlertTriangle,
   Crown,
-  Calendar,
+  CalendarIcon,
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   BarChart,
   Bar,
@@ -49,8 +56,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { DateRange } from 'react-day-picker';
 
-type TimePeriod = 'today' | 'week' | 'month';
+type TimePeriod = 'today' | 'week' | 'month' | 'custom';
 
 interface TeamMemberReport {
   agentId: string;
@@ -70,6 +78,10 @@ export const TeamReportGenerator: React.FC = () => {
   const { teamInfo, isTeamLeader } = useTeamLeaderData();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 7),
+    to: new Date(),
+  });
 
   const getDateRange = (period: TimePeriod) => {
     const today = new Date();
@@ -80,11 +92,16 @@ export const TeamReportGenerator: React.FC = () => {
         return { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) };
       case 'month':
         return { start: startOfMonth(today), end: endOfMonth(today) };
+      case 'custom':
+        return { 
+          start: startOfDay(customDateRange?.from || subDays(today, 7)), 
+          end: endOfDay(customDateRange?.to || today) 
+        };
     }
   };
 
   const { data: reportData, isLoading, refetch } = useQuery({
-    queryKey: ['team-report', ledTeamId, timePeriod],
+    queryKey: ['team-report', ledTeamId, timePeriod, customDateRange?.from?.toISOString(), customDateRange?.to?.toISOString()],
     queryFn: async (): Promise<{ members: TeamMemberReport[]; totals: TeamMemberReport }> => {
       if (!ledTeamId) return { members: [], totals: getEmptyTotals() };
 
@@ -201,6 +218,9 @@ export const TeamReportGenerator: React.FC = () => {
     const { start, end } = getDateRange(timePeriod);
     if (timePeriod === 'today') {
       return format(start, 'MMMM d, yyyy');
+    }
+    if (timePeriod === 'custom' && customDateRange?.from && customDateRange?.to) {
+      return `${format(customDateRange.from, 'MMM d')} - ${format(customDateRange.to, 'MMM d, yyyy')}`;
     }
     return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
   };
@@ -373,7 +393,7 @@ export const TeamReportGenerator: React.FC = () => {
                 Performance report for your team members
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue />
@@ -382,8 +402,49 @@ export const TeamReportGenerator: React.FC = () => {
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="week">This Week</SelectItem>
                   <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {timePeriod === 'custom' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !customDateRange && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customDateRange?.from ? (
+                        customDateRange.to ? (
+                          <>
+                            {format(customDateRange.from, "MMM d")} - {format(customDateRange.to, "MMM d, yyyy")}
+                          </>
+                        ) : (
+                          format(customDateRange.from, "PPP")
+                        )
+                      ) : (
+                        <span>Pick a date range</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={customDateRange?.from}
+                      selected={customDateRange}
+                      onSelect={setCustomDateRange}
+                      numberOfMonths={2}
+                      disabled={(date) => date > new Date()}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              
               <Button onClick={downloadPDF} disabled={isLoading || isDownloading || !reportData}>
                 {isDownloading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -405,7 +466,7 @@ export const TeamReportGenerator: React.FC = () => {
             <div className="space-y-6">
               {/* Period indicator */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
+                <CalendarIcon className="h-4 w-4" />
                 <span>{getPeriodLabel()}</span>
               </div>
 

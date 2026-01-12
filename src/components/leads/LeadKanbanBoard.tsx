@@ -310,8 +310,16 @@ export const LeadKanbanBoard = ({
                               )}
                             </div>
 
+                            {/* Created Date & Time */}
+                            <div className="flex items-center gap-1 mt-2 pt-2 border-t text-xs text-muted-foreground">
+                              <Calendar className="w-3 h-3" />
+                              <span>{format(new Date(lead.createdAt), 'MMM d, yyyy')}</span>
+                              <span className="text-muted-foreground/60">•</span>
+                              <span>{format(new Date(lead.createdAt), 'h:mm a')}</span>
+                            </div>
+
                             {/* Deal Value & Close Date */}
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                            <div className="flex items-center justify-between mt-1.5">
                               {lead.dealValue ? (
                                 <span className="text-xs font-semibold text-green-600 flex items-center gap-0.5">
                                   <DollarSign className="w-3 h-3" />

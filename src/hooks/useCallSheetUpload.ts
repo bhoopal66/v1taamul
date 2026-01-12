@@ -343,7 +343,7 @@ export const useCallSheetUpload = () => {
           company_name: c.companyName,
           contact_person_name: c.contactPersonName,
           phone_number: c.phoneNumber,
-          trade_license_number: c.tradeLicenseNumber,
+          trade_license_number: c.tradeLicenseNumber || 'PENDING',
           city: c.city || null,
           industry: c.industry || null,
           area: c.area || null,
@@ -352,30 +352,42 @@ export const useCallSheetUpload = () => {
           status: 'new' as const,
         }));
 
-        const { data: insertedContacts, error: contactsError } = await supabase
+        // Insert contacts
+        const { error: contactsError } = await supabase
           .from('master_contacts')
-          .insert(contactsToInsert)
-          .select('id');
+          .insert(contactsToInsert);
 
         if (contactsError) {
           console.error('Error inserting contacts:', contactsError);
-        } else if (insertedContacts && insertedContacts.length > 0) {
-          // Create approved call list entries immediately
-          const callListEntries = insertedContacts.map((contact, index) => ({
-            agent_id: user.id,
-            contact_id: contact.id,
-            upload_id: upload.id,
-            list_date: today,
-            call_order: index + 1,
-            call_status: 'pending' as const,
-          }));
+        } else {
+          // Fetch the inserted contacts by phone numbers (agent owns them now)
+          const phoneNumbers = validContacts.map(c => c.phoneNumber);
+          const { data: insertedContacts, error: fetchError } = await supabase
+            .from('master_contacts')
+            .select('id')
+            .eq('current_owner_agent_id', user.id)
+            .in('phone_number', phoneNumbers);
 
-          const { error: callListError } = await supabase
-            .from('approved_call_list')
-            .insert(callListEntries);
+          if (fetchError) {
+            console.error('Error fetching inserted contacts:', fetchError);
+          } else if (insertedContacts && insertedContacts.length > 0) {
+            // Create approved call list entries immediately
+            const callListEntries = insertedContacts.map((contact, index) => ({
+              agent_id: user.id,
+              contact_id: contact.id,
+              upload_id: upload.id,
+              list_date: today,
+              call_order: index + 1,
+              call_status: 'pending' as const,
+            }));
 
-          if (callListError) {
-            console.error('Error creating call list:', callListError);
+            const { error: callListError } = await supabase
+              .from('approved_call_list')
+              .insert(callListEntries);
+
+            if (callListError) {
+              console.error('Error creating call list:', callListError);
+            }
           }
         }
       }

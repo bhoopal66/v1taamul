@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,8 @@ import {
   Landmark,
   ArrowRight,
   ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -99,6 +102,20 @@ export const UploadPage: React.FC = () => {
   const [rejectionDetails, setRejectionDetails] = useState<RejectionDetail[]>([]);
   const [loadingRejections, setLoadingRejections] = useState(false);
   const [isExampleOpen, setIsExampleOpen] = useState(false);
+  const [headerCopied, setHeaderCopied] = useState(false);
+
+  const CSV_HEADER = 'Name of the Company,Contact Number,Industry,Address,Area,Emirate';
+
+  const copyHeaderToClipboard = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(CSV_HEADER);
+      setHeaderCopied(true);
+      toast.success('Header row copied to clipboard');
+      setTimeout(() => setHeaderCopied(false), 2000);
+    } catch (error) {
+      toast.error('Failed to copy to clipboard');
+    }
+  }, []);
 
   const handleViewRejections = async (upload: UploadHistory) => {
     setSelectedUploadForRejections(upload);
@@ -304,6 +321,40 @@ export const UploadPage: React.FC = () => {
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
+              {/* Copy Header Row Button */}
+              <div className="flex items-center justify-between p-3 mb-3 rounded-lg bg-muted/50 border">
+                <div className="flex-1 overflow-x-auto">
+                  <code className="text-xs font-mono text-muted-foreground">{CSV_HEADER}</code>
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={copyHeaderToClipboard}
+                        className="ml-3 gap-1.5 shrink-0"
+                      >
+                        {headerCopied ? (
+                          <>
+                            <Check className="w-4 h-4 text-green-600" />
+                            <span className="text-green-600">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span>Copy Header</span>
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Copy CSV header row to clipboard</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
               <div className="rounded-lg border bg-background overflow-hidden">
                 <ScrollArea className="w-full">
                   <Table>

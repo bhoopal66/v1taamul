@@ -7,7 +7,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pgjwt";
 
--- Create Supabase roles
+-- Note: Role passwords are set via environment variables in docker-compose.yml
+-- The postgres user is the superuser and handles authentication
+
+-- Create Supabase roles (without passwords - they inherit from postgres or use trust auth locally)
 DO $$
 BEGIN
     -- Anon role (public access)
@@ -25,27 +28,29 @@ BEGIN
         CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
     END IF;
     
-    -- Authenticator role
+    -- Authenticator role (password set dynamically)
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'your-super-secret-password';
+        CREATE ROLE authenticator NOINHERIT LOGIN;
     END IF;
     
-    -- Supabase admin
+    -- Supabase admin (password set dynamically)
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-        CREATE ROLE supabase_admin NOINHERIT BYPASSRLS LOGIN PASSWORD 'your-super-secret-password';
+        CREATE ROLE supabase_admin NOINHERIT BYPASSRLS LOGIN;
     END IF;
     
     -- Auth admin
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
-        CREATE ROLE supabase_auth_admin NOINHERIT BYPASSRLS LOGIN PASSWORD 'your-super-secret-password';
+        CREATE ROLE supabase_auth_admin NOINHERIT BYPASSRLS LOGIN;
     END IF;
     
     -- Storage admin
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN
-        CREATE ROLE supabase_storage_admin NOINHERIT BYPASSRLS LOGIN PASSWORD 'your-super-secret-password';
+        CREATE ROLE supabase_storage_admin NOINHERIT BYPASSRLS LOGIN;
     END IF;
 END
 $$;
+
+-- Note: Passwords are set by 00-setup-passwords.sh script
 
 -- Grant role memberships
 GRANT anon TO authenticator;

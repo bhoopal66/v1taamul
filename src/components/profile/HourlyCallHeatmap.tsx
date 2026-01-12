@@ -2,11 +2,79 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useHourlyCallHeatmap, HeatmapPeriod, HourlyHeatmapCell } from '@/hooks/useHourlyCallHeatmap';
-import { Calendar, Grid3X3 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useHourlyCallHeatmap, HeatmapPeriod, HourlyHeatmapCell, CallOutcomeBreakdown } from '@/hooks/useHourlyCallHeatmap';
+import { Calendar, Grid3X3, ThumbsUp, ThumbsDown, PhoneMissed, Phone, PhoneOff } from 'lucide-react';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
+
+interface HeatmapCellTooltipProps {
+  day: string;
+  hour: number;
+  value: number;
+  breakdown: CallOutcomeBreakdown;
+  children: React.ReactNode;
+}
+
+const HeatmapCellTooltip: React.FC<HeatmapCellTooltipProps> = ({ day, hour, value, breakdown, children }) => {
+  const formatHour = (h: number) => {
+    if (h === 12) return '12:00 PM';
+    return h > 12 ? `${h - 12}:00 PM` : `${h}:00 AM`;
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="top" className="p-3 max-w-[200px]">
+        <div className="space-y-2">
+          <div className="font-semibold text-sm border-b pb-1">
+            {day} at {formatHour(hour)}
+          </div>
+          <div className="text-sm font-medium">
+            Total: {value} calls
+          </div>
+          {value > 0 && (
+            <div className="space-y-1 text-xs">
+              {breakdown.interested > 0 && (
+                <div className="flex items-center gap-2 text-success">
+                  <ThumbsUp className="w-3 h-3" />
+                  <span>Interested: {breakdown.interested}</span>
+                </div>
+              )}
+              {breakdown.notInterested > 0 && (
+                <div className="flex items-center gap-2 text-destructive">
+                  <ThumbsDown className="w-3 h-3" />
+                  <span>Not Interested: {breakdown.notInterested}</span>
+                </div>
+              )}
+              {breakdown.notAnswered > 0 && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <PhoneMissed className="w-3 h-3" />
+                  <span>Not Answered: {breakdown.notAnswered}</span>
+                </div>
+              )}
+              {breakdown.callback > 0 && (
+                <div className="flex items-center gap-2 text-warning">
+                  <Phone className="w-3 h-3" />
+                  <span>Callback: {breakdown.callback}</span>
+                </div>
+              )}
+              {breakdown.wrongNumber > 0 && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <PhoneOff className="w-3 h-3" />
+                  <span>Wrong Number: {breakdown.wrongNumber}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 export const HourlyCallHeatmap: React.FC = () => {
   const [period, setPeriod] = useState<HeatmapPeriod>('weekly');
@@ -23,12 +91,19 @@ export const HourlyCallHeatmap: React.FC = () => {
     return 'bg-primary/25';
   };
 
-  const getValue = (day: number, hour: number) => {
-    const cell = heatmapData.find(d => d.day === day && d.hour === hour);
-    return cell?.value || 0;
+  const getCell = (day: number, hour: number): HourlyHeatmapCell | undefined => {
+    return heatmapData.find(d => d.day === day && d.hour === hour);
   };
 
   const totalCalls = heatmapData.reduce((sum, cell) => sum + cell.value, 0);
+
+  const emptyBreakdown: CallOutcomeBreakdown = {
+    interested: 0,
+    notInterested: 0,
+    notAnswered: 0,
+    callback: 0,
+    wrongNumber: 0,
+  };
 
   if (isLoading) {
     return (
@@ -92,19 +167,28 @@ export const HourlyCallHeatmap: React.FC = () => {
               <div key={day} className="flex items-center gap-1 mb-1">
                 <div className="w-10 text-xs text-muted-foreground font-medium">{day}</div>
                 {hours.map(hour => {
-                  const value = getValue(dayIndex, hour);
+                  const cell = getCell(dayIndex, hour);
+                  const value = cell?.value || 0;
+                  const breakdown = cell?.breakdown || emptyBreakdown;
+                  
                   return (
-                    <div
+                    <HeatmapCellTooltip
                       key={`${dayIndex}-${hour}`}
-                      className={`flex-1 h-7 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
-                      title={`${day} ${hour}:00 - ${value} calls`}
+                      day={day}
+                      hour={hour}
+                      value={value}
+                      breakdown={breakdown}
                     >
-                      {value > 0 && (
-                        <span className="text-[10px] font-medium text-primary-foreground">
-                          {value}
-                        </span>
-                      )}
-                    </div>
+                      <div
+                        className={`flex-1 h-7 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
+                      >
+                        {value > 0 && (
+                          <span className="text-[10px] font-medium text-primary-foreground">
+                            {value}
+                          </span>
+                        )}
+                      </div>
+                    </HeatmapCellTooltip>
                   );
                 })}
               </div>

@@ -1,14 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { subDays, getDay, getHours, startOfWeek, startOfMonth } from 'date-fns';
+import { getDay, getHours, startOfWeek, startOfMonth } from 'date-fns';
 
 export type HeatmapPeriod = 'weekly' | 'monthly';
+
+export interface CallOutcomeBreakdown {
+  interested: number;
+  notInterested: number;
+  notAnswered: number;
+  callback: number;
+  wrongNumber: number;
+}
 
 export interface HourlyHeatmapCell {
   day: number; // 0-6 (Sun-Sat)
   hour: number; // 8-20
   value: number;
+  breakdown: CallOutcomeBreakdown;
 }
 
 export const useHourlyCallHeatmap = (period: HeatmapPeriod = 'weekly') => {
@@ -27,21 +36,24 @@ export const useHourlyCallHeatmap = (period: HeatmapPeriod = 'weekly') => {
       
       const { data: calls, error } = await supabase
         .from('call_feedback')
-        .select('call_timestamp')
+        .select('call_timestamp, feedback_status')
         .eq('agent_id', user?.id)
         .gte('call_timestamp', startDate.toISOString());
 
       if (error) throw error;
 
-      // Initialize heatmap grid
-      const heatmap: Map<string, number> = new Map();
+      // Initialize heatmap grid with breakdown
+      const heatmap: Map<string, { total: number; breakdown: CallOutcomeBreakdown }> = new Map();
       for (let day = 0; day < 7; day++) {
         for (let hour = 8; hour <= 20; hour++) {
-          heatmap.set(`${day}-${hour}`, 0);
+          heatmap.set(`${day}-${hour}`, {
+            total: 0,
+            breakdown: { interested: 0, notInterested: 0, notAnswered: 0, callback: 0, wrongNumber: 0 }
+          });
         }
       }
 
-      // Aggregate calls by day and hour
+      // Aggregate calls by day, hour, and outcome
       calls?.forEach(call => {
         if (call.call_timestamp) {
           const date = new Date(call.call_timestamp);
@@ -49,14 +61,33 @@ export const useHourlyCallHeatmap = (period: HeatmapPeriod = 'weekly') => {
           const hour = getHours(date);
           if (hour >= 8 && hour <= 20) {
             const key = `${day}-${hour}`;
-            heatmap.set(key, (heatmap.get(key) || 0) + 1);
+            const cell = heatmap.get(key)!;
+            cell.total++;
+            
+            switch (call.feedback_status) {
+              case 'interested':
+                cell.breakdown.interested++;
+                break;
+              case 'not_interested':
+                cell.breakdown.notInterested++;
+                break;
+              case 'not_answered':
+                cell.breakdown.notAnswered++;
+                break;
+              case 'callback':
+                cell.breakdown.callback++;
+                break;
+              case 'wrong_number':
+                cell.breakdown.wrongNumber++;
+                break;
+            }
           }
         }
       });
 
-      return Array.from(heatmap.entries()).map(([key, value]) => {
+      return Array.from(heatmap.entries()).map(([key, data]) => {
         const [day, hour] = key.split('-').map(Number);
-        return { day, hour, value };
+        return { day, hour, value: data.total, breakdown: data.breakdown };
       });
     },
     enabled: !!user?.id,

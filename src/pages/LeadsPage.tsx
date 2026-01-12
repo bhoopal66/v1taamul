@@ -18,7 +18,9 @@ import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
 import { LeadActivityTimeline } from '@/components/leads/LeadActivityTimeline';
 import { LeadSourceAnalytics } from '@/components/leads/LeadSourceAnalytics';
 import { LeadTransitionsFeed } from '@/components/leads/LeadTransitionsFeed';
+import { LeadTransitionHistory } from '@/components/leads/LeadTransitionHistory';
 import { BulkLeadImport } from '@/components/leads/BulkLeadImport';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Target, 
   Phone, 
@@ -718,10 +720,27 @@ export const LeadsPage = () => {
                 </div>
               </div>
 
-              {/* Right Column - Activity Timeline */}
+              {/* Right Column - Activity Timeline & Stage History */}
               <div className="border-l pl-6">
                 {selectedLead && (
-                  <LeadActivityTimeline contactId={selectedLead.contactId} />
+                  <Tabs defaultValue="activity" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsTrigger value="activity" className="text-xs">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Activity
+                      </TabsTrigger>
+                      <TabsTrigger value="stages" className="text-xs">
+                        <History className="w-3 h-3 mr-1" />
+                        Stage History
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="activity" className="mt-0">
+                      <LeadActivityTimeline contactId={selectedLead.contactId} />
+                    </TabsContent>
+                    <TabsContent value="stages" className="mt-0">
+                      <LeadTransitionHistory leadId={selectedLead.id} />
+                    </TabsContent>
+                  </Tabs>
                 )}
               </div>
             </div>

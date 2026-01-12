@@ -65,7 +65,7 @@ import { exportContactsToCSV, exportContactsToExcel, ContactExportData } from '@
 import { format, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fns';
 import { useCallList, CallListContact, FeedbackStatus } from '@/hooks/useCallList';
 import { cn } from '@/lib/utils';
-import { ContactImportDialog } from '@/components/contacts/ContactImportDialog';
+
 
 
 const feedbackOptions: { status: FeedbackStatus; label: string; icon: React.ReactNode; color: string; description: string }[] = [
@@ -316,7 +316,6 @@ export const CallListPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <ContactImportDialog onImportComplete={() => refetch()} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={callList.length === 0}>

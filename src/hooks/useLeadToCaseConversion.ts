@@ -208,7 +208,13 @@ export const useLeadToCaseConversion = () => {
     onSuccess: (result) => {
       toast.success('📋 Case Created Successfully!', {
         description: `Case ${result.caseNumber} assigned to ${result.coordinatorName}`,
-        duration: 5000,
+        duration: 8000,
+        action: {
+          label: 'View Case',
+          onClick: () => {
+            window.location.href = `/cases?caseId=${result.caseId}`;
+          },
+        },
       });
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['leads'] });

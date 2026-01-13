@@ -26,6 +26,7 @@ import {
   FileText,
   AlertTriangle,
   ArrowUpCircle,
+  Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getScoreLabel } from '@/hooks/useLeadScoring';
@@ -324,6 +325,19 @@ export const LeadKanbanBoard = ({
                                 <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                                   <Calendar className="w-2.5 h-2.5" />
                                   {format(new Date(lead.expectedCloseDate), 'MMM d')}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Timestamps */}
+                            <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted-foreground">
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="w-2.5 h-2.5" />
+                                {format(new Date(lead.createdAt), 'MMM d, h:mm a')}
+                              </span>
+                              {lead.updatedAt !== lead.createdAt && (
+                                <span className="flex items-center gap-0.5 opacity-70">
+                                  Updated {format(new Date(lead.updatedAt), 'MMM d')}
                                 </span>
                               )}
                             </div>

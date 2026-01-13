@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useCases, Case, CaseStatus, CASE_STAGES, BANK_OPTIONS } from '@/hooks/useCases';
 import { CaseKanbanBoard } from '@/components/cases/CaseKanbanBoard';
 import { CaseDocumentUpload } from '@/components/cases/CaseDocumentUpload';
+import { CaseFollowUpScheduler } from '@/components/cases/CaseFollowUpScheduler';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ import {
   User,
   Banknote,
   FolderOpen,
+  CalendarDays,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -318,7 +320,7 @@ export const CasesPage = () => {
 
           {selectedCase && (
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="details">
                   <Briefcase className="w-4 h-4 mr-2" />
                   Details
@@ -326,6 +328,10 @@ export const CasesPage = () => {
                 <TabsTrigger value="documents">
                   <FolderOpen className="w-4 h-4 mr-2" />
                   Documents
+                </TabsTrigger>
+                <TabsTrigger value="followups">
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Follow-ups
                 </TabsTrigger>
               </TabsList>
 
@@ -413,6 +419,13 @@ export const CasesPage = () => {
 
               <TabsContent value="documents" className="mt-4">
                 <CaseDocumentUpload
+                  caseId={selectedCase.id}
+                  caseNumber={selectedCase.caseNumber}
+                />
+              </TabsContent>
+
+              <TabsContent value="followups" className="mt-4">
+                <CaseFollowUpScheduler
                   caseId={selectedCase.id}
                   caseNumber={selectedCase.caseNumber}
                 />

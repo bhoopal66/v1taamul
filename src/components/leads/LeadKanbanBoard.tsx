@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Lead, LeadStatus, parseLeadSource, ACCOUNT_BANKS, LOAN_BANKS } from '@/hooks/useLeads';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeadToCaseConversion } from '@/hooks/useLeadToCaseConversion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,8 @@ import {
   UserCircle,
   Banknote,
   CreditCard,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { getScoreLabel } from '@/hooks/useLeadScoring';
@@ -85,10 +88,15 @@ export const LeadKanbanBoard = ({
   onTypeFilterChange,
 }: LeadKanbanBoardProps) => {
   const { userRole } = useAuth();
+  const { convertLeadToCase, isConverting: isConvertingToCase, findBestCoordinator } = useLeadToCaseConversion();
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Lead | null>(null);
+  
+  // Submit to Coordinator dialog state
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [leadToSubmit, setLeadToSubmit] = useState<Lead | null>(null);
   
   // Decline dialog state
   const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
@@ -195,6 +203,23 @@ export const LeadKanbanBoard = ({
     setDeclineDialogOpen(false);
     setLeadToDecline(null);
     setDeclineReason('');
+  };
+
+  const handleSubmitToCoordinator = (lead: Lead) => {
+    setLeadToSubmit(lead);
+    setSubmitDialogOpen(true);
+  };
+
+  const handleSubmitConfirm = () => {
+    if (!leadToSubmit) return;
+    convertLeadToCase(leadToSubmit);
+    setSubmitDialogOpen(false);
+    setLeadToSubmit(null);
+  };
+
+  const handleSubmitCancel = () => {
+    setSubmitDialogOpen(false);
+    setLeadToSubmit(null);
   };
 
   return (
@@ -435,18 +460,42 @@ export const LeadKanbanBoard = ({
                               )}
                             </div>
 
-                            {/* Edit Button */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full mt-2 h-7 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditLead(lead);
-                              }}
-                            >
-                              Edit Details
-                            </Button>
+                            {/* Action Buttons */}
+                            <div className="flex flex-col gap-1 mt-2">
+                              {/* Submit to Coordinator Button - Only for approved leads */}
+                              {lead.leadStatus === 'approved' && (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="w-full h-8 text-xs bg-green-600 hover:bg-green-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSubmitToCoordinator(lead);
+                                  }}
+                                  disabled={isConvertingToCase}
+                                >
+                                  {isConvertingToCase ? (
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <Send className="w-3 h-3 mr-1" />
+                                  )}
+                                  Submit to Coordinator
+                                </Button>
+                              )}
+                              
+                              {/* Edit Button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditLead(lead);
+                                }}
+                              >
+                                Edit Details
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -515,6 +564,92 @@ export const LeadKanbanBoard = ({
               disabled={!declineReason.trim()}
             >
               Decline Lead
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit to Coordinator Dialog */}
+      <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Send className="w-5 h-5" />
+              Submit to Coordinator
+            </DialogTitle>
+            <DialogDescription>
+              {leadToSubmit && (
+                <span>
+                  You are about to submit <strong>{leadToSubmit.companyName}</strong> to a coordinator for case processing.
+                  The system will automatically assign it to the coordinator with the lowest workload.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {leadToSubmit && (
+            <div className="py-4 space-y-3">
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Company:</span>
+                    <p className="font-medium">{leadToSubmit.companyName}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Contact:</span>
+                    <p className="font-medium">{leadToSubmit.contactPersonName}</p>
+                  </div>
+                  {leadToSubmit.dealValue && (
+                    <div>
+                      <span className="text-muted-foreground">Deal Value:</span>
+                      <p className="font-medium text-green-600">
+                        {formatCurrency(leadToSubmit.dealValue)}
+                      </p>
+                    </div>
+                  )}
+                  {(() => {
+                    const parsed = parseLeadSource(leadToSubmit.leadSource);
+                    if (!parsed) return null;
+                    return (
+                      <>
+                        <div>
+                          <span className="text-muted-foreground">Bank:</span>
+                          <p className="font-medium">{getBankLabel(parsed.bank)}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Product:</span>
+                          <p className="font-medium">{getProductLabel(parsed.product).group}</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ℹ️ A new case will be created and assigned to an available coordinator. 
+                The lead will be marked as "Converted" and you can track the case progress in the Cases module.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleSubmitCancel}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleSubmitConfirm}
+              disabled={isConvertingToCase}
+            >
+              {isConvertingToCase ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating Case...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Submit to Coordinator
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

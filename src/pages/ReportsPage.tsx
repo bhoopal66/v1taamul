@@ -3,9 +3,8 @@ import { ScheduledReportsManager } from '@/components/reports/ScheduledReportsMa
 import { WeeklyReportPDFGenerator } from '@/components/reports/WeeklyReportPDFGenerator';
 import { TeamReportGenerator } from '@/components/reports/TeamReportGenerator';
 import { ApprovedLeadsExport } from '@/components/reports/ApprovedLeadsExport';
-import { LeadsComparisonView } from '@/components/reports/LeadsComparisonView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Download, Users, FileCheck, GitCompare } from 'lucide-react';
+import { Calendar, Download, Users, FileCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ReportsPage: React.FC = () => {
@@ -30,12 +29,6 @@ const ReportsPage: React.FC = () => {
               Approved Leads Export
             </TabsTrigger>
           )}
-          {canExportApprovedLeads && (
-            <TabsTrigger value="comparison" className="gap-2">
-              <GitCompare className="h-4 w-4" />
-              Period Comparison
-            </TabsTrigger>
-          )}
           {isTeamLeader && (
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
@@ -55,12 +48,6 @@ const ReportsPage: React.FC = () => {
         {canExportApprovedLeads && (
           <TabsContent value="approved" className="space-y-4">
             <ApprovedLeadsExport />
-          </TabsContent>
-        )}
-
-        {canExportApprovedLeads && (
-          <TabsContent value="comparison" className="space-y-4">
-            <LeadsComparisonView />
           </TabsContent>
         )}
 

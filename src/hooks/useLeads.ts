@@ -131,7 +131,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', filters?: LeadFilter
             city,
             industry
           ),
-          profiles!leads_agent_id_fkey (
+          profiles:agent_id (
             full_name,
             team_id
           )

@@ -18,7 +18,6 @@ import { UploadPage } from "./pages/UploadPage";
 import UploadHistoryPage from "./pages/UploadHistoryPage";
 import { CallListPage } from "./pages/CallListPage";
 import { LeadsPage } from "./pages/LeadsPage";
-import { CasesPage } from "./pages/CasesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import UserManagementPage from "./pages/UserManagementPage";
 import TeamManagementPage from "./pages/TeamManagementPage";
@@ -59,13 +58,6 @@ const App = () => (
               <Route path="/upload-history" element={<UploadHistoryPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/contacts" element={<Dashboard />} />
-              
-              {/* Case Management - Coordinators and admins */}
-              <Route path="/cases" element={
-                <ProtectedRoute allowedRoles={['coordinator', 'admin', 'super_admin']}>
-                  <CasesPage />
-                </ProtectedRoute>
-              } />
               
               {/* Supervisor Dashboard - Supervisors and above */}
               <Route path="/supervisor" element={

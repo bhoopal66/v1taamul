@@ -23,7 +23,6 @@ import {
   TrendingDown,
   ChevronRight,
   History,
-  Briefcase,
 } from 'lucide-react';
 import { canAccessPage, canUseFeature } from '@/config/rolePermissions';
 import { Database } from '@/integrations/supabase/types';
@@ -285,11 +284,6 @@ export const AppSidebar: React.FC = () => {
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
         <NavItem to="/upload-history" icon={<History className="w-5 h-5" />} label="Upload History" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
-        
-        {/* Case Management - Coordinators */}
-        {hasPageAccess('/cases') && (
-          <NavItem to="/cases" icon={<Briefcase className="w-5 h-5" />} label="Case Management" />
-        )}
         
         {/* Team Leader Section - Show only for team leaders who are not supervisors */}
         {showTeamLeaderSection && (

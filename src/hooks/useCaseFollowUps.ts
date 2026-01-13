@@ -225,3 +225,116 @@ export const useUpcomingFollowUps = () => {
     isLoading,
   };
 };
+
+// Hook to get all pending follow-ups (upcoming + overdue) for dashboard widget
+export const useFollowUpsDashboard = () => {
+  const { user, userRole } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['follow-ups-dashboard'],
+    queryFn: async () => {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // Fetch all pending follow-ups
+      const { data: allFollowUps, error } = await supabase
+        .from('follow_ups')
+        .select(`
+          *,
+          creator:created_by(full_name),
+          cases!inner(
+            case_number, 
+            status,
+            bank,
+            master_contacts!cases_contact_id_fkey(company_name, contact_person_name)
+          )
+        `)
+        .is('completed_at', null)
+        .order('scheduled_at', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+
+      const mapped = (allFollowUps || []).map(fu => ({
+        id: fu.id,
+        caseId: fu.case_id,
+        followUpType: fu.follow_up_type as FollowUpType,
+        scheduledAt: fu.scheduled_at,
+        completedAt: fu.completed_at,
+        notes: fu.notes,
+        outcome: fu.outcome,
+        createdBy: fu.created_by,
+        createdAt: fu.created_at,
+        creatorName: (fu.creator as any)?.full_name || 'Unknown',
+        caseNumber: (fu.cases as any)?.case_number || '',
+        companyName: (fu.cases as any)?.master_contacts?.company_name || 'Unknown',
+        contactName: (fu.cases as any)?.master_contacts?.contact_person_name || 'Unknown',
+        caseStatus: (fu.cases as any)?.status || '',
+        bank: (fu.cases as any)?.bank || '',
+      }));
+
+      // Categorize follow-ups
+      const overdue = mapped.filter(fu => new Date(fu.scheduledAt) < todayStart);
+      const dueToday = mapped.filter(fu => {
+        const scheduled = new Date(fu.scheduledAt);
+        return scheduled >= todayStart && scheduled < todayEnd;
+      });
+      const upcoming = mapped.filter(fu => {
+        const scheduled = new Date(fu.scheduledAt);
+        return scheduled >= todayEnd && scheduled <= weekFromNow;
+      });
+
+      return {
+        overdue,
+        dueToday,
+        upcoming,
+        total: mapped.length,
+      };
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  const completeFollowUp = useMutation({
+    mutationFn: async ({
+      followUpId,
+      outcome,
+    }: {
+      followUpId: string;
+      outcome: string;
+    }) => {
+      const { error } = await supabase
+        .from('follow_ups')
+        .update({
+          completed_at: new Date().toISOString(),
+          outcome,
+        })
+        .eq('id', followUpId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Follow-up completed');
+      queryClient.invalidateQueries({ queryKey: ['follow-ups-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-follow-ups'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to complete follow-up: ${error.message}`);
+    },
+  });
+
+  return {
+    overdue: data?.overdue || [],
+    dueToday: data?.dueToday || [],
+    upcoming: data?.upcoming || [],
+    total: data?.total || 0,
+    isLoading,
+    refetch,
+    completeFollowUp: completeFollowUp.mutate,
+    isCompleting: completeFollowUp.isPending,
+  };
+};

@@ -33,6 +33,7 @@ import { PerformanceStreakCards } from '@/components/dashboard/PerformanceStreak
 import { CallsTargetGauge } from '@/components/dashboard/CallsTargetGauge';
 import { TeamActivityTimeline } from '@/components/dashboard/TeamActivityTimeline';
 import { RealtimeNotificationsPanel } from '@/components/dashboard/RealtimeNotificationsPanel';
+import { FollowUpReminderWidget } from '@/components/dashboard/FollowUpReminderWidget';
 
 import { TopPerformersCard } from '@/components/dashboard/TopPerformersCard';
 import { usePerformanceData, DashboardTimePeriod, DashboardLeadStatusFilter } from '@/hooks/usePerformanceData';
@@ -950,6 +951,9 @@ export const Dashboard: React.FC = () => {
 
       {/* Performance Alerts */}
       <MyPerformanceAlerts />
+
+      {/* Follow-up Reminders Widget for Coordinators */}
+      <FollowUpReminderWidget />
 
       {/* Real-time Notifications and Stats Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

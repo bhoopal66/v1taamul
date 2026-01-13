@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { signOut } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -70,16 +71,20 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label }) => {
 };
 
 export const AppSidebar: React.FC = () => {
-  const { profile, userRole, ledTeamId } = useAuth();
+  const { profile, userRole } = useAuth();
   const navigate = useNavigate();
   const { streakData } = useLoginStreak();
   const { alerts, activeAlertsCount, acknowledgeAlert } = usePerformanceAlerts();
   
-  const isSupervisor = userRole === 'supervisor';
-  const isTeamLeader = !!ledTeamId;
-  
-  // Dashboard access is restricted to supervisors, admins, and management
-  const canAccessDashboard = ['admin', 'super_admin', 'operations_head', 'supervisor', 'sales_controller'].includes(userRole || '');
+  // Use centralized permissions
+  const { 
+    hasPageAccess, 
+    isTeamLeader, 
+    isManagement, 
+    isAdmin, 
+    isSupervisor,
+    roleLabel 
+  } = usePermissions();
 
   // Fetch user's team name
   const { data: userTeam } = useQuery({
@@ -122,13 +127,6 @@ export const AppSidebar: React.FC = () => {
       .slice(0, 2);
   };
 
-  const getRoleLabel = (role: string | null) => {
-    if (!role) return 'Agent';
-    return role
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
 
   return (
     <aside className="w-64 h-screen bg-sidebar flex flex-col fixed left-0 top-0">
@@ -264,17 +262,20 @@ export const AppSidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {canAccessDashboard && (
+        {/* Dashboard - Management only */}
+        {hasPageAccess('/dashboard') && (
           <NavItem to="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" />
         )}
+        
+        {/* Agent Pages - Everyone */}
         <NavItem to="/profile" icon={<UserCircle className="w-5 h-5" />} label="My Profile" />
         <NavItem to="/leaderboard" icon={<Trophy className="w-5 h-5" />} label="Leaderboard" />
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />
         <NavItem to="/leads" icon={<Target className="w-5 h-5" />} label="Leads" />
         
-        {/* Team Leader Section - Show only for team leaders who are not supervisors */}
-        {isTeamLeader && !['supervisor', 'operations_head', 'admin', 'super_admin'].includes(userRole || '') && (
+        {/* Team Leader Section - Show only for team leaders who are not management */}
+        {isTeamLeader && !isManagement && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-bold text-sidebar-muted uppercase tracking-wider">
@@ -285,7 +286,8 @@ export const AppSidebar: React.FC = () => {
           </>
         )}
         
-        {(userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin') && (
+        {/* Management Section */}
+        {isManagement && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-bold text-sidebar-muted uppercase tracking-wider">
@@ -295,22 +297,29 @@ export const AppSidebar: React.FC = () => {
             {isTeamLeader && (
               <NavItem to="/my-team" icon={<Users className="w-5 h-5" />} label="My Team" />
             )}
-            <NavItem to="/supervisor" icon={<BarChart3 className="w-5 h-5" />} label="Team Overview" />
-            <NavItem to="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
+            {hasPageAccess('/supervisor') && (
+              <NavItem to="/supervisor" icon={<BarChart3 className="w-5 h-5" />} label="Team Overview" />
+            )}
+            {hasPageAccess('/reports') && (
+              <NavItem to="/reports" icon={<BarChart3 className="w-5 h-5" />} label="Reports" />
+            )}
           </>
         )}
 
-        {(userRole === 'admin' || userRole === 'super_admin' || (isSupervisor && isTeamLeader)) && (
+        {/* Administration Section */}
+        {(isAdmin || hasPageAccess('/user-management')) && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-bold text-sidebar-muted uppercase tracking-wider">
                 Administration
               </p>
             </div>
-            {(userRole === 'admin' || userRole === 'super_admin') && (
+            {hasPageAccess('/team-management') && (
               <NavItem to="/team-management" icon={<Users className="w-5 h-5" />} label="Team Management" />
             )}
-            <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
+            {hasPageAccess('/user-management') && (
+              <NavItem to="/user-management" icon={<Shield className="w-5 h-5" />} label="User Management" />
+            )}
           </>
         )}
 
@@ -342,7 +351,7 @@ export const AppSidebar: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-sidebar-muted truncate">
-              {getRoleLabel(userRole)}
+              {roleLabel}
               {userTeam?.name && <span> • {userTeam.name}</span>}
             </p>
           </div>

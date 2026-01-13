@@ -70,6 +70,7 @@ type AppRole = DBTypes['public']['Enums']['app_role'];
 
 const roleLabels: Record<AppRole, { label: string; color: string }> = {
   agent: { label: 'Agent', color: 'bg-gray-500/10 text-gray-600' },
+  coordinator: { label: 'Coordinator', color: 'bg-cyan-500/10 text-cyan-600' },
   supervisor: { label: 'Supervisor', color: 'bg-blue-500/10 text-blue-600' },
   operations_head: { label: 'Ops Head', color: 'bg-purple-500/10 text-purple-600' },
   admin: { label: 'Admin', color: 'bg-orange-500/10 text-orange-600' },
@@ -77,7 +78,7 @@ const roleLabels: Record<AppRole, { label: string; color: string }> = {
   sales_controller: { label: 'Sales Controller', color: 'bg-green-500/10 text-green-600' },
 };
 
-const availableRoles: AppRole[] = ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'];
+const availableRoles: AppRole[] = ['agent', 'coordinator', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'];
 
 export const UserManagementPage: React.FC = () => {
   const { profile, userRole, ledTeamId } = useAuth();

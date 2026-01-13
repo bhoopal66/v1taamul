@@ -1,13 +1,19 @@
 import React from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { AppSidebar } from './AppSidebar';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { PerformanceCoachChat } from '@/components/coach/PerformanceCoachChat';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export const DashboardLayout: React.FC = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const { hasPageAccess, getUnauthorizedRedirect } = usePermissions();
+  
   // Initialize browser notifications subscription
   useBrowserNotifications();
 
@@ -24,6 +30,16 @@ export const DashboardLayout: React.FC = () => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check if user has access to the current route
+  const currentPath = location.pathname;
+  const hasAccess = hasPageAccess(currentPath);
+
+  // If no access, redirect to appropriate page
+  if (!hasAccess) {
+    const redirectPath = getUnauthorizedRedirect(currentPath);
+    return <Navigate to={redirectPath} replace />;
   }
 
   return (

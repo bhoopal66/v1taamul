@@ -538,7 +538,7 @@ export const LeadsPage = () => {
                       </div>
                     </div>
 
-                    {/* Deal Info */}
+                    {/* Deal Info & Timestamps */}
                     <div className="flex items-center gap-6 text-sm">
                       {lead.dealValue && (
                         <div className="text-center">
@@ -555,12 +555,19 @@ export const LeadsPage = () => {
                           </p>
                         </div>
                       )}
-                      {lead.qualifiedDate && (
+                      <div className="text-center">
+                        <p className="text-muted-foreground text-xs">Created</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {format(new Date(lead.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                      {lead.updatedAt !== lead.createdAt && (
                         <div className="text-center">
-                          <p className="text-muted-foreground text-xs">Added</p>
+                          <p className="text-muted-foreground text-xs">Last Updated</p>
                           <p className="font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {format(new Date(lead.qualifiedDate), 'MMM d')}
+                            <RefreshCw className="w-3 h-3" />
+                            {format(new Date(lead.updatedAt), 'MMM d, yyyy h:mm a')}
                           </p>
                         </div>
                       )}

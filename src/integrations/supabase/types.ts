@@ -185,6 +185,48 @@ export type Database = {
           },
         ]
       }
+      banker_contacts: {
+        Row: {
+          bank: Database["public"]["Enums"]["case_bank"]
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          bank: Database["public"]["Enums"]["case_bank"]
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bank?: Database["public"]["Enums"]["case_bank"]
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       call_feedback: {
         Row: {
           agent_id: string
@@ -289,6 +331,175 @@ export type Database = {
           valid_entries?: number | null
         }
         Relationships: []
+      }
+      case_audit_trail: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          case_id: string
+          created_at: string
+          id: string
+          new_value: Json | null
+          notes: string | null
+          old_value: Json | null
+          performed_by: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          case_id: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          old_value?: Json | null
+          performed_by: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          case_id?: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          old_value?: Json | null
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_audit_trail_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_documents: {
+        Row: {
+          case_id: string
+          created_at: string
+          document_type: Database["public"]["Enums"]["document_type"]
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          is_verified: boolean | null
+          notes: string | null
+          uploaded_by: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          document_type: Database["public"]["Enums"]["document_type"]
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          is_verified?: boolean | null
+          notes?: string | null
+          uploaded_by: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          document_type?: Database["public"]["Enums"]["document_type"]
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          is_verified?: boolean | null
+          notes?: string | null
+          uploaded_by?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cases: {
+        Row: {
+          actual_completion_date: string | null
+          bank: Database["public"]["Enums"]["case_bank"]
+          case_number: string
+          contact_id: string
+          coordinator_id: string
+          created_at: string
+          deal_value: number | null
+          expected_completion_date: string | null
+          id: string
+          internal_notes: string | null
+          lead_id: string | null
+          notes: string | null
+          original_agent_id: string
+          priority: number | null
+          product_type: string
+          status: Database["public"]["Enums"]["case_status"]
+          updated_at: string
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          bank: Database["public"]["Enums"]["case_bank"]
+          case_number: string
+          contact_id: string
+          coordinator_id: string
+          created_at?: string
+          deal_value?: number | null
+          expected_completion_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          lead_id?: string | null
+          notes?: string | null
+          original_agent_id: string
+          priority?: number | null
+          product_type: string
+          status?: Database["public"]["Enums"]["case_status"]
+          updated_at?: string
+        }
+        Update: {
+          actual_completion_date?: string | null
+          bank?: Database["public"]["Enums"]["case_bank"]
+          case_number?: string
+          contact_id?: string
+          coordinator_id?: string
+          created_at?: string
+          deal_value?: number | null
+          expected_completion_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          lead_id?: string | null
+          notes?: string | null
+          original_agent_id?: string
+          priority?: number | null
+          product_type?: string
+          status?: Database["public"]["Enums"]["case_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cases_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "master_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       coach_conversations: {
         Row: {
@@ -414,6 +625,80 @@ export type Database = {
           reason?: string | null
         }
         Relationships: []
+      }
+      document_templates: {
+        Row: {
+          bank: Database["public"]["Enums"]["case_bank"]
+          created_at: string
+          description: string | null
+          document_type: Database["public"]["Enums"]["document_type"]
+          id: string
+          is_required: boolean | null
+          product_type: string
+        }
+        Insert: {
+          bank: Database["public"]["Enums"]["case_bank"]
+          created_at?: string
+          description?: string | null
+          document_type: Database["public"]["Enums"]["document_type"]
+          id?: string
+          is_required?: boolean | null
+          product_type: string
+        }
+        Update: {
+          bank?: Database["public"]["Enums"]["case_bank"]
+          created_at?: string
+          description?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"]
+          id?: string
+          is_required?: boolean | null
+          product_type?: string
+        }
+        Relationships: []
+      }
+      follow_ups: {
+        Row: {
+          case_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          follow_up_type: Database["public"]["Enums"]["follow_up_type"]
+          id: string
+          notes: string | null
+          outcome: string | null
+          scheduled_at: string
+        }
+        Insert: {
+          case_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          follow_up_type: Database["public"]["Enums"]["follow_up_type"]
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          scheduled_at: string
+        }
+        Update: {
+          case_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          follow_up_type?: Database["public"]["Enums"]["follow_up_type"]
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          scheduled_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_ups_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_stage_transitions: {
         Row: {
@@ -808,6 +1093,7 @@ export type Database = {
           last_login_date: string | null
           login_streak_current: number | null
           login_streak_longest: number | null
+          max_case_capacity: number | null
           phone_number: string | null
           supervisor_id: string | null
           team_id: string | null
@@ -826,6 +1112,7 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
+          max_case_capacity?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
@@ -844,6 +1131,7 @@ export type Database = {
           last_login_date?: string | null
           login_streak_current?: number | null
           login_streak_longest?: number | null
+          max_case_capacity?: number | null
           phone_number?: string | null
           supervisor_id?: string | null
           team_id?: string | null
@@ -1294,6 +1582,7 @@ export type Database = {
         Args: { encrypted_data: string }
         Returns: string
       }
+      generate_case_number: { Args: never; Returns: string }
       get_led_team_id: { Args: { _user_id: string }; Returns: string }
       get_own_profile: {
         Args: never
@@ -1340,6 +1629,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_coordinator: { Args: { user_id: string }; Returns: boolean }
       is_team_leader: {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
@@ -1370,7 +1660,29 @@ export type Database = {
         | "admin"
         | "super_admin"
         | "sales_controller"
+        | "coordinator"
+      audit_action:
+        | "case_created"
+        | "status_changed"
+        | "document_uploaded"
+        | "document_verified"
+        | "note_added"
+        | "follow_up_scheduled"
+        | "follow_up_completed"
+        | "assigned"
+        | "reassigned"
       call_status: "pending" | "called" | "skipped"
+      case_bank: "RAK" | "NBF" | "UBL" | "RUYA" | "MASHREQ" | "WIO"
+      case_status:
+        | "new"
+        | "document_collection"
+        | "under_review"
+        | "submitted_to_bank"
+        | "bank_processing"
+        | "approved"
+        | "declined"
+        | "on_hold"
+        | "cancelled"
       contact_status:
         | "new"
         | "contacted"
@@ -1378,12 +1690,29 @@ export type Database = {
         | "not_interested"
         | "converted"
       delivery_status: "pending" | "sent" | "delivered" | "read" | "failed"
+      document_type:
+        | "trade_license"
+        | "emirates_id"
+        | "passport"
+        | "visa"
+        | "bank_statement"
+        | "financials"
+        | "moa"
+        | "power_of_attorney"
+        | "other"
       feedback_status:
         | "not_answered"
         | "interested"
         | "not_interested"
         | "callback"
         | "wrong_number"
+      follow_up_type:
+        | "call"
+        | "email"
+        | "whatsapp"
+        | "meeting"
+        | "bank_visit"
+        | "other"
       lead_status:
         | "new"
         | "contacted"
@@ -1534,8 +1863,32 @@ export const Constants = {
         "admin",
         "super_admin",
         "sales_controller",
+        "coordinator",
+      ],
+      audit_action: [
+        "case_created",
+        "status_changed",
+        "document_uploaded",
+        "document_verified",
+        "note_added",
+        "follow_up_scheduled",
+        "follow_up_completed",
+        "assigned",
+        "reassigned",
       ],
       call_status: ["pending", "called", "skipped"],
+      case_bank: ["RAK", "NBF", "UBL", "RUYA", "MASHREQ", "WIO"],
+      case_status: [
+        "new",
+        "document_collection",
+        "under_review",
+        "submitted_to_bank",
+        "bank_processing",
+        "approved",
+        "declined",
+        "on_hold",
+        "cancelled",
+      ],
       contact_status: [
         "new",
         "contacted",
@@ -1544,12 +1897,31 @@ export const Constants = {
         "converted",
       ],
       delivery_status: ["pending", "sent", "delivered", "read", "failed"],
+      document_type: [
+        "trade_license",
+        "emirates_id",
+        "passport",
+        "visa",
+        "bank_statement",
+        "financials",
+        "moa",
+        "power_of_attorney",
+        "other",
+      ],
       feedback_status: [
         "not_answered",
         "interested",
         "not_interested",
         "callback",
         "wrong_number",
+      ],
+      follow_up_type: [
+        "call",
+        "email",
+        "whatsapp",
+        "meeting",
+        "bank_visit",
+        "other",
       ],
       lead_status: [
         "new",

@@ -618,11 +618,12 @@ export const useCallSheetUpload = () => {
           estimatedTimeRemaining: calculateETA(startTime, 1, validContacts.length),
         });
 
-        const contactsToInsert = validContacts.map(c => ({
+        const contactsToInsert = validContacts.map((c, index) => ({
           company_name: c.companyName,
           contact_person_name: c.contactPersonName || c.companyName,
           phone_number: c.phoneNumber,
-          trade_license_number: c.tradeLicenseNumber || 'PENDING',
+          // Generate unique placeholder if no trade license - use phone number or timestamp+index
+          trade_license_number: c.tradeLicenseNumber || `PENDING-${c.phoneNumber || `${Date.now()}-${index}`}`,
           city: c.city || null,
           industry: c.industry || null,
           area: c.area || null,

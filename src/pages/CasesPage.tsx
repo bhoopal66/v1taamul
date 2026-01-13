@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCases, Case, CaseStatus, CASE_STAGES, BANK_OPTIONS } from '@/hooks/useCases';
 import { CaseKanbanBoard } from '@/components/cases/CaseKanbanBoard';
+import { CaseDocumentUpload } from '@/components/cases/CaseDocumentUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ import {
   Phone,
   User,
   Banknote,
+  FolderOpen,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -315,87 +317,107 @@ export const CasesPage = () => {
           </DialogHeader>
 
           {selectedCase && (
-            <div className="space-y-6">
-              {/* Case Info Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Company</Label>
-                  <p className="font-medium">{selectedCase.companyName}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Contact Person</Label>
-                  <p className="font-medium">{selectedCase.contactPersonName}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Phone</Label>
-                  <a href={`tel:${selectedCase.phoneNumber}`} className="font-medium text-primary hover:underline">
-                    {selectedCase.phoneNumber}
-                  </a>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Trade License</Label>
-                  <p className="font-medium">{selectedCase.tradeLicenseNumber || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Bank</Label>
-                  <Badge variant="outline" className="mt-1">
-                    <Banknote className="w-3 h-3 mr-1" />
-                    {BANK_OPTIONS.find(b => b.value === selectedCase.bank)?.label}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Product Type</Label>
-                  <Badge variant="secondary" className="mt-1">
-                    {selectedCase.productType === 'account' ? 'Account' : 'Loan'}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Deal Value</Label>
-                  <p className="font-medium text-green-600">{formatCurrency(selectedCase.dealValue)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Expected Completion</Label>
-                  <p className="font-medium">
-                    {selectedCase.expectedCompletionDate 
-                      ? format(new Date(selectedCase.expectedCompletionDate), 'PPP')
-                      : 'Not set'}
-                  </p>
-                </div>
-              </div>
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Details
+                </TabsTrigger>
+                <TabsTrigger value="documents">
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Documents
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Status */}
-              <div>
-                <Label className="text-muted-foreground text-xs">Current Status</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge className={CASE_STAGES.find(s => s.status === selectedCase.status)?.bgColor}>
-                    {CASE_STAGES.find(s => s.status === selectedCase.status)?.label}
-                  </Badge>
+              <TabsContent value="details" className="space-y-6 mt-4">
+                {/* Case Info Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Company</Label>
+                    <p className="font-medium">{selectedCase.companyName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Contact Person</Label>
+                    <p className="font-medium">{selectedCase.contactPersonName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Phone</Label>
+                    <a href={`tel:${selectedCase.phoneNumber}`} className="font-medium text-primary hover:underline">
+                      {selectedCase.phoneNumber}
+                    </a>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Trade License</Label>
+                    <p className="font-medium">{selectedCase.tradeLicenseNumber || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Bank</Label>
+                    <Badge variant="outline" className="mt-1">
+                      <Banknote className="w-3 h-3 mr-1" />
+                      {BANK_OPTIONS.find(b => b.value === selectedCase.bank)?.label}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Product Type</Label>
+                    <Badge variant="secondary" className="mt-1">
+                      {selectedCase.productType === 'account' ? 'Account' : 'Loan'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Deal Value</Label>
+                    <p className="font-medium text-green-600">{formatCurrency(selectedCase.dealValue)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs">Expected Completion</Label>
+                    <p className="font-medium">
+                      {selectedCase.expectedCompletionDate 
+                        ? format(new Date(selectedCase.expectedCompletionDate), 'PPP')
+                        : 'Not set'}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Add notes about this case..."
-                  rows={4}
-                  className="mt-1"
+                {/* Status */}
+                <div>
+                  <Label className="text-muted-foreground text-xs">Current Status</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={CASE_STAGES.find(s => s.status === selectedCase.status)?.bgColor}>
+                      {CASE_STAGES.find(s => s.status === selectedCase.status)?.label}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Add notes about this case..."
+                    rows={4}
+                    className="mt-1"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveEdit} disabled={isUpdating}>
+                    Save Changes
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="documents" className="mt-4">
+                <CaseDocumentUpload
+                  caseId={selectedCase.id}
+                  caseNumber={selectedCase.caseNumber}
                 />
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveEdit} disabled={isUpdating}>
-                  Save Changes
-                </Button>
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

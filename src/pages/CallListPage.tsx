@@ -62,6 +62,8 @@ import {
   CheckSquare,
   Square,
   Users,
+  BarChart3,
+  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportContactsToCSV, exportContactsToExcel, ContactExportData } from '@/utils/contactsExport';
@@ -175,6 +177,77 @@ export const CallListPage: React.FC = () => {
     },
     enabled: canExport,
   });
+
+  // Fetch all-time stats
+  const { data: allTimeStats } = useQuery({
+    queryKey: ['all-time-call-stats', profile?.id],
+    queryFn: async () => {
+      // Get total contacts and call statuses
+      const { data: callListData, error: callListError } = await supabase
+        .from('approved_call_list')
+        .select('call_status, contact_id')
+        .eq('agent_id', profile?.id);
+      
+      if (callListError) throw callListError;
+
+      // Get all feedback
+      const { data: feedbackData, error: feedbackError } = await supabase
+        .from('call_feedback')
+        .select('feedback_status, contact_id')
+        .eq('agent_id', profile?.id);
+      
+      if (feedbackError) throw feedbackError;
+
+      // Calculate stats
+      const totalContacts = callListData?.length || 0;
+      const calledCount = callListData?.filter(c => c.call_status === 'called').length || 0;
+      const pendingCount = callListData?.filter(c => c.call_status === 'pending').length || 0;
+      const skippedCount = callListData?.filter(c => c.call_status === 'skipped').length || 0;
+
+      // Get unique contacts with their latest feedback
+      const feedbackByContact = new Map<string, string>();
+      feedbackData?.forEach(f => {
+        if (!feedbackByContact.has(f.contact_id)) {
+          feedbackByContact.set(f.contact_id, f.feedback_status);
+        }
+      });
+
+      let interestedCount = 0;
+      let notInterestedCount = 0;
+      let notAnsweredCount = 0;
+      let callbackCount = 0;
+      let wrongNumberCount = 0;
+
+      feedbackByContact.forEach(status => {
+        if (status === 'interested') interestedCount++;
+        else if (status === 'not_interested') notInterestedCount++;
+        else if (status === 'not_answered') notAnsweredCount++;
+        else if (status === 'callback') callbackCount++;
+        else if (status === 'wrong_number') wrongNumberCount++;
+      });
+
+      const conversionRate = calledCount > 0 ? ((interestedCount / calledCount) * 100).toFixed(1) : '0';
+      const completionRate = totalContacts > 0 ? ((calledCount / totalContacts) * 100).toFixed(1) : '0';
+
+      return {
+        totalContacts,
+        calledCount,
+        pendingCount,
+        skippedCount,
+        interestedCount,
+        notInterestedCount,
+        notAnsweredCount,
+        callbackCount,
+        wrongNumberCount,
+        conversionRate,
+        completionRate,
+        totalDays: datesWithData.length,
+      };
+    },
+    enabled: !!profile?.id && datesWithData.length > 0,
+  });
+
+  const [showAllTimeStats, setShowAllTimeStats] = useState(false);
 
   // Get unique areas and cities from call list
   const uniqueAreas = Array.from(
@@ -704,50 +777,169 @@ export const CallListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card className="col-span-2">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Today's Progress</span>
-              <span className="text-2xl font-bold">{progressPercent}%</span>
-            </div>
-            <Progress value={progressPercent} className="h-2" />
-            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-              <span>{stats.called} called</span>
-              <span>{stats.pending} remaining</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <ThumbsUp className="w-5 h-5 mx-auto text-green-600 mb-1" />
-            <p className="text-2xl font-bold text-green-600">{stats.interested}</p>
-            <p className="text-xs text-muted-foreground">Interested</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <PhoneMissed className="w-5 h-5 mx-auto text-yellow-600 mb-1" />
-            <p className="text-2xl font-bold text-yellow-600">{stats.notAnswered}</p>
-            <p className="text-xs text-muted-foreground">No Answer</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <ThumbsDown className="w-5 h-5 mx-auto text-orange-600 mb-1" />
-            <p className="text-2xl font-bold text-orange-600">{stats.notInterested}</p>
-            <p className="text-xs text-muted-foreground">Not Interested</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <PhoneForwarded className="w-5 h-5 mx-auto text-blue-600 mb-1" />
-            <p className="text-2xl font-bold text-blue-600">{stats.callback}</p>
-            <p className="text-xs text-muted-foreground">Callbacks</p>
-          </CardContent>
-        </Card>
+      {/* Stats Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={!showAllTimeStats ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowAllTimeStats(false)}
+          >
+            {isToday ? "Today's Stats" : format(selectedDate, 'MMM d') + " Stats"}
+          </Button>
+          <Button
+            variant={showAllTimeStats ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowAllTimeStats(true)}
+            className="gap-2"
+          >
+            <BarChart3 className="w-4 h-4" />
+            All-Time Stats
+          </Button>
+        </div>
+        {showAllTimeStats && allTimeStats && (
+          <Badge variant="secondary" className="gap-1">
+            <TrendingUp className="w-3 h-3" />
+            {allTimeStats.totalDays} days tracked
+          </Badge>
+        )}
       </div>
+
+      {/* Stats Cards */}
+      {!showAllTimeStats ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <Card className="col-span-2">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">{isToday ? "Today's" : format(selectedDate, 'MMM d')} Progress</span>
+                <span className="text-2xl font-bold">{progressPercent}%</span>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
+              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                <span>{stats.called} called</span>
+                <span>{stats.pending} remaining</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <ThumbsUp className="w-5 h-5 mx-auto text-green-600 mb-1" />
+              <p className="text-2xl font-bold text-green-600">{stats.interested}</p>
+              <p className="text-xs text-muted-foreground">Interested</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <PhoneMissed className="w-5 h-5 mx-auto text-yellow-600 mb-1" />
+              <p className="text-2xl font-bold text-yellow-600">{stats.notAnswered}</p>
+              <p className="text-xs text-muted-foreground">No Answer</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <ThumbsDown className="w-5 h-5 mx-auto text-orange-600 mb-1" />
+              <p className="text-2xl font-bold text-orange-600">{stats.notInterested}</p>
+              <p className="text-xs text-muted-foreground">Not Interested</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <PhoneForwarded className="w-5 h-5 mx-auto text-blue-600 mb-1" />
+              <p className="text-2xl font-bold text-blue-600">{stats.callback}</p>
+              <p className="text-xs text-muted-foreground">Callbacks</p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* All-Time Stats View */
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <Card className="col-span-2 md:col-span-1">
+              <CardContent className="p-4 text-center">
+                <Phone className="w-6 h-6 mx-auto text-primary mb-2" />
+                <p className="text-3xl font-bold">{allTimeStats?.totalContacts || 0}</p>
+                <p className="text-sm text-muted-foreground">Total Contacts</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <CheckCircle2 className="w-6 h-6 mx-auto text-green-600 mb-2" />
+                <p className="text-3xl font-bold text-green-600">{allTimeStats?.calledCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Calls Made</p>
+                <p className="text-xs text-muted-foreground mt-1">{allTimeStats?.completionRate}% completion</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <ThumbsUp className="w-6 h-6 mx-auto text-emerald-600 mb-2" />
+                <p className="text-3xl font-bold text-emerald-600">{allTimeStats?.interestedCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Interested</p>
+                <p className="text-xs text-muted-foreground mt-1">{allTimeStats?.conversionRate}% conversion</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <Clock className="w-6 h-6 mx-auto text-yellow-600 mb-2" />
+                <p className="text-3xl font-bold text-yellow-600">{allTimeStats?.pendingCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Pending</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <SkipForward className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
+                <p className="text-3xl font-bold text-muted-foreground">{allTimeStats?.skippedCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Skipped</p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Feedback Breakdown */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">All-Time Feedback Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10">
+                  <ThumbsUp className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="text-lg font-semibold text-green-600">{allTimeStats?.interestedCount || 0}</p>
+                    <p className="text-xs text-muted-foreground">Interested</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-orange-500/10">
+                  <ThumbsDown className="w-5 h-5 text-orange-600" />
+                  <div>
+                    <p className="text-lg font-semibold text-orange-600">{allTimeStats?.notInterestedCount || 0}</p>
+                    <p className="text-xs text-muted-foreground">Not Interested</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/10">
+                  <PhoneMissed className="w-5 h-5 text-yellow-600" />
+                  <div>
+                    <p className="text-lg font-semibold text-yellow-600">{allTimeStats?.notAnsweredCount || 0}</p>
+                    <p className="text-xs text-muted-foreground">No Answer</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10">
+                  <PhoneForwarded className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-lg font-semibold text-blue-600">{allTimeStats?.callbackCount || 0}</p>
+                    <p className="text-xs text-muted-foreground">Callbacks</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-500/10">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <div>
+                    <p className="text-lg font-semibold text-red-600">{allTimeStats?.wrongNumberCount || 0}</p>
+                    <p className="text-xs text-muted-foreground">Wrong Number</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-3">

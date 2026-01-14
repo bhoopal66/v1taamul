@@ -232,6 +232,7 @@ export type Database = {
           agent_id: string
           call_list_id: string | null
           call_timestamp: string | null
+          callback_datetime: string | null
           contact_id: string
           created_at: string | null
           feedback_status: Database["public"]["Enums"]["feedback_status"]
@@ -243,6 +244,7 @@ export type Database = {
           agent_id: string
           call_list_id?: string | null
           call_timestamp?: string | null
+          callback_datetime?: string | null
           contact_id: string
           created_at?: string | null
           feedback_status: Database["public"]["Enums"]["feedback_status"]
@@ -254,6 +256,7 @@ export type Database = {
           agent_id?: string
           call_list_id?: string | null
           call_timestamp?: string | null
+          callback_datetime?: string | null
           contact_id?: string
           created_at?: string | null
           feedback_status?: Database["public"]["Enums"]["feedback_status"]

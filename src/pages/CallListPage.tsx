@@ -272,18 +272,21 @@ export const CallListPage: React.FC = () => {
   const handleSubmitFeedback = () => {
     if (!selectedContact || !selectedFeedback) return;
 
-    // Build notes with callback date/time if callback is selected
-    let finalNotes = feedbackNotes;
+    // Build callback datetime ISO string if callback is selected
+    let callbackDatetimeISO: string | undefined;
     if (selectedFeedback === 'callback' && callbackDate) {
-      const callbackDateTime = `${format(callbackDate, 'yyyy-MM-dd')} at ${callbackTime}`;
-      finalNotes = `Callback scheduled: ${callbackDateTime}${feedbackNotes ? '. ' + feedbackNotes : ''}`;
+      const [hours, minutes] = callbackTime.split(':').map(Number);
+      const callbackDateTime = new Date(callbackDate);
+      callbackDateTime.setHours(hours, minutes, 0, 0);
+      callbackDatetimeISO = callbackDateTime.toISOString();
     }
 
     logFeedback({
       callListId: selectedContact.callListId,
       contactId: selectedContact.contactId,
       status: selectedFeedback,
-      notes: finalNotes || undefined,
+      notes: feedbackNotes || undefined,
+      callbackDatetime: callbackDatetimeISO,
     });
 
     setFeedbackDialogOpen(false);

@@ -144,12 +144,14 @@ export const useCallList = (selectedDate?: Date) => {
       callListId, 
       contactId, 
       status, 
-      notes 
+      notes,
+      callbackDatetime 
     }: { 
       callListId: string; 
       contactId: string; 
       status: FeedbackStatus; 
       notes?: string;
+      callbackDatetime?: string;
     }) => {
       // Insert feedback
       const { error: feedbackError } = await supabase
@@ -161,6 +163,7 @@ export const useCallList = (selectedDate?: Date) => {
           feedback_status: status,
           notes: notes || null,
           call_timestamp: new Date().toISOString(),
+          callback_datetime: callbackDatetime || null,
         });
 
       if (feedbackError) throw feedbackError;

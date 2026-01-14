@@ -50,6 +50,7 @@ import { HourlyCallHeatmap } from '@/components/profile/HourlyCallHeatmap';
 import { TalkTimeProfileCard } from '@/components/profile/TalkTimeProfileCard';
 import { SubmissionForm } from '@/components/profile/SubmissionForm';
 import { SubmissionsTable } from '@/components/profile/SubmissionsTable';
+import { CallbackRemindersPanel } from '@/components/profile/CallbackRemindersPanel';
 
 const chartConfig = {
   calls: { label: 'Calls', color: 'hsl(var(--primary))' },
@@ -199,8 +200,13 @@ export const AgentProfile: React.FC = () => {
         </Card>
       </div>
 
-      {/* Performance Alerts */}
-      <MyPerformanceAlerts />
+      {/* Performance Alerts & Callback Reminders */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <MyPerformanceAlerts />
+        </div>
+        <CallbackRemindersPanel />
+      </div>
 
       {/* Daily Submissions Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

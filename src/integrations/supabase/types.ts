@@ -1587,6 +1587,7 @@ export type Database = {
         Returns: {
           exists_in_db: boolean
           owner_agent_id: string
+          owner_name: string
           phone_number: string
         }[]
       }

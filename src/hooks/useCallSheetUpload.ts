@@ -379,11 +379,14 @@ export const useCallSheetUpload = () => {
             console.error('Error checking duplicates:', duplicateError);
           }
 
-          // Build a map of existing phone numbers and their owners
-          const existingPhones = new Map<string, string | null>();
-          (duplicateCheck || []).forEach((item: { phone_number: string; exists_in_db: boolean; owner_agent_id: string | null }) => {
+          // Build a map of existing phone numbers and their owner names
+          const existingPhones = new Map<string, { ownerId: string | null; ownerName: string }>();
+          (duplicateCheck || []).forEach((item: { phone_number: string; exists_in_db: boolean; owner_agent_id: string | null; owner_name: string | null }) => {
             if (item.exists_in_db) {
-              existingPhones.set(item.phone_number, item.owner_agent_id);
+              existingPhones.set(item.phone_number, {
+                ownerId: item.owner_agent_id,
+                ownerName: item.owner_name || 'Unknown Agent'
+              });
             }
           });
 
@@ -432,7 +435,8 @@ export const useCallSheetUpload = () => {
               errors.push('Duplicate in this file');
               isDuplicate = true;
             } else if (existingPhones.has(cleanedPhone)) {
-              errors.push('Already exists in system (uploaded by another agent)');
+              const owner = existingPhones.get(cleanedPhone);
+              errors.push(`Already exists (owned by ${owner?.ownerName || 'another agent'})`);
               isDuplicate = true;
             }
 

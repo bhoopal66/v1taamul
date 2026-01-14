@@ -206,12 +206,12 @@ export const TeamManagementPage: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="team-leader">Team Leader (Optional)</Label>
-                <Select value={formLeaderId} onValueChange={setFormLeaderId}>
+                <Select value={formLeaderId || "none"} onValueChange={(v) => setFormLeaderId(v === "none" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a leader" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No leader assigned</SelectItem>
+                    <SelectItem value="none">No leader assigned</SelectItem>
                     {agents.filter(a => a.is_active).map(agent => (
                       <SelectItem key={agent.id} value={agent.id}>
                         {agent.full_name || agent.username}
@@ -512,12 +512,12 @@ export const TeamManagementPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-team-leader">Team Leader</Label>
-              <Select value={formLeaderId} onValueChange={setFormLeaderId}>
+              <Select value={formLeaderId || "none"} onValueChange={(v) => setFormLeaderId(v === "none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a leader" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No leader assigned</SelectItem>
+                  <SelectItem value="none">No leader assigned</SelectItem>
                   {agents.filter(a => a.is_active).map(agent => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.full_name || agent.username}

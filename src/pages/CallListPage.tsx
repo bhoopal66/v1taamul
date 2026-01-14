@@ -135,6 +135,33 @@ export const CallListPage: React.FC = () => {
   const [isLoadingTeamData, setIsLoadingTeamData] = useState(false);
   const [teamCallList, setTeamCallList] = useState<CallListContact[]>([]);
 
+  // Fetch dates that have call list data for current user
+  const { data: datesWithData = [] } = useQuery({
+    queryKey: ['call-list-dates', profile?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('approved_call_list')
+        .select('list_date')
+        .eq('agent_id', profile?.id)
+        .order('list_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Get unique dates with their counts
+      const dateCountMap = new Map<string, number>();
+      data?.forEach(item => {
+        const count = dateCountMap.get(item.list_date) || 0;
+        dateCountMap.set(item.list_date, count + 1);
+      });
+      
+      return Array.from(dateCountMap.entries()).map(([date, count]) => ({
+        date,
+        count
+      }));
+    },
+    enabled: !!profile?.id,
+  });
+
   // Fetch teams for super_admin export filter
   const { data: teams = [] } = useQuery({
     queryKey: ['teams-for-export'],
@@ -583,9 +610,59 @@ export const CallListPage: React.FC = () => {
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
                 disabled={(date) => date > new Date()}
+                modifiers={{
+                  hasData: datesWithData.map(d => new Date(d.date + 'T00:00:00'))
+                }}
+                modifiersStyles={{
+                  hasData: { 
+                    fontWeight: 'bold',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)',
+                    borderRadius: '50%'
+                  }
+                }}
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
+              <div className="border-t max-h-[200px] overflow-y-auto">
+                <div className="p-2 text-xs font-medium text-muted-foreground sticky top-0 bg-background">
+                  Dates with data ({datesWithData.length})
+                </div>
+                {datesWithData.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    No call list history
+                  </div>
+                ) : (
+                  <div className="space-y-0.5 p-1">
+                    {datesWithData.slice(0, 10).map(({ date, count }) => {
+                      const dateObj = new Date(date + 'T00:00:00');
+                      const isSelected = format(selectedDate, 'yyyy-MM-dd') === date;
+                      const isTodayDate = format(new Date(), 'yyyy-MM-dd') === date;
+                      return (
+                        <Button
+                          key={date}
+                          variant={isSelected ? "secondary" : "ghost"}
+                          size="sm"
+                          className="w-full justify-between text-left h-8"
+                          onClick={() => setSelectedDate(dateObj)}
+                        >
+                          <span className="flex items-center gap-2">
+                            {isTodayDate && <Badge variant="outline" className="text-xs py-0 h-4">Today</Badge>}
+                            {format(dateObj, 'MMM d, yyyy')}
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            {count} contacts
+                          </Badge>
+                        </Button>
+                      );
+                    })}
+                    {datesWithData.length > 10 && (
+                      <div className="text-xs text-muted-foreground text-center py-1">
+                        +{datesWithData.length - 10} more dates
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {!isToday && (
                 <div className="p-2 border-t">
                   <Button 

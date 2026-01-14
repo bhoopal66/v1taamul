@@ -145,13 +145,17 @@ export const useCallList = (selectedDate?: Date) => {
       contactId, 
       status, 
       notes,
-      callbackDatetime 
+      callbackDatetime,
+      tradeLicenseNumber,
+      contactPersonName,
     }: { 
       callListId: string; 
       contactId: string; 
       status: FeedbackStatus; 
       notes?: string;
       callbackDatetime?: string;
+      tradeLicenseNumber?: string;
+      contactPersonName?: string;
     }) => {
       // Insert feedback
       const { error: feedbackError } = await supabase
@@ -189,8 +193,28 @@ export const useCallList = (selectedDate?: Date) => {
         .update({ status: contactStatus })
         .eq('id', contactId);
 
-      // If interested, create a lead
+      // If interested, update contact with trade license and contact person, then create lead
       if (status === 'interested') {
+        // Update contact with trade license number and contact person name
+        const contactUpdateData: { 
+          status: 'interested'; 
+          trade_license_number?: string; 
+          contact_person_name?: string;
+        } = { status: 'interested' };
+        
+        if (tradeLicenseNumber) {
+          contactUpdateData.trade_license_number = tradeLicenseNumber;
+        }
+        if (contactPersonName) {
+          contactUpdateData.contact_person_name = contactPersonName;
+        }
+        
+        await supabase
+          .from('master_contacts')
+          .update(contactUpdateData)
+          .eq('id', contactId);
+
+        // Create lead
         await supabase
           .from('leads')
           .insert({

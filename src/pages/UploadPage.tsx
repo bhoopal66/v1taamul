@@ -30,12 +30,14 @@ import {
   MoreVertical,
   RotateCcw,
   Eye,
+  Wand2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
 import { useCallSheetUpload, RejectionDetail, UploadHistory, ParsedContact } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export const UploadPage: React.FC = () => {
   const { profile } = useAuth();
@@ -52,6 +54,7 @@ export const UploadPage: React.FC = () => {
     resubmitUpload,
     isResubmitting,
     updateContact,
+    autoFixContacts,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -362,10 +365,28 @@ export const UploadPage: React.FC = () => {
                   {parsedData.invalidEntries > 0 && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Some entries have issues</AlertTitle>
+                      <AlertTitle className="flex items-center justify-between">
+                        <span>Some entries have issues</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const result = autoFixContacts();
+                            if (result.fixed > 0) {
+                              toast.success(`Fixed ${result.fixed} entries automatically!`);
+                            } else {
+                              toast.info('No entries could be auto-fixed. Please edit manually.');
+                            }
+                          }}
+                          className="ml-2 gap-1.5 h-7 text-xs bg-background hover:bg-muted"
+                        >
+                          <Wand2 className="w-3.5 h-3.5" />
+                          Fix All
+                        </Button>
+                      </AlertTitle>
                       <AlertDescription>
                         {parsedData.invalidEntries} entries have validation errors. 
-                        You can edit invalid rows inline below to fix them before submitting.
+                        Click "Fix All" to auto-correct phone formats & capitalization, or edit rows manually below.
                       </AlertDescription>
                     </Alert>
                   )}

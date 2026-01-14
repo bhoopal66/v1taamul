@@ -128,6 +128,129 @@ export const useCallSheetUpload = () => {
     });
   }, [parsedData]);
 
+  // Auto-fix common issues in invalid contacts
+  const autoFixContacts = useCallback(() => {
+    if (!parsedData) return { fixed: 0 };
+
+    let fixedCount = 0;
+
+    setParsedData(prev => {
+      if (!prev) return prev;
+
+      const updatedContacts = prev.contacts.map(contact => {
+        if (contact.isValid) return contact;
+
+        const updated = { ...contact };
+        let wasFixed = false;
+
+        // Fix 1: Trim whitespace from all fields
+        if (updated.companyName !== updated.companyName.trim()) {
+          updated.companyName = updated.companyName.trim();
+          wasFixed = true;
+        }
+        if (updated.contactPersonName !== updated.contactPersonName.trim()) {
+          updated.contactPersonName = updated.contactPersonName.trim();
+          wasFixed = true;
+        }
+        if (updated.phoneNumber !== updated.phoneNumber.trim()) {
+          updated.phoneNumber = updated.phoneNumber.trim();
+          wasFixed = true;
+        }
+
+        // Fix 2: Clean phone number format
+        const cleanedPhone = updated.phoneNumber
+          .replace(/[\s\-\(\)\.]/g, '') // Remove spaces, dashes, parens, dots
+          .replace(/^00/, '+'); // Convert 00 prefix to +
+        
+        // Add UAE country code if phone starts with 0 and doesn't have +
+        let fixedPhone = cleanedPhone;
+        if (cleanedPhone.match(/^0[0-9]{9}$/)) {
+          // UAE mobile starting with 0 (e.g., 0501234567)
+          fixedPhone = '+971' + cleanedPhone.substring(1);
+          wasFixed = true;
+        } else if (cleanedPhone.match(/^5[0-9]{8}$/)) {
+          // UAE mobile without 0 prefix (e.g., 501234567)
+          fixedPhone = '+971' + cleanedPhone;
+          wasFixed = true;
+        } else if (cleanedPhone !== updated.phoneNumber) {
+          wasFixed = true;
+        }
+        updated.phoneNumber = fixedPhone;
+
+        // Fix 3: Capitalize company name properly
+        if (updated.companyName && updated.companyName === updated.companyName.toLowerCase()) {
+          updated.companyName = updated.companyName
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          wasFixed = true;
+        }
+
+        // Fix 4: Capitalize contact person name
+        if (updated.contactPersonName && updated.contactPersonName === updated.contactPersonName.toLowerCase()) {
+          updated.contactPersonName = updated.contactPersonName
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          wasFixed = true;
+        }
+
+        // Revalidate after fixes
+        const errors: string[] = [];
+        
+        if (!updated.companyName) errors.push('Company name is required');
+        if (!updated.phoneNumber) errors.push('Phone number is required');
+        
+        if (updated.phoneNumber && !validatePhoneNumber(updated.phoneNumber)) {
+          errors.push('Invalid phone number format');
+        }
+
+        // Check for duplicate errors (preserve these as they can't be auto-fixed)
+        const duplicateErrors = contact.errors.filter(e => 
+          e.includes('Duplicate') || e.includes('Already exists') || e.includes('Do Not Call')
+        );
+        errors.push(...duplicateErrors);
+
+        updated.errors = errors;
+        updated.isValid = errors.length === 0;
+
+        if (wasFixed && updated.isValid) {
+          fixedCount++;
+        }
+
+        return updated;
+      });
+
+      // Recalculate counts
+      let validCount = 0;
+      let invalidCount = 0;
+      let duplicateCount = 0;
+
+      updatedContacts.forEach(c => {
+        const hasDuplicateError = c.errors.some(e => 
+          e.includes('Duplicate') || e.includes('Already exists')
+        );
+        if (hasDuplicateError) {
+          duplicateCount++;
+        } else if (c.isValid) {
+          validCount++;
+        } else {
+          invalidCount++;
+        }
+      });
+
+      return {
+        ...prev,
+        contacts: updatedContacts,
+        validEntries: validCount,
+        invalidEntries: invalidCount,
+        duplicateEntries: duplicateCount,
+      };
+    });
+
+    return { fixed: fixedCount };
+  }, [parsedData]);
+
   // Subscribe to realtime updates for upload status changes
   useEffect(() => {
     if (!user?.id) return;
@@ -537,5 +660,6 @@ export const useCallSheetUpload = () => {
     resubmitUpload: resubmitUpload.mutate,
     isResubmitting: resubmitUpload.isPending,
     updateContact,
+    autoFixContacts,
   };
 };

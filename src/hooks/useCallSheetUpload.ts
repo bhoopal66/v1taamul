@@ -96,6 +96,9 @@ export const useCallSheetUpload = () => {
         
         if (!updated.companyName) errors.push('Company name is required');
         if (!updated.phoneNumber) errors.push('Phone number is required');
+        if (!updated.city) errors.push('City is required');
+        if (!updated.area) errors.push('Area is required');
+        if (!updated.industry) errors.push('Industry is required');
         
         if (updated.phoneNumber && !validatePhoneNumber(updated.phoneNumber)) {
           errors.push('Invalid phone number format');

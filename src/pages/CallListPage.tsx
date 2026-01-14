@@ -1180,10 +1180,20 @@ export const CallListPage: React.FC = () => {
             </DialogTitle>
             <DialogDescription>
               {selectedContact && (
-                <>
-                  <span className="font-medium">{selectedContact.companyName}</span>
-                  {' • '}{selectedContact.contactPersonName}
-                </>
+                <div className="space-y-1 mt-2">
+                  <p className="font-medium text-foreground">{selectedContact.companyName}</p>
+                  <p className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    <span className="font-medium">{selectedContact.contactPersonName || 'No contact name'}</span>
+                  </p>
+                  <a 
+                    href={`tel:${selectedContact.phoneNumber}`}
+                    className="flex items-center gap-2 text-primary hover:underline font-mono"
+                  >
+                    <Phone className="w-3 h-3" />
+                    {selectedContact.phoneNumber}
+                  </a>
+                </div>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -1209,15 +1219,38 @@ export const CallListPage: React.FC = () => {
               ))}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (optional)</label>
-              <Textarea
-                placeholder="Add any notes about this call..."
-                value={feedbackNotes}
-                onChange={(e) => setFeedbackNotes(e.target.value)}
-                rows={3}
-              />
-            </div>
+            {/* Show notes field - required for interested/callback */}
+            {(selectedFeedback === 'interested' || selectedFeedback === 'callback') && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Notes <span className="text-destructive">*</span>
+                </label>
+                <Textarea
+                  placeholder={selectedFeedback === 'interested' 
+                    ? "Add details about the interest (required)..." 
+                    : "Add callback details (required)..."}
+                  value={feedbackNotes}
+                  onChange={(e) => setFeedbackNotes(e.target.value)}
+                  rows={3}
+                  className={!feedbackNotes.trim() ? "border-destructive" : ""}
+                />
+                {!feedbackNotes.trim() && (
+                  <p className="text-xs text-destructive">Notes are required for {selectedFeedback} status</p>
+                )}
+              </div>
+            )}
+
+            {selectedFeedback && selectedFeedback !== 'interested' && selectedFeedback !== 'callback' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (optional)</label>
+                <Textarea
+                  placeholder="Add any notes about this call..."
+                  value={feedbackNotes}
+                  onChange={(e) => setFeedbackNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -1226,14 +1259,18 @@ export const CallListPage: React.FC = () => {
             </Button>
             <Button 
               onClick={handleSubmitFeedback}
-              disabled={!selectedFeedback || isLogging}
+              disabled={
+                !selectedFeedback || 
+                isLogging || 
+                ((selectedFeedback === 'interested' || selectedFeedback === 'callback') && !feedbackNotes.trim())
+              }
             >
               {isLogging ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <CheckCircle2 className="w-4 h-4 mr-2" />
               )}
-              Log Call
+              Submit
             </Button>
           </DialogFooter>
         </DialogContent>

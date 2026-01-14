@@ -111,7 +111,9 @@ const feedbackOptions: { status: FeedbackStatus; label: string; icon: React.Reac
 
 export const CallListPage: React.FC = () => {
   const { profile, userRole } = useAuth();
-  const { callList, stats, isLoading, refetch, logFeedback, isLogging, skipContact, isSkipping } = useCallList();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const { callList, stats, isLoading, refetch, logFeedback, isLogging, skipContact, isSkipping } = useCallList(selectedDate);
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
   
   const canExport = userRole === 'super_admin';
 
@@ -556,11 +558,48 @@ export const CallListPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Call List</h1>
             <p className="text-muted-foreground mt-1">
-              {format(new Date(), 'EEEE, MMMM d')} • {stats.total} contacts to call
+              {format(selectedDate, 'EEEE, MMMM d')} • {stats.total} contacts {isToday ? 'to call' : 'called'}
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Date Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[180px] justify-start text-left font-normal",
+                  !isToday && "border-primary text-primary"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {isToday ? 'Today' : format(selectedDate, 'MMM d, yyyy')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-background" align="end">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                disabled={(date) => date > new Date()}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+              {!isToday && (
+                <div className="p-2 border-t">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => setSelectedDate(new Date())}
+                  >
+                    Go to Today
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           {canExport && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -281,6 +281,16 @@ export const LeadKanbanBoard = ({
                               )}
                             </div>
 
+                            {/* Trade License Number */}
+                            {lead.tradeLicenseNumber && (
+                              <div className="mt-1">
+                                <span className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-0.5 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded">
+                                  <FileText className="w-2.5 h-2.5" />
+                                  TL: {lead.tradeLicenseNumber}
+                                </span>
+                              </div>
+                            )}
+
                             {/* Lead vs Opportunity Badge */}
                             <div className="mt-1 flex items-center gap-2">
                               {lead.isLead ? (

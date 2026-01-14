@@ -45,6 +45,7 @@ import {
   BarChart3,
   RefreshCw,
   Zap,
+  FileText,
   Bell,
   Megaphone,
   History,
@@ -521,6 +522,12 @@ export const LeadsPage = () => {
                               <Phone className="w-3 h-3" />
                               {lead.phoneNumber}
                             </a>
+                            {lead.tradeLicenseNumber && (
+                              <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                <FileText className="w-3 h-3" />
+                                TL: {lead.tradeLicenseNumber}
+                              </span>
+                            )}
                             {lead.city && (
                               <span className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />

@@ -130,6 +130,10 @@ export const CallListPage: React.FC = () => {
   const [callbackDate, setCallbackDate] = useState<Date | undefined>(undefined);
   const [callbackTime, setCallbackTime] = useState<string>('10:00');
   
+  // Lead creation fields for interested status
+  const [interestedTradeLicense, setInterestedTradeLicense] = useState('');
+  const [interestedContactPerson, setInterestedContactPerson] = useState('');
+  
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('csv');
@@ -266,6 +270,9 @@ export const CallListPage: React.FC = () => {
     setFeedbackNotes('');
     setCallbackDate(undefined);
     setCallbackTime('10:00');
+    // Pre-fill with existing values if available
+    setInterestedTradeLicense(contact.tradeLicenseNumber || '');
+    setInterestedContactPerson(contact.contactPersonName || '');
     setFeedbackDialogOpen(true);
   };
 
@@ -287,6 +294,8 @@ export const CallListPage: React.FC = () => {
       status: selectedFeedback,
       notes: feedbackNotes || undefined,
       callbackDatetime: callbackDatetimeISO,
+      tradeLicenseNumber: selectedFeedback === 'interested' ? interestedTradeLicense : undefined,
+      contactPersonName: selectedFeedback === 'interested' ? interestedContactPerson : undefined,
     });
 
     setFeedbackDialogOpen(false);
@@ -295,6 +304,8 @@ export const CallListPage: React.FC = () => {
     setFeedbackNotes('');
     setCallbackDate(undefined);
     setCallbackTime('10:00');
+    setInterestedTradeLicense('');
+    setInterestedContactPerson('');
   };
 
   const handleQuickFeedback = (contact: CallListContact, status: FeedbackStatus) => {
@@ -1308,21 +1319,57 @@ export const CallListPage: React.FC = () => {
               </div>
             )}
 
-            {/* Notes for interested status */}
+            {/* Fields for interested status - required for lead creation */}
             {selectedFeedback === 'interested' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Notes <span className="text-destructive">*</span>
-                </label>
-                <Textarea
-                  placeholder="Add details about the interest (required)..."
-                  value={feedbackNotes}
-                  onChange={(e) => setFeedbackNotes(e.target.value)}
-                  rows={3}
-                  className={!feedbackNotes.trim() ? "border-destructive" : ""}
-                />
-                {!feedbackNotes.trim() && (
-                  <p className="text-xs text-destructive">Notes are required for interested status</p>
+              <div className="space-y-3 p-3 rounded-lg border border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
+                <p className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+                  <Star className="w-4 h-4" />
+                  Lead Information (Required)
+                </p>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="w-3 h-3" />
+                    Trade License Number <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Enter trade license number..."
+                    value={interestedTradeLicense}
+                    onChange={(e) => setInterestedTradeLicense(e.target.value)}
+                    className={!interestedTradeLicense.trim() ? "border-destructive" : ""}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    Contact Person Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Enter contact person name..."
+                    value={interestedContactPerson}
+                    onChange={(e) => setInterestedContactPerson(e.target.value)}
+                    className={!interestedContactPerson.trim() ? "border-destructive" : ""}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Notes <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    placeholder="Add details about the interest (required)..."
+                    value={feedbackNotes}
+                    onChange={(e) => setFeedbackNotes(e.target.value)}
+                    rows={2}
+                    className={!feedbackNotes.trim() ? "border-destructive" : ""}
+                  />
+                </div>
+                
+                {(!interestedTradeLicense.trim() || !interestedContactPerson.trim() || !feedbackNotes.trim()) && (
+                  <p className="text-xs text-destructive">
+                    Trade license, contact person name, and notes are required to create a lead
+                  </p>
                 )}
               </div>
             )}
@@ -1350,7 +1397,7 @@ export const CallListPage: React.FC = () => {
               disabled={
                 !selectedFeedback || 
                 isLogging || 
-                (selectedFeedback === 'interested' && !feedbackNotes.trim()) ||
+                (selectedFeedback === 'interested' && (!feedbackNotes.trim() || !interestedTradeLicense.trim() || !interestedContactPerson.trim())) ||
                 (selectedFeedback === 'callback' && !callbackDate)
               }
             >

@@ -221,15 +221,42 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
 
   const updateLeadDetails = (
     leadId: string,
+    contactId: string,
     details: {
       lead_score?: number;
       lead_source?: LeadSource;
       deal_value?: number | null;
       expected_close_date?: string | null;
       notes?: string | null;
+      trade_license_number?: string | null;
+      contact_person_name?: string | null;
     }
   ) => {
-    updateLead.mutate({ leadId, updates: details });
+    // Separate contact fields from lead fields
+    const { trade_license_number, contact_person_name, ...leadDetails } = details;
+    
+    // Update lead
+    updateLead.mutate({ leadId, updates: leadDetails });
+    
+    // Update contact if contact fields are provided
+    if (trade_license_number !== undefined || contact_person_name !== undefined) {
+      const contactUpdates: { trade_license_number?: string | null; contact_person_name?: string | null } = {};
+      if (trade_license_number !== undefined) contactUpdates.trade_license_number = trade_license_number;
+      if (contact_person_name !== undefined) contactUpdates.contact_person_name = contact_person_name;
+      
+      supabase
+        .from('master_contacts')
+        .update({
+          ...contactUpdates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', contactId)
+        .then(({ error }) => {
+          if (error) {
+            toast.error(`Failed to update contact: ${error.message}`);
+          }
+        });
+    }
   };
 
   // Mutation to update trade license on master_contacts (convert Opportunity to Lead)

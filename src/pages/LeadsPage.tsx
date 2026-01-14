@@ -76,6 +76,8 @@ export const LeadsPage = () => {
     leadScore: '',
     productType: 'account' as ProductType,
     bankName: 'RAK' as BankName,
+    tradeLicenseNumber: '',
+    contactPersonName: '',
   });
 
   const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter);
@@ -103,18 +105,22 @@ export const LeadsPage = () => {
       leadScore: lead.leadScore?.toString() || '0',
       productType: parsed?.product || 'account',
       bankName: parsed?.bank || 'RAK',
+      tradeLicenseNumber: lead.tradeLicenseNumber || '',
+      contactPersonName: lead.contactPersonName || '',
     });
     setEditDialogOpen(true);
   };
 
   const handleSaveEdit = () => {
     if (!selectedLead) return;
-    updateLeadDetails(selectedLead.id, {
+    updateLeadDetails(selectedLead.id, selectedLead.contactId, {
       deal_value: editForm.dealValue ? parseFloat(editForm.dealValue) : null,
       expected_close_date: editForm.expectedCloseDate || null,
       notes: editForm.notes || null,
       lead_score: parseInt(editForm.leadScore) || 0,
       lead_source: createLeadSource(editForm.productType, editForm.bankName),
+      trade_license_number: editForm.tradeLicenseNumber || null,
+      contact_person_name: editForm.contactPersonName || null,
     });
     setEditDialogOpen(false);
     setSelectedLead(null);
@@ -668,6 +674,35 @@ export const LeadsPage = () => {
             <div className="grid md:grid-cols-2 gap-6 py-4">
               {/* Left Column - Edit Form */}
               <div className="space-y-4">
+                {/* Contact Information Section */}
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Contact Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contactPersonName">Contact Person Name</Label>
+                      <Input
+                        id="contactPersonName"
+                        placeholder="Enter name..."
+                        value={editForm.contactPersonName}
+                        onChange={(e) => setEditForm(f => ({ ...f, contactPersonName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tradeLicenseNumber">Trade License Number</Label>
+                      <Input
+                        id="tradeLicenseNumber"
+                        placeholder="Enter TL number..."
+                        value={editForm.tradeLicenseNumber}
+                        onChange={(e) => setEditForm(f => ({ ...f, tradeLicenseNumber: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deal Information */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dealValue">Deal Value (AED)</Label>

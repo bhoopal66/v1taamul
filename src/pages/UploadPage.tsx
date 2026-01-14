@@ -68,6 +68,9 @@ export const UploadPage: React.FC = () => {
   const [rejectionDetails, setRejectionDetails] = useState<RejectionDetail[]>([]);
   const [loadingRejections, setLoadingRejections] = useState(false);
 
+  // Confirmation dialog state
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+
   const handleViewRejections = async (upload: UploadHistory) => {
     setSelectedUploadForRejections(upload);
     setRejectionDialogOpen(true);
@@ -195,6 +198,13 @@ export const UploadPage: React.FC = () => {
     if (selectedFile && parsedData) {
       submitUpload({ file: selectedFile, validationResult: parsedData });
       setSelectedFile(null);
+      setConfirmDialogOpen(false);
+    }
+  };
+
+  const handleOpenConfirmDialog = () => {
+    if (selectedFile && parsedData && parsedData.validEntries > 0) {
+      setConfirmDialogOpen(true);
     }
   };
 
@@ -584,7 +594,7 @@ export const UploadPage: React.FC = () => {
                       Clear
                     </Button>
                     <Button 
-                      onClick={handleSubmit}
+                      onClick={handleOpenConfirmDialog}
                       disabled={parsedData.validEntries === 0 || isSubmitting}
                     >
                       {isSubmitting ? (
@@ -599,6 +609,87 @@ export const UploadPage: React.FC = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Confirmation Dialog */}
+          <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-primary" />
+                  Confirm Upload
+                </DialogTitle>
+                <DialogDescription>
+                  Review the summary below before submitting your call sheet.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {parsedData && (
+                <div className="space-y-4 py-4">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-600">Will be imported</span>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 mt-1">{parsedData.validEntries}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 border">
+                      <div className="flex items-center gap-2">
+                        <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Total in file</span>
+                      </div>
+                      <p className="text-2xl font-bold mt-1">{parsedData.totalEntries}</p>
+                    </div>
+                  </div>
+
+                  {/* Skipped entries breakdown */}
+                  {(parsedData.invalidEntries > 0 || parsedData.duplicateEntries > 0) && (
+                    <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm font-medium text-yellow-600">Will be skipped</span>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        {parsedData.invalidEntries > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Invalid entries</span>
+                            <span className="font-medium">{parsedData.invalidEntries}</span>
+                          </div>
+                        )}
+                        {parsedData.duplicateEntries > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Duplicates</span>
+                            <span className="font-medium">{parsedData.duplicateEntries}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File info */}
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30 text-sm">
+                    <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground truncate">{selectedFile?.name}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Confirm & Submit
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* File Format Guide */}
           <Card>

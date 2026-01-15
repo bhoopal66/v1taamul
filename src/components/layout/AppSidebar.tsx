@@ -37,6 +37,7 @@ import { SoundToggle } from '@/components/ui/SoundToggle';
 import { LoginStreakBadge } from '@/components/profile/LoginStreakBadge';
 import { useLoginStreak } from '@/hooks/useLoginStreak';
 import { usePerformanceAlerts } from '@/hooks/usePerformanceAlerts';
+import { TeamPerformanceSidebar } from '@/components/layout/TeamPerformanceSidebar';
 
 const METRIC_LABELS: Record<string, string> = {
   total_calls: 'Total Calls',
@@ -259,6 +260,9 @@ export const AppSidebar: React.FC = () => {
           </Popover>
         </div>
       </div>
+
+      {/* Team Performance Stats */}
+      <TeamPerformanceSidebar />
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

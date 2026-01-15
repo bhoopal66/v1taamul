@@ -66,6 +66,7 @@ export const createLeadSource = (product: ProductType, bank: BankName): LeadSour
 export interface Lead {
   id: string;
   contactId: string;
+  agentId?: string;
   companyName: string;
   contactPersonName: string;
   phoneNumber: string;
@@ -99,12 +100,37 @@ export interface LeadStats {
 }
 
 export const useLeads = (statusFilter?: LeadStatus | 'all') => {
-  const { user } = useAuth();
+  const { user, userRole, profile, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
 
+  // Check if user is a supervisor, team leader, or higher role that should see team leads
+  const isTeamViewer = userRole === 'supervisor' || userRole === 'operations_head' || 
+                       userRole === 'admin' || userRole === 'super_admin' || 
+                       userRole === 'sales_controller' || !!ledTeamId;
+
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, statusFilter],
+    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter],
     queryFn: async (): Promise<Lead[]> => {
+      // First, get all team member IDs if user is a team viewer
+      let teamMemberIds: string[] = [user?.id || ''];
+
+      if (isTeamViewer) {
+        // Get the team ID to fetch members for
+        const teamIdToFetch = ledTeamId || profile?.team_id;
+
+        if (teamIdToFetch) {
+          // Fetch all agents in the team
+          const { data: teamMembers } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('team_id', teamIdToFetch);
+
+          if (teamMembers && teamMembers.length > 0) {
+            teamMemberIds = teamMembers.map(m => m.id);
+          }
+        }
+      }
+
       let query = supabase
         .from('leads')
         .select(`
@@ -118,7 +144,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
             industry
           )
         `)
-        .eq('agent_id', user?.id)
+        .in('agent_id', teamMemberIds)
         .order('created_at', { ascending: false });
 
       if (statusFilter && statusFilter !== 'all') {
@@ -134,6 +160,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         return {
           id: item.id,
           contactId: item.contact_id,
+          agentId: item.agent_id,
           companyName: item.master_contacts?.company_name || 'Unknown',
           contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
           phoneNumber: item.master_contacts?.phone_number || '',

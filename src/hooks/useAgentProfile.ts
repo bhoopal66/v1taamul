@@ -33,6 +33,8 @@ export interface ProfileStats {
   daysActive: number;
   rank: number;
   totalAgents: number;
+  isTeamView?: boolean;
+  teamMemberCount?: number;
 }
 
 export interface DailyPerformance {
@@ -44,36 +46,60 @@ export interface DailyPerformance {
 }
 
 export const useAgentProfile = (agentId?: string) => {
-  const { user, profile } = useAuth();
+  const { user, profile, userRole, ledTeamId } = useAuth();
   const targetUserId = agentId || user?.id;
   const today = new Date();
 
+  // Check if user should see team aggregated data
+  const isTeamViewer = !agentId && (
+    userRole === 'supervisor' || userRole === 'operations_head' || 
+    userRole === 'admin' || userRole === 'super_admin' || 
+    userRole === 'sales_controller' || !!ledTeamId
+  );
+
   // Fetch all-time stats
   const { data: profileStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['agent-profile-stats', targetUserId],
+    queryKey: ['agent-profile-stats', targetUserId, isTeamViewer, ledTeamId, profile?.team_id],
     queryFn: async (): Promise<ProfileStats> => {
       if (!targetUserId) throw new Error('No user');
 
-      // Get all feedback for this agent
+      // Get team member IDs if team viewer
+      let teamMemberIds: string[] = [targetUserId];
+      
+      if (isTeamViewer) {
+        const teamIdToFetch = ledTeamId || profile?.team_id;
+        if (teamIdToFetch) {
+          const { data: teamMembers } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('team_id', teamIdToFetch);
+          
+          if (teamMembers && teamMembers.length > 0) {
+            teamMemberIds = teamMembers.map(m => m.id);
+          }
+        }
+      }
+
+      // Get all feedback for team members
       const { data: allFeedback, error } = await supabase
         .from('call_feedback')
-        .select('feedback_status, call_timestamp')
-        .eq('agent_id', targetUserId)
+        .select('feedback_status, call_timestamp, agent_id')
+        .in('agent_id', teamMemberIds)
         .order('call_timestamp', { ascending: true });
 
       if (error) throw error;
 
-      // Get all leads
+      // Get all leads for team members
       const { data: allLeads } = await supabase
         .from('leads')
         .select('id, created_at')
-        .eq('agent_id', targetUserId);
+        .in('agent_id', teamMemberIds);
 
       const totalCalls = allFeedback?.length || 0;
       const interested = allFeedback?.filter(f => f.feedback_status === 'interested').length || 0;
       const totalLeads = allLeads?.length || 0;
 
-      // Calculate best day
+      // Calculate best day (combined for team)
       const dailyMap = new Map<string, number>();
       allFeedback?.forEach(f => {
         if (f.call_timestamp) {
@@ -89,7 +115,7 @@ export const useAgentProfile = (agentId?: string) => {
         }
       });
 
-      // Calculate streaks (days with at least 1 call)
+      // Calculate streaks (days with at least 1 call from team)
       const uniqueDays = Array.from(dailyMap.keys()).sort();
       let currentStreak = 0;
       let longestStreak = 0;
@@ -120,7 +146,7 @@ export const useAgentProfile = (agentId?: string) => {
         currentStreak = tempStreak;
       }
 
-      // Get ranking
+      // Get ranking (based on individual or team performance)
       const { data: allAgentsFeedback } = await supabase
         .from('call_feedback')
         .select('agent_id');
@@ -133,7 +159,18 @@ export const useAgentProfile = (agentId?: string) => {
       const sortedAgents = Array.from(agentCallCounts.entries())
         .sort((a, b) => b[1] - a[1]);
       
-      const rank = sortedAgents.findIndex(([id]) => id === targetUserId) + 1;
+      // For team view, find the best ranking team member
+      let rank = sortedAgents.length + 1;
+      if (isTeamViewer) {
+        for (const memberId of teamMemberIds) {
+          const memberRank = sortedAgents.findIndex(([id]) => id === memberId) + 1;
+          if (memberRank > 0 && memberRank < rank) {
+            rank = memberRank;
+          }
+        }
+      } else {
+        rank = sortedAgents.findIndex(([id]) => id === targetUserId) + 1 || sortedAgents.length + 1;
+      }
 
       return {
         totalCallsAllTime: totalCalls,
@@ -146,6 +183,8 @@ export const useAgentProfile = (agentId?: string) => {
         daysActive: uniqueDays.length,
         rank: rank || sortedAgents.length + 1,
         totalAgents: sortedAgents.length || 1,
+        isTeamView: isTeamViewer,
+        teamMemberCount: isTeamViewer ? teamMemberIds.length : undefined,
       };
     },
     enabled: !!targetUserId,
@@ -153,9 +192,26 @@ export const useAgentProfile = (agentId?: string) => {
 
   // Fetch monthly performance (last 6 months)
   const { data: monthlyPerformance, isLoading: monthlyLoading } = useQuery({
-    queryKey: ['agent-monthly-performance', targetUserId],
+    queryKey: ['agent-monthly-performance', targetUserId, isTeamViewer, ledTeamId, profile?.team_id],
     queryFn: async (): Promise<MonthlyPerformance[]> => {
       if (!targetUserId) throw new Error('No user');
+
+      // Get team member IDs if team viewer
+      let teamMemberIds: string[] = [targetUserId];
+      
+      if (isTeamViewer) {
+        const teamIdToFetch = ledTeamId || profile?.team_id;
+        if (teamIdToFetch) {
+          const { data: teamMembers } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('team_id', teamIdToFetch);
+          
+          if (teamMembers && teamMembers.length > 0) {
+            teamMemberIds = teamMembers.map(m => m.id);
+          }
+        }
+      }
 
       const months: MonthlyPerformance[] = [];
 
@@ -167,14 +223,14 @@ export const useAgentProfile = (agentId?: string) => {
         const { data: feedback } = await supabase
           .from('call_feedback')
           .select('feedback_status')
-          .eq('agent_id', targetUserId)
+          .in('agent_id', teamMemberIds)
           .gte('call_timestamp', monthStart)
           .lte('call_timestamp', monthEnd);
 
         const { data: leads } = await supabase
           .from('leads')
           .select('id')
-          .eq('agent_id', targetUserId)
+          .in('agent_id', teamMemberIds)
           .gte('created_at', monthStart)
           .lte('created_at', monthEnd);
 
@@ -197,16 +253,33 @@ export const useAgentProfile = (agentId?: string) => {
 
   // Fetch daily performance (last 30 days)
   const { data: dailyPerformance, isLoading: dailyLoading } = useQuery({
-    queryKey: ['agent-daily-performance', targetUserId],
+    queryKey: ['agent-daily-performance', targetUserId, isTeamViewer, ledTeamId, profile?.team_id],
     queryFn: async (): Promise<DailyPerformance[]> => {
       if (!targetUserId) throw new Error('No user');
+
+      // Get team member IDs if team viewer
+      let teamMemberIds: string[] = [targetUserId];
+      
+      if (isTeamViewer) {
+        const teamIdToFetch = ledTeamId || profile?.team_id;
+        if (teamIdToFetch) {
+          const { data: teamMembers } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('team_id', teamIdToFetch);
+          
+          if (teamMembers && teamMembers.length > 0) {
+            teamMemberIds = teamMembers.map(m => m.id);
+          }
+        }
+      }
 
       const thirtyDaysAgo = subDays(today, 30);
       
       const { data: feedback, error } = await supabase
         .from('call_feedback')
         .select('feedback_status, call_timestamp')
-        .eq('agent_id', targetUserId)
+        .in('agent_id', teamMemberIds)
         .gte('call_timestamp', startOfDay(thirtyDaysAgo).toISOString())
         .order('call_timestamp', { ascending: true });
 

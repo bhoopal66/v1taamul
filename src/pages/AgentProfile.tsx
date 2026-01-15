@@ -60,7 +60,7 @@ const chartConfig = {
 };
 
 export const AgentProfile: React.FC = () => {
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, userRole, ledTeamId } = useAuth();
   const { 
     profile, 
     profileStats, 
@@ -72,6 +72,9 @@ export const AgentProfile: React.FC = () => {
   } = useAgentProfile();
   const { streaks } = useAgentGoals();
   const { streakData } = useLoginStreak();
+
+  // Check if viewing team data
+  const isTeamView = profileStats.isTeamView;
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -116,13 +119,21 @@ export const AgentProfile: React.FC = () => {
             <div className="flex-1 space-y-2">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold">{authProfile?.full_name || 'Agent'}</h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold">{authProfile?.full_name || 'Agent'}</h1>
+                    {isTeamView && (
+                      <Badge variant="outline" className="text-sm px-3 py-1 bg-primary/10 border-primary/30">
+                        <User className="w-3 h-3 mr-1" />
+                        Team View ({profileStats.teamMemberCount} members)
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-muted-foreground">@{authProfile?.username}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary" className="text-lg px-4 py-1">
                     <Trophy className="w-4 h-4 mr-2" />
-                    Rank #{profileStats.rank}
+                    {isTeamView ? 'Best Rank' : 'Rank'} #{profileStats.rank}
                   </Badge>
                   {profileStats.currentStreak > 0 && (
                     <Badge className="text-lg px-4 py-1 bg-warning text-warning-foreground">
@@ -135,6 +146,7 @@ export const AgentProfile: React.FC = () => {
               <p className="text-sm text-muted-foreground">
                 Member since {authProfile?.created_at ? format(new Date(authProfile.created_at), 'MMMM yyyy') : 'N/A'}
                 {' · '}{profileStats.daysActive} days active
+                {isTeamView && ' (team combined)'}
               </p>
             </div>
           </div>
@@ -147,7 +159,9 @@ export const AgentProfile: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Calls</p>
+                <p className="text-sm text-muted-foreground">
+                  {isTeamView ? 'Team Total Calls' : 'Total Calls'}
+                </p>
                 <p className="text-3xl font-bold">{profileStats.totalCallsAllTime.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-full bg-primary/10">
@@ -161,7 +175,9 @@ export const AgentProfile: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Interested</p>
+                <p className="text-sm text-muted-foreground">
+                  {isTeamView ? 'Team Interested' : 'Interested'}
+                </p>
                 <p className="text-3xl font-bold">{profileStats.totalInterestedAllTime.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-full bg-success/10">
@@ -175,7 +191,9 @@ export const AgentProfile: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Leads Generated</p>
+                <p className="text-sm text-muted-foreground">
+                  {isTeamView ? 'Team Leads' : 'Leads Generated'}
+                </p>
                 <p className="text-3xl font-bold">{profileStats.totalLeadsAllTime.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-full bg-info/10">
@@ -189,7 +207,9 @@ export const AgentProfile: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg. Conversion</p>
+                <p className="text-sm text-muted-foreground">
+                  {isTeamView ? 'Team Avg. Conversion' : 'Avg. Conversion'}
+                </p>
                 <p className="text-3xl font-bold">{profileStats.averageConversionRate}%</p>
               </div>
               <div className="p-3 rounded-full bg-warning/10">

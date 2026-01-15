@@ -57,6 +57,7 @@ export const UploadPage: React.FC = () => {
     isResubmitting,
     updateContact,
     autoFixContacts,
+    deleteContact,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -516,6 +517,7 @@ export const UploadPage: React.FC = () => {
                             <TableHead>Area</TableHead>
                             <TableHead>Industry</TableHead>
                             <TableHead className="w-24">Status</TableHead>
+                            <TableHead className="w-12">Action</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -630,6 +632,27 @@ export const UploadPage: React.FC = () => {
                                             <li key={i}>• {err}</li>
                                           ))}
                                         </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {!contact.isValid && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          onClick={() => deleteContact(contact.rowNumber)}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs">Remove this entry</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>

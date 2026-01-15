@@ -63,7 +63,7 @@ export const SubmissionForm: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="group2" id="group2" />
                 <Label htmlFor="group2" className="font-normal cursor-pointer">
-                  Group 2 (RAK, Mashreq, Wioriya)
+                  Group 2 (RAK, Mashreq, WIO, RUYA)
                 </Label>
               </div>
             </RadioGroup>

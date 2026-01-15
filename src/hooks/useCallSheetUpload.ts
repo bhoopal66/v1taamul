@@ -78,6 +78,53 @@ export const useCallSheetUpload = () => {
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Delete an invalid contact from the parsed data
+  const deleteContact = useCallback((rowNumber: number) => {
+    if (!parsedData) return;
+
+    setParsedData(prev => {
+      if (!prev) return prev;
+
+      // Only allow deleting invalid entries
+      const contactToDelete = prev.contacts.find(c => c.rowNumber === rowNumber);
+      if (!contactToDelete || contactToDelete.isValid) {
+        toast.error('Only invalid entries can be deleted');
+        return prev;
+      }
+
+      const updatedContacts = prev.contacts.filter(c => c.rowNumber !== rowNumber);
+
+      // Recalculate counts
+      let validCount = 0;
+      let invalidCount = 0;
+      let duplicateCount = 0;
+
+      updatedContacts.forEach(c => {
+        const hasDuplicateError = c.errors.some(e => 
+          e.includes('Duplicate') || e.includes('Already exists')
+        );
+        if (hasDuplicateError) {
+          duplicateCount++;
+        } else if (c.isValid) {
+          validCount++;
+        } else {
+          invalidCount++;
+        }
+      });
+
+      toast.success(`Removed entry #${rowNumber}`);
+
+      return {
+        ...prev,
+        contacts: updatedContacts,
+        totalEntries: updatedContacts.length,
+        validEntries: validCount,
+        invalidEntries: invalidCount,
+        duplicateEntries: duplicateCount,
+      };
+    });
+  }, [parsedData]);
+
   // Update a contact and revalidate
   const updateContact = useCallback((rowNumber: number, field: keyof ParsedContact, value: string) => {
     if (!parsedData) return;
@@ -708,5 +755,6 @@ export const useCallSheetUpload = () => {
     isResubmitting: resubmitUpload.isPending,
     updateContact,
     autoFixContacts,
+    deleteContact,
   };
 };

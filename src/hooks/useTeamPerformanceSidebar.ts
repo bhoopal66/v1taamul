@@ -13,13 +13,18 @@ export interface TeamPerformanceStats {
 export const useTeamPerformanceSidebar = () => {
   const { user, profile, userRole, ledTeamId } = useAuth();
 
-  const isTeamViewer = ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'].includes(userRole || '') || !!ledTeamId;
+  // Show for management roles OR team leaders who lead a team
+  const managementRoles = ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'];
+  const isManagementRole = managementRoles.includes(userRole || '');
+  const isTeamLeaderWithTeam = !!ledTeamId;
+  const isTeamViewer = isManagementRole || isTeamLeaderWithTeam;
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['team-performance-sidebar', user?.id, profile?.team_id, ledTeamId, userRole],
     queryFn: async (): Promise<TeamPerformanceStats> => {
       if (!user) throw new Error('No user');
 
+      // For team leaders, use their led team; for management, use their own team or all teams if no specific team
       const teamId = ledTeamId || profile?.team_id;
       
       if (!teamId) {

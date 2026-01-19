@@ -77,6 +77,7 @@ export const useCallSheetUpload = () => {
   const queryClient = useQueryClient();
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lastUploadSuccess, setLastUploadSuccess] = useState(false);
 
   // Delete an invalid contact from the parsed data
   const deleteContact = useCallback((rowNumber: number) => {
@@ -743,6 +744,7 @@ export const useCallSheetUpload = () => {
         description: `${data.approved_count || 0} valid entries processed.`,
       });
       setParsedData(null);
+      setLastUploadSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['upload-history'] });
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
@@ -753,6 +755,11 @@ export const useCallSheetUpload = () => {
 
   const clearParsedData = useCallback(() => {
     setParsedData(null);
+    setLastUploadSuccess(false);
+  }, []);
+
+  const resetUploadSuccess = useCallback(() => {
+    setLastUploadSuccess(false);
   }, []);
 
   // Fetch rejection details for a specific upload
@@ -812,5 +819,7 @@ export const useCallSheetUpload = () => {
     updateContact,
     autoFixContacts,
     deleteContact,
+    lastUploadSuccess,
+    resetUploadSuccess,
   };
 };

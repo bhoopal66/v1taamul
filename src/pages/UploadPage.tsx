@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,8 @@ import {
   RotateCcw,
   Eye,
   Wand2,
+  Phone,
+  ArrowRight,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,6 +46,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 export const UploadPage: React.FC = () => {
   const { profile } = useAuth();
   const { isAdmin } = usePermissions();
+  const navigate = useNavigate();
   const {
     parsedData,
     isProcessing,
@@ -58,6 +62,8 @@ export const UploadPage: React.FC = () => {
     updateContact,
     autoFixContacts,
     deleteContact,
+    lastUploadSuccess,
+    resetUploadSuccess,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -314,7 +320,40 @@ export const UploadPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!parsedData ? (
+              {/* Success state - show after successful upload */}
+              {lastUploadSuccess && !parsedData && (
+                <div className="mb-6 p-6 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <div className="flex flex-col items-center gap-4 text-center">
+                    <div className="p-3 rounded-full bg-green-500/20">
+                      <CheckCircle2 className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg text-green-700">Upload Successful!</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Your contacts have been added to today's call list
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => navigate('/call-list')}
+                        className="gap-2"
+                      >
+                        <Phone className="w-4 h-4" />
+                        View Call List
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={resetUploadSuccess}
+                      >
+                        Upload More
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!parsedData && !lastUploadSuccess && (
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -363,7 +402,9 @@ export const UploadPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-              ) : (
+              )}
+
+              {parsedData && (
                 <div className="space-y-6">
                   {/* File Info */}
                   <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">

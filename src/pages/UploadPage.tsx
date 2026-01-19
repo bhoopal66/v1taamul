@@ -65,6 +65,8 @@ export const UploadPage: React.FC = () => {
     lastUploadSuccess,
     resetUploadSuccess,
     checkDuplicateUpload,
+    deleteDuplicateUploads,
+    isDeletingDuplicates,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -265,6 +267,21 @@ export const UploadPage: React.FC = () => {
     setPendingValidation(null);
     setSelectedFile(null);
     clearParsedData();
+  };
+
+  const handleDeleteAndUpload = async () => {
+    const uploadIds = duplicateUploads.map(u => u.id);
+    const success = await deleteDuplicateUploads(uploadIds);
+    
+    if (success && pendingFile && pendingValidation) {
+      submitUpload({ file: pendingFile, validationResult: pendingValidation });
+      setSelectedFile(null);
+    }
+    
+    setDuplicateWarningOpen(false);
+    setDuplicateUploads([]);
+    setPendingFile(null);
+    setPendingValidation(null);
   };
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -924,18 +941,33 @@ export const UploadPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex gap-3 justify-end">
-                <Button variant="outline" onClick={handleDuplicateCancel}>
-                  Cancel
-                </Button>
-                <Button onClick={handleDuplicateConfirm} disabled={isSubmitting}>
-                  {isSubmitting ? (
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteAndUpload}
+                  disabled={isSubmitting || isDeletingDuplicates}
+                  className="order-2 sm:order-1"
+                >
+                  {isDeletingDuplicates ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <Send className="w-4 h-4 mr-2" />
+                    <Trash2 className="w-4 h-4 mr-2" />
                   )}
-                  Upload Anyway
+                  Delete Previous & Upload
                 </Button>
+                <div className="flex gap-3 order-1 sm:order-2">
+                  <Button variant="outline" onClick={handleDuplicateCancel}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleDuplicateConfirm} disabled={isSubmitting || isDeletingDuplicates}>
+                    {isSubmitting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Upload Anyway
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>

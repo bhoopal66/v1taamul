@@ -114,6 +114,60 @@ export const useCallSheetUpload = () => {
     }));
   }, [user?.id]);
 
+  // Delete duplicate uploads and their related data
+  const [isDeletingDuplicates, setIsDeletingDuplicates] = useState(false);
+  
+  const deleteDuplicateUploads = useCallback(async (uploadIds: string[]): Promise<boolean> => {
+    if (!user?.id || uploadIds.length === 0) return false;
+    
+    setIsDeletingDuplicates(true);
+    
+    try {
+      // Delete related records first (foreign key constraints)
+      // 1. Delete from upload_rejections
+      const { error: rejectionsError } = await supabase
+        .from('upload_rejections')
+        .delete()
+        .in('upload_id', uploadIds);
+      
+      if (rejectionsError) {
+        console.error('Error deleting rejections:', rejectionsError);
+      }
+
+      // 2. Delete from approved_call_list
+      const { error: callListError } = await supabase
+        .from('approved_call_list')
+        .delete()
+        .in('upload_id', uploadIds);
+      
+      if (callListError) {
+        console.error('Error deleting call list entries:', callListError);
+      }
+
+      // 3. Delete the uploads themselves
+      const { error: uploadsError } = await supabase
+        .from('call_sheet_uploads')
+        .delete()
+        .in('id', uploadIds);
+      
+      if (uploadsError) {
+        throw uploadsError;
+      }
+
+      // Refresh upload history
+      queryClient.invalidateQueries({ queryKey: ['upload-history'] });
+      
+      toast.success(`Deleted ${uploadIds.length} previous upload${uploadIds.length > 1 ? 's' : ''}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting duplicate uploads:', error);
+      toast.error('Failed to delete previous uploads');
+      return false;
+    } finally {
+      setIsDeletingDuplicates(false);
+    }
+  }, [user?.id, queryClient]);
+
   // Delete an invalid contact from the parsed data
   const deleteContact = useCallback((rowNumber: number) => {
     if (!parsedData) return;
@@ -857,5 +911,7 @@ export const useCallSheetUpload = () => {
     lastUploadSuccess,
     resetUploadSuccess,
     checkDuplicateUpload,
+    deleteDuplicateUploads,
+    isDeletingDuplicates,
   };
 };

@@ -775,13 +775,15 @@ export const useCallSheetUpload = () => {
           
           if (insertError) {
             if (insertError.code === '23505') {
+              // Duplicate phone number - find existing contact and still add to call list
               const { data: existingContact } = await supabase
                 .from('master_contacts')
                 .select('id, current_owner_agent_id')
                 .eq('phone_number', c.phoneNumber)
                 .maybeSingle();
               
-              if (existingContact && existingContact.current_owner_agent_id === user.id) {
+              if (existingContact) {
+                // Add to call list regardless of owner - agents can call any contact
                 existingContactIds.push(existingContact.id);
               }
             } else {

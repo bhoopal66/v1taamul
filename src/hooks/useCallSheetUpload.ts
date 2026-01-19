@@ -84,12 +84,19 @@ export interface DuplicateUploadInfo {
   isCurrentUser?: boolean;
 }
 
+export interface UploadProgress {
+  stage: 'preparing' | 'uploading' | 'processing' | 'creating_list' | 'complete';
+  percentage: number;
+  message: string;
+}
+
 export const useCallSheetUpload = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastUploadSuccess, setLastUploadSuccess] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
 // Check for all duplicate uploads today (same file name) across ALL agents
   const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo[]> => {
@@ -703,8 +710,12 @@ export const useCallSheetUpload = () => {
       if (!user?.id) throw new Error('Not authenticated');
 
       const today = new Date().toISOString().split('T')[0];
+      const validContacts = validationResult.contacts.filter(c => c.isValid);
+      const totalSteps = validContacts.length + 3; // upload record + contacts + call list + rejections
 
-      // Create upload record - auto-approved
+      // Step 1: Create upload record
+      setUploadProgress({ stage: 'preparing', percentage: 5, message: 'Creating upload record...' });
+      
       const { data: upload, error: uploadError } = await supabase
         .from('call_sheet_uploads')
         .insert({
@@ -724,16 +735,27 @@ export const useCallSheetUpload = () => {
 
       if (uploadError) throw uploadError;
 
-      // Insert valid contacts and get their IDs
-      const validContacts = validationResult.contacts.filter(c => c.isValid);
-      
+      setUploadProgress({ stage: 'uploading', percentage: 15, message: 'Upload record created...' });
+
+      // Step 2: Insert valid contacts
       if (validContacts.length > 0) {
-        // First, try to insert new contacts one by one to handle duplicates gracefully
+        setUploadProgress({ stage: 'processing', percentage: 20, message: `Processing ${validContacts.length} contacts...` });
+        
         const insertedContactIds: string[] = [];
         const existingContactIds: string[] = [];
         
-        for (const c of validContacts) {
-          // Try to insert the contact
+        for (let i = 0; i < validContacts.length; i++) {
+          const c = validContacts[i];
+          const contactProgress = 20 + Math.round((i / validContacts.length) * 50);
+          
+          if (i % 5 === 0 || i === validContacts.length - 1) {
+            setUploadProgress({ 
+              stage: 'processing', 
+              percentage: contactProgress, 
+              message: `Processing contact ${i + 1} of ${validContacts.length}...` 
+            });
+          }
+          
           const { data: insertedContact, error: insertError } = await supabase
             .from('master_contacts')
             .insert({
@@ -752,9 +774,7 @@ export const useCallSheetUpload = () => {
             .single();
           
           if (insertError) {
-            // If it's a duplicate key error, try to get the existing contact
             if (insertError.code === '23505') {
-              // Check if this contact already exists and belongs to this user
               const { data: existingContact } = await supabase
                 .from('master_contacts')
                 .select('id, current_owner_agent_id')
@@ -774,8 +794,10 @@ export const useCallSheetUpload = () => {
         
         const allContactIds = [...insertedContactIds, ...existingContactIds];
         
+        // Step 3: Create call list entries
         if (allContactIds.length > 0) {
-          // Check which contacts already have call list entries for today
+          setUploadProgress({ stage: 'creating_list', percentage: 75, message: 'Creating call list entries...' });
+          
           const { data: existingCallListEntries } = await supabase
             .from('approved_call_list')
             .select('contact_id')
@@ -787,13 +809,13 @@ export const useCallSheetUpload = () => {
             (existingCallListEntries || []).map(e => e.contact_id)
           );
           
-          // Only create call list entries for contacts not already in today's list
           const contactsNeedingCallList = allContactIds.filter(
             id => !existingContactIdsInCallList.has(id)
           );
           
           if (contactsNeedingCallList.length > 0) {
-            // Get the current max call_order for today
+            setUploadProgress({ stage: 'creating_list', percentage: 85, message: `Adding ${contactsNeedingCallList.length} contacts to call list...` });
+            
             const { data: maxOrderData } = await supabase
               .from('approved_call_list')
               .select('call_order')
@@ -832,7 +854,9 @@ export const useCallSheetUpload = () => {
         }
       }
 
-      // Insert rejection records for invalid entries
+      // Step 4: Insert rejection records for invalid entries
+      setUploadProgress({ stage: 'complete', percentage: 95, message: 'Saving rejection records...' });
+      
       const invalidContacts = validationResult.contacts.filter(c => !c.isValid);
       
       if (invalidContacts.length > 0) {
@@ -849,6 +873,8 @@ export const useCallSheetUpload = () => {
           .insert(rejectionsToInsert);
       }
 
+      setUploadProgress({ stage: 'complete', percentage: 100, message: 'Upload complete!' });
+
       return upload;
     },
     onSuccess: (data) => {
@@ -857,11 +883,13 @@ export const useCallSheetUpload = () => {
       });
       setParsedData(null);
       setLastUploadSuccess(true);
+      setUploadProgress(null);
       queryClient.invalidateQueries({ queryKey: ['upload-history'] });
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
     onError: (error) => {
       toast.error(`Upload failed: ${error.message}`);
+      setUploadProgress(null);
     },
   });
 
@@ -922,6 +950,7 @@ export const useCallSheetUpload = () => {
     processFile,
     submitUpload: submitUpload.mutate,
     isSubmitting: submitUpload.isPending,
+    uploadProgress,
     uploadHistory: uploadHistory || [],
     historyLoading,
     clearParsedData,

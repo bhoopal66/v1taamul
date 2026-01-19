@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
-import { useCallSheetUpload, RejectionDetail, UploadHistory, ParsedContact, DuplicatesByAgent, DuplicateUploadInfo } from '@/hooks/useCallSheetUpload';
+import { useCallSheetUpload, RejectionDetail, UploadHistory, ParsedContact, DuplicatesByAgent, DuplicateUploadInfo, UploadProgress } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -53,6 +53,7 @@ export const UploadPage: React.FC = () => {
     processFile,
     submitUpload,
     isSubmitting,
+    uploadProgress,
     uploadHistory,
     historyLoading,
     clearParsedData,
@@ -398,8 +399,38 @@ export const UploadPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Upload Progress Indicator */}
+              {isSubmitting && uploadProgress && (
+                <div className="mb-6 p-6 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                        <span className="font-medium">{uploadProgress.message}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-primary">{uploadProgress.percentage}%</span>
+                    </div>
+                    <Progress value={uploadProgress.percentage} className="h-2" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span className={uploadProgress.stage === 'preparing' ? 'text-primary font-medium' : ''}>
+                        Preparing
+                      </span>
+                      <span className={uploadProgress.stage === 'processing' ? 'text-primary font-medium' : ''}>
+                        Processing Contacts
+                      </span>
+                      <span className={uploadProgress.stage === 'creating_list' ? 'text-primary font-medium' : ''}>
+                        Creating List
+                      </span>
+                      <span className={uploadProgress.stage === 'complete' ? 'text-primary font-medium' : ''}>
+                        Complete
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Success state - show after successful upload */}
-              {lastUploadSuccess && !parsedData && (
+              {lastUploadSuccess && !parsedData && !isSubmitting && (
                 <div className="mb-6 p-6 rounded-xl bg-green-500/10 border border-green-500/20">
                   <div className="flex flex-col items-center gap-4 text-center">
                     <div className="p-3 rounded-full bg-green-500/20">
@@ -431,7 +462,7 @@ export const UploadPage: React.FC = () => {
                 </div>
               )}
 
-              {!parsedData && !lastUploadSuccess && (
+              {!parsedData && !lastUploadSuccess && !isSubmitting && (
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}

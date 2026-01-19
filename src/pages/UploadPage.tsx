@@ -894,7 +894,12 @@ export const UploadPage: React.FC = () => {
                       {duplicateUploads.map((upload, index) => (
                         <div 
                           key={upload.id} 
-                          className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
+                          className={cn(
+                            "p-3 rounded-lg border",
+                            upload.isCurrentUser 
+                              ? "bg-yellow-500/10 border-yellow-500/20" 
+                              : "bg-orange-500/10 border-orange-500/20"
+                          )}
                         >
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 min-w-0">
@@ -902,7 +907,12 @@ export const UploadPage: React.FC = () => {
                                 #{duplicateUploads.length - index}
                               </span>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{upload.fileName}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium truncate">{upload.fileName}</p>
+                                  <Badge variant="outline" className="text-xs shrink-0">
+                                    {upload.agentName || 'Unknown'}
+                                  </Badge>
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                   {upload.uploadTime ? formatDistanceToNow(new Date(upload.uploadTime), { addSuffix: true }) : 'Earlier today'}
                                 </p>

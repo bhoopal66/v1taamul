@@ -79,6 +79,9 @@ export interface DuplicateUploadInfo {
   totalEntries: number;
   validEntries: number;
   status?: string;
+  agentId?: string;
+  agentName?: string;
+  isCurrentUser?: boolean;
 }
 
 export const useCallSheetUpload = () => {
@@ -88,30 +91,50 @@ export const useCallSheetUpload = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastUploadSuccess, setLastUploadSuccess] = useState(false);
 
-// Check for all duplicate uploads today (same file name)
+// Check for all duplicate uploads today (same file name) across ALL agents
   const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo[]> => {
     if (!user?.id) return [];
 
     const today = new Date().toISOString().split('T')[0];
     
-    const { data, error } = await supabase
+    // First, get the duplicate uploads
+    const { data: uploads, error } = await supabase
       .from('call_sheet_uploads')
-      .select('id, file_name, upload_timestamp, total_entries_submitted, valid_entries, status')
-      .eq('agent_id', user.id)
+      .select('id, file_name, upload_timestamp, total_entries_submitted, valid_entries, status, agent_id')
       .eq('upload_date', today)
       .eq('file_name', fileName)
       .order('upload_timestamp', { ascending: false });
 
-    if (error || !data || data.length === 0) return [];
+    if (error || !uploads || uploads.length === 0) return [];
 
-    return data.map(upload => ({
-      id: upload.id,
-      fileName: upload.file_name || fileName,
-      uploadTime: upload.upload_timestamp || '',
-      totalEntries: upload.total_entries_submitted || 0,
-      validEntries: upload.valid_entries || 0,
-      status: upload.status || 'pending',
-    }));
+    // Get unique agent IDs to fetch their names
+    const agentIds = [...new Set(uploads.map(u => u.agent_id))];
+    
+    // Fetch agent profiles
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, username')
+      .in('id', agentIds);
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    return uploads.map(upload => {
+      const profile = profileMap.get(upload.agent_id);
+      const agentName = profile?.full_name || profile?.username || 'Unknown';
+      const isCurrentUser = upload.agent_id === user.id;
+      
+      return {
+        id: upload.id,
+        fileName: upload.file_name || fileName,
+        uploadTime: upload.upload_timestamp || '',
+        totalEntries: upload.total_entries_submitted || 0,
+        validEntries: upload.valid_entries || 0,
+        status: upload.status || 'pending',
+        agentId: upload.agent_id,
+        agentName: isCurrentUser ? 'You' : agentName,
+        isCurrentUser,
+      };
+    });
   }, [user?.id]);
 
   // Delete duplicate uploads and their related data

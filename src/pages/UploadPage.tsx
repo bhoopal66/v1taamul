@@ -270,10 +270,17 @@ export const UploadPage: React.FC = () => {
   };
 
   const handleDeleteAndUpload = async () => {
-    const uploadIds = duplicateUploads.map(u => u.id);
-    const success = await deleteDuplicateUploads(uploadIds);
+    // Only delete current user's uploads, not other agents'
+    const ownUploadIds = duplicateUploads
+      .filter(u => u.isCurrentUser)
+      .map(u => u.id);
     
-    if (success && pendingFile && pendingValidation) {
+    if (ownUploadIds.length > 0) {
+      const success = await deleteDuplicateUploads(ownUploadIds);
+      if (!success) return;
+    }
+    
+    if (pendingFile && pendingValidation) {
       submitUpload({ file: pendingFile, validationResult: pendingValidation });
       setSelectedFile(null);
     }
@@ -283,6 +290,9 @@ export const UploadPage: React.FC = () => {
     setPendingFile(null);
     setPendingValidation(null);
   };
+
+  // Count of current user's deletable uploads
+  const ownDuplicateCount = duplicateUploads.filter(u => u.isCurrentUser).length;
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -952,19 +962,25 @@ export const UploadPage: React.FC = () => {
               )}
 
               <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                <Button 
-                  variant="destructive" 
-                  onClick={handleDeleteAndUpload}
-                  disabled={isSubmitting || isDeletingDuplicates}
-                  className="order-2 sm:order-1"
-                >
-                  {isDeletingDuplicates ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 mr-2" />
-                  )}
-                  Delete Previous & Upload
-                </Button>
+                {ownDuplicateCount > 0 ? (
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteAndUpload}
+                    disabled={isSubmitting || isDeletingDuplicates}
+                    className="order-2 sm:order-1"
+                  >
+                    {isDeletingDuplicates ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Delete My {ownDuplicateCount} Upload{ownDuplicateCount > 1 ? 's' : ''} & Upload
+                  </Button>
+                ) : (
+                  <div className="text-xs text-muted-foreground self-center order-2 sm:order-1">
+                    Other agents' uploads cannot be deleted
+                  </div>
+                )}
                 <div className="flex gap-3 order-1 sm:order-2">
                   <Button variant="outline" onClick={handleDuplicateCancel}>
                     Cancel

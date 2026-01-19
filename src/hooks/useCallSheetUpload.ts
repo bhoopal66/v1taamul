@@ -713,6 +713,29 @@ export const useCallSheetUpload = () => {
       const validContacts = validationResult.contacts.filter(c => c.isValid);
       const totalSteps = validContacts.length + 3; // upload record + contacts + call list + rejections
 
+      // Server-side duplicate check - prevent same agent uploading same file within 5 minutes
+      setUploadProgress({ stage: 'preparing', percentage: 2, message: 'Checking for duplicate uploads...' });
+      
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: recentDuplicate, error: dupCheckError } = await supabase
+        .from('call_sheet_uploads')
+        .select('id, upload_timestamp')
+        .eq('agent_id', user.id)
+        .eq('file_name', file.name)
+        .eq('upload_date', today)
+        .gte('upload_timestamp', fiveMinutesAgo)
+        .order('upload_timestamp', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (dupCheckError) {
+        console.error('Duplicate check error:', dupCheckError);
+      }
+      
+      if (recentDuplicate) {
+        throw new Error('This file was already uploaded in the last 5 minutes. Please wait before uploading again.');
+      }
+
       // Step 1: Create upload record
       setUploadProgress({ stage: 'preparing', percentage: 5, message: 'Creating upload record...' });
       

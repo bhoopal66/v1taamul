@@ -75,6 +75,10 @@ export const UploadPage: React.FC = () => {
   const [previewFilter, setPreviewFilter] = useState<'all' | 'valid' | 'invalid'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Debounce ref to prevent rapid file selections
+  const lastFileSelectTime = useRef<number>(0);
+  const isUploadInProgress = useRef<boolean>(false);
+  
   // Rejection details dialog state
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
   const [selectedUploadForRejections, setSelectedUploadForRejections] = useState<UploadHistory | null>(null);
@@ -89,7 +93,6 @@ export const UploadPage: React.FC = () => {
   const [duplicateUploads, setDuplicateUploads] = useState<DuplicateUploadInfo[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingValidation, setPendingValidation] = useState<any>(null);
-
   const handleViewRejections = async (upload: UploadHistory) => {
     setSelectedUploadForRejections(upload);
     setRejectionDialogOpen(true);
@@ -207,6 +210,22 @@ export const UploadPage: React.FC = () => {
   }, []);
 
   const handleFileSelect = async (file: File) => {
+    // Debounce: prevent rapid file selections (within 3 seconds)
+    const now = Date.now();
+    if (now - lastFileSelectTime.current < 3000) {
+      toast.error('Please wait a moment before uploading another file');
+      return;
+    }
+    
+    // Prevent overlapping uploads
+    if (isUploadInProgress.current || isProcessing || isSubmitting) {
+      toast.error('An upload is already in progress');
+      return;
+    }
+    
+    lastFileSelectTime.current = now;
+    isUploadInProgress.current = true;
+    
     const validTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
@@ -220,11 +239,13 @@ export const UploadPage: React.FC = () => {
 
     if (!validTypes.includes(file.type) && !hasValidExtension) {
       toast.error('Please upload a valid Excel (.xlsx, .xls) or CSV file');
+      isUploadInProgress.current = false;
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error('File size must be less than 10MB');
+      isUploadInProgress.current = false;
       return;
     }
 
@@ -238,6 +259,7 @@ export const UploadPage: React.FC = () => {
       // If processing failed or returned null, stop here
       if (!result) {
         setSelectedFile(null);
+        isUploadInProgress.current = false;
         return;
       }
       
@@ -247,6 +269,7 @@ export const UploadPage: React.FC = () => {
         setPendingFile(file);
         setPendingValidation(result);
         setDuplicateWarningOpen(true);
+        isUploadInProgress.current = false;
         return;
       }
       
@@ -255,9 +278,11 @@ export const UploadPage: React.FC = () => {
         submitUpload({ file, validationResult: result });
         setSelectedFile(null);
       }
+      isUploadInProgress.current = false;
     } catch (error) {
       console.error('File processing error:', error);
       setSelectedFile(null);
+      isUploadInProgress.current = false;
       // Error toast is already shown by processFile
     }
   };
@@ -470,7 +495,7 @@ export const UploadPage: React.FC = () => {
                   className={cn(
                     "border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer hover:border-primary/50 hover:bg-primary/5",
                     isDragging && "border-primary bg-primary/10 scale-[1.02]",
-                    isProcessing && "pointer-events-none opacity-50"
+                    (isProcessing || isSubmitting) && "pointer-events-none opacity-50"
                   )}
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -482,12 +507,14 @@ export const UploadPage: React.FC = () => {
                     className="hidden"
                   />
                   
-                  {isProcessing ? (
+                  {isProcessing || isSubmitting ? (
                     <div className="flex flex-col items-center gap-4">
                       <Loader2 className="w-12 h-12 text-primary animate-spin" />
                       <div>
-                        <p className="font-medium">Processing file...</p>
-                        <p className="text-sm text-muted-foreground">Validating contacts and checking for duplicates</p>
+                        <p className="font-medium">{isSubmitting ? 'Uploading...' : 'Processing file...'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {isSubmitting ? 'Adding contacts to your call list' : 'Validating contacts and checking for duplicates'}
+                        </p>
                       </div>
                     </div>
                   ) : (

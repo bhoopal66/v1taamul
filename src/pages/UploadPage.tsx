@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
-import { useCallSheetUpload, RejectionDetail, UploadHistory, ParsedContact, DuplicatesByAgent } from '@/hooks/useCallSheetUpload';
+import { useCallSheetUpload, RejectionDetail, UploadHistory, ParsedContact, DuplicatesByAgent, DuplicateUploadInfo } from '@/hooks/useCallSheetUpload';
 import { TalkTimeUpload } from '@/components/upload/TalkTimeUpload';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -64,6 +64,7 @@ export const UploadPage: React.FC = () => {
     deleteContact,
     lastUploadSuccess,
     resetUploadSuccess,
+    checkDuplicateUpload,
   } = useCallSheetUpload();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -79,6 +80,12 @@ export const UploadPage: React.FC = () => {
 
   // Confirmation dialog state
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+
+  // Duplicate warning dialog state
+  const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateUploadInfo | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingValidation, setPendingValidation] = useState<any>(null);
 
   const handleViewRejections = async (upload: UploadHistory) => {
     setSelectedUploadForRejections(upload);
@@ -218,14 +225,46 @@ export const UploadPage: React.FC = () => {
       return;
     }
 
+    // Check for duplicate upload
+    const existingUpload = await checkDuplicateUpload(file.name);
+    
     setSelectedFile(file);
     const result = await processFile(file);
     
-    // Auto-submit if there are valid entries
+    // If duplicate found, show warning dialog instead of auto-submitting
+    if (existingUpload && result && result.validEntries > 0) {
+      setDuplicateInfo(existingUpload);
+      setPendingFile(file);
+      setPendingValidation(result);
+      setDuplicateWarningOpen(true);
+      return;
+    }
+    
+    // Auto-submit if there are valid entries and no duplicate
     if (result && result.validEntries > 0) {
       submitUpload({ file, validationResult: result });
       setSelectedFile(null);
     }
+  };
+
+  const handleDuplicateConfirm = () => {
+    if (pendingFile && pendingValidation) {
+      submitUpload({ file: pendingFile, validationResult: pendingValidation });
+      setSelectedFile(null);
+    }
+    setDuplicateWarningOpen(false);
+    setDuplicateInfo(null);
+    setPendingFile(null);
+    setPendingValidation(null);
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicateWarningOpen(false);
+    setDuplicateInfo(null);
+    setPendingFile(null);
+    setPendingValidation(null);
+    setSelectedFile(null);
+    clearParsedData();
   };
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -810,6 +849,66 @@ export const UploadPage: React.FC = () => {
                     <Send className="w-4 h-4 mr-2" />
                   )}
                   Confirm & Submit
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Duplicate Upload Warning Dialog */}
+          <Dialog open={duplicateWarningOpen} onOpenChange={setDuplicateWarningOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-yellow-600">
+                  <AlertTriangle className="w-5 h-5" />
+                  Duplicate File Detected
+                </DialogTitle>
+                <DialogDescription>
+                  This file was already uploaded today. Do you want to upload it again?
+                </DialogDescription>
+              </DialogHeader>
+              
+              {duplicateInfo && (
+                <div className="space-y-4 py-4">
+                  <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">File name</span>
+                        <span className="font-medium truncate ml-2">{duplicateInfo.fileName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Uploaded</span>
+                        <span className="font-medium">
+                          {duplicateInfo.uploadTime ? formatDistanceToNow(new Date(duplicateInfo.uploadTime), { addSuffix: true }) : 'Earlier today'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Entries processed</span>
+                        <span className="font-medium">{duplicateInfo.validEntries} / {duplicateInfo.totalEntries}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Note</AlertTitle>
+                    <AlertDescription>
+                      Uploading again will add new contacts to your call list. Existing contacts will be skipped automatically.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={handleDuplicateCancel}>
+                  Cancel
+                </Button>
+                <Button onClick={handleDuplicateConfirm} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Upload Anyway
                 </Button>
               </div>
             </DialogContent>

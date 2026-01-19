@@ -72,12 +72,47 @@ const cleanPhoneNumber = (phone: string): string => {
   return phone.replace(/[\s\-\(\)\.]/g, '').replace(/^00/, '+');
 };
 
+export interface DuplicateUploadInfo {
+  id: string;
+  fileName: string;
+  uploadTime: string;
+  totalEntries: number;
+  validEntries: number;
+}
+
 export const useCallSheetUpload = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [parsedData, setParsedData] = useState<UploadValidationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastUploadSuccess, setLastUploadSuccess] = useState(false);
+
+  // Check for duplicate uploads (same file name today)
+  const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo | null> => {
+    if (!user?.id) return null;
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('call_sheet_uploads')
+      .select('id, file_name, upload_timestamp, total_entries_submitted, valid_entries')
+      .eq('agent_id', user.id)
+      .eq('upload_date', today)
+      .eq('file_name', fileName)
+      .order('upload_timestamp', { ascending: false })
+      .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+
+    const upload = data[0];
+    return {
+      id: upload.id,
+      fileName: upload.file_name || fileName,
+      uploadTime: upload.upload_timestamp || '',
+      totalEntries: upload.total_entries_submitted || 0,
+      validEntries: upload.valid_entries || 0,
+    };
+  }, [user?.id]);
 
   // Delete an invalid contact from the parsed data
   const deleteContact = useCallback((rowNumber: number) => {
@@ -821,5 +856,6 @@ export const useCallSheetUpload = () => {
     deleteContact,
     lastUploadSuccess,
     resetUploadSuccess,
+    checkDuplicateUpload,
   };
 };

@@ -615,53 +615,107 @@ export const useCallSheetUpload = () => {
       const validContacts = validationResult.contacts.filter(c => c.isValid);
       
       if (validContacts.length > 0) {
-        const contactsToInsert = validContacts.map(c => ({
-          company_name: c.companyName,
-          contact_person_name: c.contactPersonName || null,
-          phone_number: c.phoneNumber,
-          trade_license_number: c.tradeLicenseNumber || null,
-          city: c.city || null,
-          industry: c.industry || null,
-          area: c.area || null,
-          first_uploaded_by: user.id,
-          current_owner_agent_id: user.id,
-          status: 'new' as const,
-        }));
-
-        // Insert contacts and get back their IDs
-        const { data: insertedContacts, error: contactsError } = await supabase
-          .from('master_contacts')
-          .insert(contactsToInsert)
-          .select('id');
-
-        if (contactsError) {
-          console.error('Error inserting contacts:', contactsError);
-          throw new Error(`Failed to insert contacts: ${contactsError.message}`);
+        // First, try to insert new contacts one by one to handle duplicates gracefully
+        const insertedContactIds: string[] = [];
+        const existingContactIds: string[] = [];
+        
+        for (const c of validContacts) {
+          // Try to insert the contact
+          const { data: insertedContact, error: insertError } = await supabase
+            .from('master_contacts')
+            .insert({
+              company_name: c.companyName,
+              contact_person_name: c.contactPersonName || null,
+              phone_number: c.phoneNumber,
+              trade_license_number: c.tradeLicenseNumber || null,
+              city: c.city || null,
+              industry: c.industry || null,
+              area: c.area || null,
+              first_uploaded_by: user.id,
+              current_owner_agent_id: user.id,
+              status: 'new' as const,
+            })
+            .select('id')
+            .single();
+          
+          if (insertError) {
+            // If it's a duplicate key error, try to get the existing contact
+            if (insertError.code === '23505') {
+              // Check if this contact already exists and belongs to this user
+              const { data: existingContact } = await supabase
+                .from('master_contacts')
+                .select('id, current_owner_agent_id')
+                .eq('phone_number', c.phoneNumber)
+                .maybeSingle();
+              
+              if (existingContact && existingContact.current_owner_agent_id === user.id) {
+                existingContactIds.push(existingContact.id);
+              }
+            } else {
+              console.error('Error inserting contact:', insertError);
+            }
+          } else if (insertedContact) {
+            insertedContactIds.push(insertedContact.id);
+          }
         }
         
-        if (insertedContacts && insertedContacts.length > 0) {
-          // Create approved call list entries immediately
-          const callListEntries = insertedContacts.map((contact, index) => ({
-            agent_id: user.id,
-            contact_id: contact.id,
-            upload_id: upload.id,
-            list_date: today,
-            call_order: index + 1,
-            call_status: 'pending' as const,
-          }));
-
-          const { error: callListError } = await supabase
+        const allContactIds = [...insertedContactIds, ...existingContactIds];
+        
+        if (allContactIds.length > 0) {
+          // Check which contacts already have call list entries for today
+          const { data: existingCallListEntries } = await supabase
             .from('approved_call_list')
-            .insert(callListEntries);
-
-          if (callListError) {
-            console.error('Error creating call list:', callListError);
-            throw new Error(`Failed to create call list: ${callListError.message}`);
-          }
+            .select('contact_id')
+            .eq('agent_id', user.id)
+            .eq('list_date', today)
+            .in('contact_id', allContactIds);
           
-          console.log(`Successfully created ${callListEntries.length} call list entries`);
+          const existingContactIdsInCallList = new Set(
+            (existingCallListEntries || []).map(e => e.contact_id)
+          );
+          
+          // Only create call list entries for contacts not already in today's list
+          const contactsNeedingCallList = allContactIds.filter(
+            id => !existingContactIdsInCallList.has(id)
+          );
+          
+          if (contactsNeedingCallList.length > 0) {
+            // Get the current max call_order for today
+            const { data: maxOrderData } = await supabase
+              .from('approved_call_list')
+              .select('call_order')
+              .eq('agent_id', user.id)
+              .eq('list_date', today)
+              .order('call_order', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            const startOrder = (maxOrderData?.call_order || 0) + 1;
+            
+            const callListEntries = contactsNeedingCallList.map((contactId, index) => ({
+              agent_id: user.id,
+              contact_id: contactId,
+              upload_id: upload.id,
+              list_date: today,
+              call_order: startOrder + index,
+              call_status: 'pending' as const,
+            }));
+
+            const { error: callListError } = await supabase
+              .from('approved_call_list')
+              .insert(callListEntries);
+
+            if (callListError) {
+              console.error('Error creating call list:', callListError);
+              throw new Error(`Failed to create call list: ${callListError.message}`);
+            }
+            
+            console.log(`Successfully created ${callListEntries.length} call list entries (${insertedContactIds.length} new, ${existingContactIds.length} existing)`);
+          } else {
+            console.log('All contacts already in today\'s call list');
+          }
         } else {
-          console.warn('No contacts were inserted - they may already exist');
+          console.warn('No contacts were inserted or found - they may belong to other agents');
         }
       }
 
@@ -685,7 +739,9 @@ export const useCallSheetUpload = () => {
       return upload;
     },
     onSuccess: (data) => {
-      toast.success(`Call sheet uploaded and approved! ${data.approved_count || 0} contacts added to your call list.`);
+      toast.success(`Call sheet processed! Contacts added to today's call list.`, {
+        description: `${data.approved_count || 0} valid entries processed.`,
+      });
       setParsedData(null);
       queryClient.invalidateQueries({ queryKey: ['upload-history'] });
       queryClient.invalidateQueries({ queryKey: ['call-list'] });

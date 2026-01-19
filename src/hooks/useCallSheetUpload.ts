@@ -78,6 +78,7 @@ export interface DuplicateUploadInfo {
   uploadTime: string;
   totalEntries: number;
   validEntries: number;
+  status?: string;
 }
 
 export const useCallSheetUpload = () => {
@@ -87,31 +88,30 @@ export const useCallSheetUpload = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastUploadSuccess, setLastUploadSuccess] = useState(false);
 
-  // Check for duplicate uploads (same file name today)
-  const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo | null> => {
-    if (!user?.id) return null;
+// Check for all duplicate uploads today (same file name)
+  const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo[]> => {
+    if (!user?.id) return [];
 
     const today = new Date().toISOString().split('T')[0];
     
     const { data, error } = await supabase
       .from('call_sheet_uploads')
-      .select('id, file_name, upload_timestamp, total_entries_submitted, valid_entries')
+      .select('id, file_name, upload_timestamp, total_entries_submitted, valid_entries, status')
       .eq('agent_id', user.id)
       .eq('upload_date', today)
       .eq('file_name', fileName)
-      .order('upload_timestamp', { ascending: false })
-      .limit(1);
+      .order('upload_timestamp', { ascending: false });
 
-    if (error || !data || data.length === 0) return null;
+    if (error || !data || data.length === 0) return [];
 
-    const upload = data[0];
-    return {
+    return data.map(upload => ({
       id: upload.id,
       fileName: upload.file_name || fileName,
       uploadTime: upload.upload_timestamp || '',
       totalEntries: upload.total_entries_submitted || 0,
       validEntries: upload.valid_entries || 0,
-    };
+      status: upload.status || 'pending',
+    }));
   }, [user?.id]);
 
   // Delete an invalid contact from the parsed data

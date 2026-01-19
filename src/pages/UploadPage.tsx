@@ -83,7 +83,7 @@ export const UploadPage: React.FC = () => {
 
   // Duplicate warning dialog state
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
-  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateUploadInfo | null>(null);
+  const [duplicateUploads, setDuplicateUploads] = useState<DuplicateUploadInfo[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingValidation, setPendingValidation] = useState<any>(null);
 
@@ -225,15 +225,15 @@ export const UploadPage: React.FC = () => {
       return;
     }
 
-    // Check for duplicate upload
-    const existingUpload = await checkDuplicateUpload(file.name);
+    // Check for duplicate uploads
+    const existingUploads = await checkDuplicateUpload(file.name);
     
     setSelectedFile(file);
     const result = await processFile(file);
     
-    // If duplicate found, show warning dialog instead of auto-submitting
-    if (existingUpload && result && result.validEntries > 0) {
-      setDuplicateInfo(existingUpload);
+    // If duplicates found, show warning dialog instead of auto-submitting
+    if (existingUploads.length > 0 && result && result.validEntries > 0) {
+      setDuplicateUploads(existingUploads);
       setPendingFile(file);
       setPendingValidation(result);
       setDuplicateWarningOpen(true);
@@ -253,14 +253,14 @@ export const UploadPage: React.FC = () => {
       setSelectedFile(null);
     }
     setDuplicateWarningOpen(false);
-    setDuplicateInfo(null);
+    setDuplicateUploads([]);
     setPendingFile(null);
     setPendingValidation(null);
   };
 
   const handleDuplicateCancel = () => {
     setDuplicateWarningOpen(false);
-    setDuplicateInfo(null);
+    setDuplicateUploads([]);
     setPendingFile(null);
     setPendingValidation(null);
     setSelectedFile(null);
@@ -856,37 +856,63 @@ export const UploadPage: React.FC = () => {
 
           {/* Duplicate Upload Warning Dialog */}
           <Dialog open={duplicateWarningOpen} onOpenChange={setDuplicateWarningOpen}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-yellow-600">
                   <AlertTriangle className="w-5 h-5" />
                   Duplicate File Detected
                 </DialogTitle>
                 <DialogDescription>
-                  This file was already uploaded today. Do you want to upload it again?
+                  This file has been uploaded {duplicateUploads.length} time{duplicateUploads.length > 1 ? 's' : ''} today. Do you want to upload it again?
                 </DialogDescription>
               </DialogHeader>
               
-              {duplicateInfo && (
+              {duplicateUploads.length > 0 && (
                 <div className="space-y-4 py-4">
-                  <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">File name</span>
-                        <span className="font-medium truncate ml-2">{duplicateInfo.fileName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Uploaded</span>
-                        <span className="font-medium">
-                          {duplicateInfo.uploadTime ? formatDistanceToNow(new Date(duplicateInfo.uploadTime), { addSuffix: true }) : 'Earlier today'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Entries processed</span>
-                        <span className="font-medium">{duplicateInfo.validEntries} / {duplicateInfo.totalEntries}</span>
-                      </div>
-                    </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Previous uploads today:
                   </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="space-y-2">
+                      {duplicateUploads.map((upload, index) => (
+                        <div 
+                          key={upload.id} 
+                          className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs text-muted-foreground font-medium shrink-0">
+                                #{duplicateUploads.length - index}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{upload.fileName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {upload.uploadTime ? formatDistanceToNow(new Date(upload.uploadTime), { addSuffix: true }) : 'Earlier today'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right">
+                                <p className="text-sm font-medium">{upload.validEntries} / {upload.totalEntries}</p>
+                                <p className="text-xs text-muted-foreground">entries</p>
+                              </div>
+                              {upload.status && (
+                                <Badge 
+                                  variant={upload.status === 'approved' ? 'default' : upload.status === 'rejected' ? 'destructive' : 'secondary'}
+                                  className={cn(
+                                    'text-xs',
+                                    upload.status === 'approved' && 'bg-green-500/10 text-green-600 border-green-500/20'
+                                  )}
+                                >
+                                  {upload.status}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
 
                   <Alert>
                     <AlertCircle className="h-4 w-4" />

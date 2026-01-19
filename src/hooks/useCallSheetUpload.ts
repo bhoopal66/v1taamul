@@ -144,15 +144,70 @@ export const useCallSheetUpload = () => {
     });
   }, [user?.id]);
 
-  // Delete duplicate uploads and their related data
+  // Delete duplicate uploads and their related data (with protection for worked entries)
   const [isDeletingDuplicates, setIsDeletingDuplicates] = useState(false);
   
-  const deleteDuplicateUploads = useCallback(async (uploadIds: string[]): Promise<boolean> => {
+  // Check if uploads have protected (worked on) call list entries
+  const checkProtectedEntries = useCallback(async (uploadIds: string[]): Promise<{
+    hasProtected: boolean;
+    protectedCount: number;
+    safeToDeleteCount: number;
+  }> => {
+    if (uploadIds.length === 0) return { hasProtected: false, protectedCount: 0, safeToDeleteCount: 0 };
+
+    // Get call list entries for these uploads
+    const { data: callListEntries } = await supabase
+      .from('approved_call_list')
+      .select('id, call_status, contact_id')
+      .in('upload_id', uploadIds);
+
+    if (!callListEntries || callListEntries.length === 0) {
+      return { hasProtected: false, protectedCount: 0, safeToDeleteCount: 0 };
+    }
+
+    // Check for entries that have been called
+    const calledEntries = callListEntries.filter(e => e.call_status === 'called');
+    
+    // Also check if any have feedback logged
+    const contactIds = callListEntries.map(e => e.contact_id);
+    const { data: feedbackData } = await supabase
+      .from('call_feedback')
+      .select('contact_id')
+      .in('contact_id', contactIds);
+
+    const contactsWithFeedback = new Set(feedbackData?.map(f => f.contact_id) || []);
+    
+    // Protected = called OR has feedback
+    const protectedEntries = callListEntries.filter(e => 
+      e.call_status === 'called' || contactsWithFeedback.has(e.contact_id)
+    );
+
+    return {
+      hasProtected: protectedEntries.length > 0,
+      protectedCount: protectedEntries.length,
+      safeToDeleteCount: callListEntries.length - protectedEntries.length,
+    };
+  }, []);
+  
+  const deleteDuplicateUploads = useCallback(async (uploadIds: string[], forceDelete = false): Promise<boolean> => {
     if (!user?.id || uploadIds.length === 0) return false;
     
     setIsDeletingDuplicates(true);
     
     try {
+      // First check for protected entries (unless force delete)
+      if (!forceDelete) {
+        const protection = await checkProtectedEntries(uploadIds);
+        if (protection.hasProtected) {
+          toast.error(`Cannot delete: ${protection.protectedCount} contacts have already been called or have feedback logged`, {
+            description: 'These records are protected to prevent data loss.',
+            duration: 6000,
+          });
+          setIsDeletingDuplicates(false);
+          return false;
+        }
+      }
+
       // Delete related records first (foreign key constraints)
       // 1. Delete from upload_rejections
       const { error: rejectionsError } = await supabase
@@ -164,14 +219,44 @@ export const useCallSheetUpload = () => {
         console.error('Error deleting rejections:', rejectionsError);
       }
 
-      // 2. Delete from approved_call_list
-      const { error: callListError } = await supabase
+      // 2. Only delete call list entries that haven't been worked on
+      // First get entries that are safe to delete (pending status, no feedback)
+      const { data: callListEntries } = await supabase
         .from('approved_call_list')
-        .delete()
+        .select('id, contact_id, call_status')
         .in('upload_id', uploadIds);
-      
-      if (callListError) {
-        console.error('Error deleting call list entries:', callListError);
+
+      if (callListEntries && callListEntries.length > 0) {
+        // Get contacts with feedback
+        const contactIds = callListEntries.map(e => e.contact_id);
+        const { data: feedbackData } = await supabase
+          .from('call_feedback')
+          .select('contact_id')
+          .in('contact_id', contactIds);
+
+        const contactsWithFeedback = new Set(feedbackData?.map(f => f.contact_id) || []);
+
+        // Filter to only delete safe entries
+        const safeToDeleteIds = callListEntries
+          .filter(e => e.call_status === 'pending' && !contactsWithFeedback.has(e.contact_id))
+          .map(e => e.id);
+
+        if (safeToDeleteIds.length > 0) {
+          const { error: callListError } = await supabase
+            .from('approved_call_list')
+            .delete()
+            .in('id', safeToDeleteIds);
+          
+          if (callListError) {
+            console.error('Error deleting call list entries:', callListError);
+          }
+        }
+
+        // Log if some entries were protected
+        const protectedCount = callListEntries.length - safeToDeleteIds.length;
+        if (protectedCount > 0) {
+          console.log(`Protected ${protectedCount} call list entries from deletion (already worked on)`);
+        }
       }
 
       // 3. Delete the uploads themselves
@@ -196,7 +281,7 @@ export const useCallSheetUpload = () => {
     } finally {
       setIsDeletingDuplicates(false);
     }
-  }, [user?.id, queryClient]);
+  }, [user?.id, queryClient, checkProtectedEntries]);
 
   // Delete an invalid contact from the parsed data
   const deleteContact = useCallback((rowNumber: number) => {
@@ -990,5 +1075,6 @@ export const useCallSheetUpload = () => {
     checkDuplicateUpload,
     deleteDuplicateUploads,
     isDeletingDuplicates,
+    checkProtectedEntries,
   };
 };

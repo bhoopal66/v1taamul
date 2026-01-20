@@ -24,16 +24,52 @@ export interface UnansweredCallsData {
   periodLabel: string;
 }
 
+export interface TeamAgent {
+  id: string;
+  name: string;
+  username: string;
+}
+
 export const useUnansweredCallsReport = (
   period: UnansweredPeriod = 'today',
   teamId?: string,
-  feedbackType: CallFeedbackType = 'not_answered'
+  feedbackType: CallFeedbackType = 'not_answered',
+  selectedAgentId?: string
 ) => {
   const { user, ledTeamId, userRole } = useAuth();
   const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
+  // Fetch team agents for the filter dropdown
+  const { data: teamAgents } = useQuery({
+    queryKey: ['team-agents-for-filter', teamId, ledTeamId, user?.id],
+    queryFn: async (): Promise<TeamAgent[]> => {
+      const effectiveTeamId = teamId || (!canSeeAllTeams ? ledTeamId : undefined);
+      
+      let query = supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('is_active', true)
+        .order('full_name');
+      
+      if (effectiveTeamId) {
+        query = query.eq('team_id', effectiveTeamId);
+      } else if (!canSeeAllTeams && user?.id) {
+        query = query.eq('supervisor_id', user.id);
+      }
+      
+      const { data: agents } = await query;
+      
+      return (agents || []).map(a => ({
+        id: a.id,
+        name: a.full_name || a.username || 'Unknown',
+        username: a.username || '',
+      }));
+    },
+    enabled: !!user?.id,
+  });
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['unanswered-calls-report', period, teamId, ledTeamId, user?.id, feedbackType],
+    queryKey: ['unanswered-calls-report', period, teamId, ledTeamId, user?.id, feedbackType, selectedAgentId],
     queryFn: async (): Promise<UnansweredCallsData> => {
       // Calculate start date based on period
       const now = new Date();
@@ -105,8 +141,11 @@ export const useUnansweredCallsReport = (
         .gte('call_timestamp', startDate.toISOString())
         .order('call_timestamp', { ascending: false });
 
-      // Apply agent filter if we have specific agents to filter
-      if (agentIds.length > 0) {
+      // Apply agent filter - if specific agent selected, use that; otherwise use team agents
+      if (selectedAgentId) {
+        // Filter by specific selected agent
+        query = query.eq('agent_id', selectedAgentId);
+      } else if (agentIds.length > 0) {
         query = query.in('agent_id', agentIds);
       } else if (!canSeeAllTeams) {
         // No agents found for this supervisor, return empty
@@ -157,5 +196,6 @@ export const useUnansweredCallsReport = (
     data: data || { records: [], totalCount: 0, periodLabel: '' },
     isLoading,
     refetch,
+    teamAgents: teamAgents || [],
   };
 };

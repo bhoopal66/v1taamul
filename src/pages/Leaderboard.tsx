@@ -843,12 +843,12 @@ export const Leaderboard: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
+                    <Select value={newPresetCategory || '__none__'} onValueChange={(val) => setNewPresetCategory(val === '__none__' ? '' : val)}>
                       <SelectTrigger id="preset-category">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No category</SelectItem>
+                        <SelectItem value="__none__">No category</SelectItem>
                         {getCategories.map((cat) => {
                           const catColor = getCategoryColor(cat);
                           return (

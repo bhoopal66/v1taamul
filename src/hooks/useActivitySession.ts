@@ -267,6 +267,7 @@ export function useActivitySession() {
     onSuccess: () => {
       toast.success('Session started! Select your activity.');
       queryClient.invalidateQueries({ queryKey: ['activity-session'] });
+      queryClient.invalidateQueries({ queryKey: ['activity-session-status'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
     onError: (error) => {

@@ -48,12 +48,12 @@ const getReasonBadge = (status: AgentWorkingStatus) => {
   // Not working - determine reason
   const endReason = status.endReason || '';
   
-  // Check for 5-minute auto-logout first
+  // Check for 10-minute auto-logout first
   if (endReason.startsWith('auto_logout_5min_')) {
     const activityType = endReason.replace('auto_logout_5min_', '');
     const label = activityType === 'calling_telecalling' 
-      ? 'Auto Logout – Cold Calling (5 min rule)'
-      : 'Auto Logout – Client Meeting (5 min rule)';
+      ? 'Auto Logout – Cold Calling (10 min rule)'
+      : 'Auto Logout – Client Meeting (10 min rule)';
     return { label, icon: Phone, variant: 'destructive' as const };
   }
 

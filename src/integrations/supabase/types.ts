@@ -44,9 +44,60 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_confirmations: {
+        Row: {
+          activity_after: string | null
+          activity_before: string | null
+          auto_switch_reason: string | null
+          created_at: string
+          id: string
+          prompted_at: string
+          responded_at: string | null
+          response_type: string | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          activity_after?: string | null
+          activity_before?: string | null
+          auto_switch_reason?: string | null
+          created_at?: string
+          id?: string
+          prompted_at?: string
+          responded_at?: string | null
+          response_type?: string | null
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          activity_after?: string | null
+          activity_before?: string | null
+          auto_switch_reason?: string | null
+          created_at?: string
+          id?: string
+          prompted_at?: string
+          responded_at?: string | null
+          response_type?: string | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_confirmations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_logs: {
         Row: {
+          activity_details: string | null
           activity_type: Database["public"]["Enums"]["activity_type"]
+          auto_switch_reason: string | null
+          confirmation_status: string | null
+          confirmed_at: string | null
           created_at: string
           duration_minutes: number | null
           ended_at: string | null
@@ -57,7 +108,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_details?: string | null
           activity_type: Database["public"]["Enums"]["activity_type"]
+          auto_switch_reason?: string | null
+          confirmation_status?: string | null
+          confirmed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
           ended_at?: string | null
@@ -68,7 +123,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_details?: string | null
           activity_type?: Database["public"]["Enums"]["activity_type"]
+          auto_switch_reason?: string | null
+          confirmation_status?: string | null
+          confirmed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
           ended_at?: string | null
@@ -76,6 +135,57 @@ export type Database = {
           is_system_enforced?: boolean
           metadata?: Json | null
           started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      activity_sessions: {
+        Row: {
+          created_at: string
+          current_activity: string | null
+          current_activity_started_at: string | null
+          date: string
+          end_reason: string | null
+          end_time: string | null
+          id: string
+          is_active: boolean | null
+          last_confirmation_at: string | null
+          missed_confirmations: number | null
+          start_time: string | null
+          total_others_minutes: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_activity?: string | null
+          current_activity_started_at?: string | null
+          date?: string
+          end_reason?: string | null
+          end_time?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_confirmation_at?: string | null
+          missed_confirmations?: number | null
+          start_time?: string | null
+          total_others_minutes?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_activity?: string | null
+          current_activity_started_at?: string | null
+          date?: string
+          end_reason?: string | null
+          end_time?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_confirmation_at?: string | null
+          missed_confirmations?: number | null
+          start_time?: string | null
+          total_others_minutes?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -256,11 +366,16 @@ export type Database = {
           created_at: string
           daily_score: number | null
           date: string
+          end_reason: string | null
           first_login: string | null
           id: string
           is_late: boolean | null
+          is_working: boolean | null
+          last_confirmation_at: string | null
           last_logout: string | null
           late_by_minutes: number | null
+          missed_confirmations: number | null
+          start_button_pressed_at: string | null
           status: Database["public"]["Enums"]["attendance_status"] | null
           total_break_minutes: number | null
           total_work_minutes: number | null
@@ -271,11 +386,16 @@ export type Database = {
           created_at?: string
           daily_score?: number | null
           date?: string
+          end_reason?: string | null
           first_login?: string | null
           id?: string
           is_late?: boolean | null
+          is_working?: boolean | null
+          last_confirmation_at?: string | null
           last_logout?: string | null
           late_by_minutes?: number | null
+          missed_confirmations?: number | null
+          start_button_pressed_at?: string | null
           status?: Database["public"]["Enums"]["attendance_status"] | null
           total_break_minutes?: number | null
           total_work_minutes?: number | null
@@ -286,11 +406,16 @@ export type Database = {
           created_at?: string
           daily_score?: number | null
           date?: string
+          end_reason?: string | null
           first_login?: string | null
           id?: string
           is_late?: boolean | null
+          is_working?: boolean | null
+          last_confirmation_at?: string | null
           last_logout?: string | null
           late_by_minutes?: number | null
+          missed_confirmations?: number | null
+          start_button_pressed_at?: string | null
           status?: Database["public"]["Enums"]["attendance_status"] | null
           total_break_minutes?: number | null
           total_work_minutes?: number | null
@@ -1444,6 +1569,48 @@ export type Database = {
           schedule_day?: number
           schedule_time?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      supervisor_alerts: {
+        Row: {
+          agent_id: string
+          agent_name: string | null
+          alert_type: string
+          created_at: string
+          description: string | null
+          details: Json | null
+          id: string
+          is_read: boolean | null
+          read_at: string | null
+          supervisor_id: string
+          title: string
+        }
+        Insert: {
+          agent_id: string
+          agent_name?: string | null
+          alert_type: string
+          created_at?: string
+          description?: string | null
+          details?: Json | null
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          supervisor_id: string
+          title: string
+        }
+        Update: {
+          agent_id?: string
+          agent_name?: string | null
+          alert_type?: string
+          created_at?: string
+          description?: string | null
+          details?: Json | null
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          supervisor_id?: string
+          title?: string
         }
         Relationships: []
       }

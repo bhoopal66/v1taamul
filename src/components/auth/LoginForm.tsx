@@ -7,12 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { signIn } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Eye, EyeOff, LogIn, Phone } from 'lucide-react';
+import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,7 +64,16 @@ export const LoginForm: React.FC = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <button
+                type="button"
+                onClick={() => setForgotPasswordOpen(true)}
+                className="text-xs text-primary hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="relative">
               <Input
                 id="password"
@@ -108,6 +119,11 @@ export const LoginForm: React.FC = () => {
           </p>
         </div>
       </CardContent>
+
+      <ForgotPasswordDialog 
+        open={forgotPasswordOpen} 
+        onOpenChange={setForgotPasswordOpen} 
+      />
     </Card>
   );
 };

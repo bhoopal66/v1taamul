@@ -242,6 +242,21 @@ export function useActivitySession() {
       const now = new Date().toISOString();
       const dbActivity = SIMPLE_TO_DB_ACTIVITY[activity];
 
+      // Calculate time spent on previous "others" activity if applicable
+      let newTotalOthersMinutes = session.total_others_minutes || 0;
+      if (session.current_activity === 'others' && session.current_activity_started_at) {
+        const othersMinutes = Math.round(
+          (Date.now() - new Date(session.current_activity_started_at).getTime()) / 60000
+        );
+        newTotalOthersMinutes += othersMinutes;
+      }
+
+      // Check if we need to flag excessive others (only when switching away from others)
+      const wasOnOthers = session.current_activity === 'others';
+      const shouldFlagExcessiveOthers = wasOnOthers && 
+        newTotalOthersMinutes >= OTHERS_FLAG_THRESHOLD_MINUTES &&
+        (session.total_others_minutes || 0) < OTHERS_FLAG_THRESHOLD_MINUTES;
+
       // Update session with new activity
       const { error: sessionError } = await supabase
         .from('activity_sessions')
@@ -249,6 +264,7 @@ export function useActivitySession() {
           current_activity: dbActivity,
           current_activity_started_at: now,
           last_confirmation_at: now,
+          total_others_minutes: newTotalOthersMinutes,
           updated_at: now,
         })
         .eq('id', session.id);
@@ -265,6 +281,14 @@ export function useActivitySession() {
           metadata: details ? { details } : {},
           activity_details: details || null,
         });
+
+      // Alert supervisor for excessive others
+      if (shouldFlagExcessiveOthers) {
+        await alertSupervisor('excessive_others',
+          `${profile?.full_name || 'Agent'} has used "Others" activity for more than ${OTHERS_FLAG_THRESHOLD_MINUTES} minutes today.`,
+          { total_others_minutes: newTotalOthersMinutes }
+        );
+      }
 
       // Handle Market Visit - immediate logout
       if (activity === 'market_visit') {
@@ -396,6 +420,24 @@ export function useActivitySession() {
       
       const now = new Date().toISOString();
 
+      // Calculate time spent on "others" activity if applicable
+      let newTotalOthersMinutes = session.total_others_minutes || 0;
+      const isCurrentlyOnOthers = session.current_activity === 'others';
+      const isChangingAwayFromOthers = responseType === 'changed' && isCurrentlyOnOthers && newActivity !== 'others';
+      const isAcceptingOthers = responseType === 'accepted' && isCurrentlyOnOthers;
+
+      // If changing away from others or confirming others continues, track time
+      if ((isChangingAwayFromOthers || isAcceptingOthers) && session.current_activity_started_at) {
+        const othersMinutes = Math.round(
+          (Date.now() - new Date(session.current_activity_started_at).getTime()) / 60000
+        );
+        newTotalOthersMinutes += othersMinutes;
+      }
+
+      // Check if we need to flag excessive others
+      const shouldFlagExcessiveOthers = newTotalOthersMinutes >= OTHERS_FLAG_THRESHOLD_MINUTES &&
+        (session.total_others_minutes || 0) < OTHERS_FLAG_THRESHOLD_MINUTES;
+
       // Log the confirmation
       await supabase
         .from('activity_confirmations')
@@ -413,16 +455,21 @@ export function useActivitySession() {
       const updateData: Record<string, unknown> = {
         last_confirmation_at: now,
         missed_confirmations: 0,
+        total_others_minutes: newTotalOthersMinutes,
         updated_at: now,
       };
+
+      // If accepting and still on others, reset the start time for next interval tracking
+      if (isAcceptingOthers) {
+        updateData.current_activity_started_at = now;
+      }
 
       if (responseType === 'changed' && newActivity) {
         updateData.current_activity = SIMPLE_TO_DB_ACTIVITY[newActivity];
         updateData.current_activity_started_at = now;
 
-        // If changing to Others, track it
+        // If changing to Others, log activity with details
         if (newActivity === 'others') {
-          // Log activity with details
           await supabase
             .from('activity_logs')
             .insert({
@@ -444,6 +491,14 @@ export function useActivitySession() {
         .from('activity_sessions')
         .update(updateData)
         .eq('id', session.id);
+
+      // Alert supervisor for excessive others
+      if (shouldFlagExcessiveOthers) {
+        await alertSupervisor('excessive_others',
+          `${profile?.full_name || 'Agent'} has used "Others" activity for more than ${OTHERS_FLAG_THRESHOLD_MINUTES} minutes today.`,
+          { total_others_minutes: newTotalOthersMinutes }
+        );
+      }
 
       return { responseType, newActivity };
     },

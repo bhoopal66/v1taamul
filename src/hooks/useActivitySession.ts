@@ -192,7 +192,10 @@ export function useActivitySession() {
       return data as ActivitySession | null;
     },
     enabled: !!user?.id,
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds (was 10)
+    staleTime: 15000, // Consider data fresh for 15 seconds
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   const hasStarted = !!session?.start_time;

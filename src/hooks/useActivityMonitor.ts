@@ -145,7 +145,10 @@ export function useActivityMonitor() {
       return data as ActivityLog[];
     },
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Refetch every 60 seconds (was 30)
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   // Fetch today's attendance
@@ -166,7 +169,10 @@ export function useActivityMonitor() {
       return data as AttendanceRecord | null;
     },
     enabled: !!user?.id,
-    refetchInterval: 60000,
+    refetchInterval: 120000, // Refetch every 2 minutes (was 1)
+    staleTime: 60000, // Consider data fresh for 60 seconds
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   // Fetch today's idle alerts
@@ -187,7 +193,10 @@ export function useActivityMonitor() {
       return data as IdleAlert[];
     },
     enabled: !!user?.id,
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Refetch every 60 seconds (was 30)
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   // Get current (active) activity

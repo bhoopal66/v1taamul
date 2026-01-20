@@ -852,6 +852,8 @@ export const useCallSheetUpload = () => {
         const insertedContactIds: string[] = [];
         const existingContactIds: string[] = [];
         
+        const skippedContacts: { phone: string; reason: string }[] = [];
+        
         for (let i = 0; i < validContacts.length; i++) {
           const c = validContacts[i];
           const contactProgress = 20 + Math.round((i / validContacts.length) * 50);
@@ -892,14 +894,34 @@ export const useCallSheetUpload = () => {
                 existingContactIds.push(existingContactId);
                 console.log(`Found existing contact ${existingContactId} for phone ${c.phoneNumber}`);
               } else {
-                console.error('Error finding existing contact:', findError);
+                // If RPC fails, try direct query as fallback (will only work if user has access)
+                console.warn(`RPC find_contact_by_phone failed for ${c.phoneNumber}, trying fallback...`);
+                const { data: fallbackContact } = await supabase
+                  .from('master_contacts')
+                  .select('id')
+                  .eq('phone_number', c.phoneNumber)
+                  .maybeSingle();
+                
+                if (fallbackContact) {
+                  existingContactIds.push(fallbackContact.id);
+                  console.log(`Fallback found contact ${fallbackContact.id} for phone ${c.phoneNumber}`);
+                } else {
+                  skippedContacts.push({ phone: c.phoneNumber, reason: 'Duplicate exists but could not locate' });
+                  console.error('Could not find existing contact:', findError, c.phoneNumber);
+                }
               }
             } else {
+              skippedContacts.push({ phone: c.phoneNumber, reason: insertError.message });
               console.error('Error inserting contact:', insertError);
             }
           } else if (insertedContact) {
             insertedContactIds.push(insertedContact.id);
           }
+        }
+        
+        // Log skipped contacts summary
+        if (skippedContacts.length > 0) {
+          console.warn(`Skipped ${skippedContacts.length} contacts during upload:`, skippedContacts);
         }
         
         const allContactIds = [...insertedContactIds, ...existingContactIds];
@@ -956,11 +978,39 @@ export const useCallSheetUpload = () => {
             }
             
             console.log(`Successfully created ${callListEntries.length} call list entries (${insertedContactIds.length} new, ${existingContactIds.length} existing)`);
+            
+            // Update upload record with actual call list count
+            await supabase
+              .from('call_sheet_uploads')
+              .update({ 
+                approved_count: callListEntries.length,
+              })
+              .eq('id', upload.id);
           } else {
             console.log('All contacts already in today\'s call list');
+            // Update upload to reflect 0 new entries added (all were duplicates)
+            await supabase
+              .from('call_sheet_uploads')
+              .update({ 
+                approved_count: existingCallListEntries?.length || 0,
+              })
+              .eq('id', upload.id);
           }
         } else {
-          console.warn('No contacts were inserted or found - they may belong to other agents');
+          console.warn('No contacts were inserted or found - all may have been duplicates or errors occurred');
+          // Update upload record to reflect issue
+          await supabase
+            .from('call_sheet_uploads')
+            .update({ 
+              approved_count: 0,
+            })
+            .eq('id', upload.id);
+          
+          // Show warning to user
+          toast.warning('No new contacts were added to call list', {
+            description: 'All contacts may already exist in the system or there were processing errors.',
+            duration: 5000,
+          });
         }
       }
 

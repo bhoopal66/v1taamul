@@ -84,6 +84,8 @@ export const useUnansweredCallsReport = (
       }
 
       // Build the query for calls with specified feedback type
+      // Use left join (remove !inner) to ensure we get all call feedback records
+      // even if the contact data isn't accessible due to RLS
       let query = supabase
         .from('call_feedback')
         .select(`
@@ -93,7 +95,7 @@ export const useUnansweredCallsReport = (
           notes,
           contact_id,
           feedback_status,
-          master_contacts!inner (
+          master_contacts (
             company_name,
             contact_person_name,
             phone_number

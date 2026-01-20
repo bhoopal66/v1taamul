@@ -50,12 +50,10 @@ export const useAgentProfile = (agentId?: string) => {
   const targetUserId = agentId || user?.id;
   const today = new Date();
 
-  // Check if user should see team aggregated data
-  const isTeamViewer = !agentId && (
-    userRole === 'supervisor' || userRole === 'operations_head' || 
-    userRole === 'admin' || userRole === 'super_admin' || 
-    userRole === 'sales_controller' || !!ledTeamId
-  );
+  // On the profile page, ALL users (including supervisors) should see only their own data
+  // Team view is only for viewing other agent's profiles (not self)
+  // Supervisors see their own individual stats, not team aggregated data
+  const isTeamViewer = false; // Profile page always shows individual data
 
   // Fetch all-time stats
   const { data: profileStats, isLoading: statsLoading } = useQuery({

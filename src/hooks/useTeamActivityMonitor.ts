@@ -9,6 +9,9 @@ import {
   CALLING_ACTIVITIES,
 } from './useActivityMonitor';
 
+// Re-export for convenience
+export { CALLING_ACTIVITIES };
+
 export interface TeamMemberActivity {
   userId: string;
   fullName: string;

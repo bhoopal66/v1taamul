@@ -15,10 +15,10 @@ import { PerformanceComparisonView } from '@/components/supervisor/PerformanceCo
 import { AgentDrillDownChart } from '@/components/supervisor/AgentDrillDownChart';
 import { TeamSubmissionsView } from '@/components/supervisor/TeamSubmissionsView';
 import { UnansweredCallsReport } from '@/components/supervisor/UnansweredCallsReport';
-import { AgentActivityMonitor } from '@/components/supervisor/AgentActivityMonitor';
+import { TeamActivityMonitor } from '@/components/supervisor/TeamActivityMonitor';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
-import { useAgentActivity } from '@/hooks/useAgentActivity';
+import { useTeamActivityMonitor } from '@/hooks/useTeamActivityMonitor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -75,15 +75,14 @@ export const SupervisorDashboard: React.FC = () => {
   } = useTeamPerformanceTrends({ days: trendDays, teamId: effectiveTeamId });
 
   const {
-    agents: activityAgents,
+    teamActivity,
+    teamStats: activityStats,
     isLoading: activityLoading,
-    refetch: refetchActivity,
-  } = useAgentActivity({ teamId: effectiveTeamId });
+  } = useTeamActivityMonitor({ teamId: effectiveTeamId });
 
   const handleRefresh = () => {
     refetch();
     refetchTrends();
-    refetchActivity();
   };
 
   if (!isSupervisor) {
@@ -198,7 +197,11 @@ export const SupervisorDashboard: React.FC = () => {
         </div>
 
         <TabsContent value="activity" className="space-y-6">
-          <AgentActivityMonitor agents={activityAgents} isLoading={activityLoading} />
+          <TeamActivityMonitor 
+            teamActivity={teamActivity} 
+            teamStats={activityStats} 
+            isLoading={activityLoading} 
+          />
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-6">

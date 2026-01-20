@@ -274,6 +274,7 @@ export const AppSidebar: React.FC = () => {
         
         {/* Agent Pages - Everyone */}
         <NavItem to="/profile" icon={<UserCircle className="w-5 h-5" />} label="My Profile" />
+        <NavItem to="/activity-monitor" icon={<Activity className="w-5 h-5" />} label="Activity Monitor" />
         <NavItem to="/leaderboard" icon={<Trophy className="w-5 h-5" />} label="Leaderboard" />
         <NavItem to="/call-list" icon={<Phone className="w-5 h-5" />} label="Call List" />
         <NavItem to="/upload" icon={<Upload className="w-5 h-5" />} label="Upload Contacts" />

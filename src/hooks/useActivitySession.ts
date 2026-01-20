@@ -68,9 +68,9 @@ export const GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 minutes grace
 export const MAX_MISSED_CONFIRMATIONS = 2;
 export const OTHERS_FLAG_THRESHOLD_MINUTES = 30;
 
-// 5-MINUTE AUTO-LOGOUT ACTIVITIES (Cold Calling, Client Meeting)
+// 10-MINUTE AUTO-LOGOUT ACTIVITIES (Cold Calling, Client Meeting)
 export const FIVE_MIN_AUTO_LOGOUT_ACTIVITIES: SimpleActivityType[] = ['calling', 'meeting_in_office'];
-export const FIVE_MIN_AUTO_LOGOUT_MS = 5 * 60 * 1000; // 5 minutes
+export const FIVE_MIN_AUTO_LOGOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 // Activity labels for auto-logout reasons
 export const FIVE_MIN_ACTIVITY_LABELS: Record<string, string> = {
@@ -448,7 +448,7 @@ export function useActivitySession() {
       case 'break_overrun':
         return 'Break Time Overrun';
       case 'five_min_auto_logout':
-        return 'Auto Logout – 5 Minute Rule';
+        return 'Auto Logout – 10 Minute Rule';
       default:
         return 'Agent Activity Alert';
     }
@@ -913,18 +913,18 @@ export function useActivitySession() {
           ended_at: nowIso,
           metadata: { 
             auto_logout: true, 
-            auto_logout_reason: `5_min_rule_${activityLabel.toLowerCase().replace(' ', '_')}`,
+            auto_logout_reason: `10_min_rule_${activityLabel.toLowerCase().replace(' ', '_')}`,
             supervisor_notified: true
           },
         });
 
       // Alert supervisor
       await alertSupervisor('five_min_auto_logout',
-        `Agent ${profile?.full_name || 'Unknown'} selected ${activityLabel} and was auto-logged out after 5 minutes.`,
+        `Agent ${profile?.full_name || 'Unknown'} selected ${activityLabel} and was auto-logged out after 10 minutes.`,
         { 
           activity_type: session!.current_activity || '',
           activity_label: activityLabel,
-          auto_logout_reason: `5 min rule – ${activityLabel}`,
+          auto_logout_reason: `10 min rule – ${activityLabel}`,
           supervisor_notified: true
         }
       );

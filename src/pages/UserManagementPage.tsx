@@ -56,7 +56,9 @@ import {
   AlertTriangle,
   UserPlus,
   Edit2,
+  Key,
 } from 'lucide-react';
+import { AdminResetPasswordDialog } from '@/components/auth/AdminResetPasswordDialog';
 import { useUserManagement, useCompanyPool, UserWithRole } from '@/hooks/useUserManagement';
 import { exportUserDataToExcel } from '@/utils/userDataExport';
 import { format } from 'date-fns';
@@ -133,6 +135,10 @@ export const UserManagementPage: React.FC = () => {
     whatsapp_number: '',
     team_id: '' as string | null,
   });
+
+  // Reset password state
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserWithRole | null>(null);
 
   // Fetch teams for assignment
   const { data: teams = [] } = useQuery({
@@ -461,6 +467,17 @@ export const UserManagementPage: React.FC = () => {
                                   <Edit2 className="w-4 h-4 mr-2" />
                                   Edit Profile
                                 </DropdownMenuItem>
+                                {isAdmin && (
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      setResetPasswordUser(user);
+                                      setResetPasswordDialogOpen(true);
+                                    }}
+                                  >
+                                    <Key className="w-4 h-4 mr-2" />
+                                    Reset Password
+                                  </DropdownMenuItem>
+                                )}
                                 {isAdmin && (
                                   <>
                                     <DropdownMenuItem 
@@ -856,6 +873,13 @@ export const UserManagementPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Admin Reset Password Dialog */}
+      <AdminResetPasswordDialog
+        open={resetPasswordDialogOpen}
+        onOpenChange={setResetPasswordDialogOpen}
+        user={resetPasswordUser}
+      />
     </div>
   );
 };

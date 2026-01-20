@@ -68,6 +68,18 @@ export const GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 minutes grace
 export const MAX_MISSED_CONFIRMATIONS = 2;
 export const OTHERS_FLAG_THRESHOLD_MINUTES = 30;
 
+// 5-MINUTE AUTO-LOGOUT ACTIVITIES (Cold Calling, Client Meeting)
+export const FIVE_MIN_AUTO_LOGOUT_ACTIVITIES: SimpleActivityType[] = ['calling', 'meeting_in_office'];
+export const FIVE_MIN_AUTO_LOGOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+// Activity labels for auto-logout reasons
+export const FIVE_MIN_ACTIVITY_LABELS: Record<string, string> = {
+  calling: 'Cold Calling',
+  calling_telecalling: 'Cold Calling',
+  meeting_in_office: 'Client Meeting',
+  client_meeting: 'Client Meeting',
+};
+
 // Break schedule (Asia/Dubai)
 export const BREAK_SCHEDULE = {
   tea_morning: { start: '11:15', end: '11:30', label: 'Tea Break', durationMinutes: 15 },
@@ -149,6 +161,7 @@ export function useActivitySession() {
   const [breakOverrunAlerted, setBreakOverrunAlerted] = useState<string | null>(null); // Track which break was alerted
   const confirmationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fiveMinAutoLogoutTimerRef = useRef<NodeJS.Timeout | null>(null); // 5-min auto-logout timer
 
   // Update current time every second for the clock
   useEffect(() => {
@@ -430,6 +443,8 @@ export function useActivitySession() {
         return 'Excessive "Others" Activity';
       case 'break_overrun':
         return 'Break Time Overrun';
+      case 'five_min_auto_logout':
+        return 'Auto Logout – 5 Minute Rule';
       default:
         return 'Agent Activity Alert';
     }
@@ -824,6 +839,105 @@ export function useActivitySession() {
       }
     }
   }, [isSessionActive, session?.current_activity, session?.id, currentTime, breakOverrunAlerted, profile?.full_name, user?.id, queryClient]);
+
+  // 5-MINUTE AUTO-LOGOUT for Cold Calling / Client Meeting
+  useEffect(() => {
+    // Clear existing timer when activity changes or session becomes inactive
+    if (fiveMinAutoLogoutTimerRef.current) {
+      clearTimeout(fiveMinAutoLogoutTimerRef.current);
+      fiveMinAutoLogoutTimerRef.current = null;
+    }
+
+    if (!isSessionActive || !session?.id || !user?.id || !session?.current_activity) return;
+
+    // Check if current activity is one that requires 5-min auto-logout
+    const isFiveMinActivity = session.current_activity === 'calling_telecalling' || 
+                              session.current_activity === 'client_meeting';
+    
+    if (!isFiveMinActivity || !session.current_activity_started_at) return;
+
+    // Calculate time remaining until auto-logout
+    const activityStartedAt = new Date(session.current_activity_started_at).getTime();
+    const now = Date.now();
+    const elapsed = now - activityStartedAt;
+    const remaining = FIVE_MIN_AUTO_LOGOUT_MS - elapsed;
+
+    if (remaining <= 0) {
+      // Already exceeded 5 minutes - perform auto-logout immediately
+      performFiveMinAutoLogout();
+    } else {
+      // Set timer for remaining time
+      fiveMinAutoLogoutTimerRef.current = setTimeout(() => {
+        performFiveMinAutoLogout();
+      }, remaining);
+    }
+
+    async function performFiveMinAutoLogout() {
+      const nowIso = new Date().toISOString();
+      const today = new Date().toISOString().split('T')[0];
+      const activityLabel = FIVE_MIN_ACTIVITY_LABELS[session!.current_activity || ''] || 'Activity';
+
+      // End the session
+      await supabase
+        .from('activity_sessions')
+        .update({
+          end_time: nowIso,
+          end_reason: `auto_logout_5min_${session!.current_activity}`,
+          is_active: false,
+          updated_at: nowIso,
+        })
+        .eq('id', session!.id);
+
+      // Update attendance record
+      await supabase
+        .from('attendance_records')
+        .update({
+          is_working: false,
+          end_reason: `Auto logout – ${activityLabel} (5 min rule)`,
+          last_logout: nowIso,
+        })
+        .eq('user_id', user!.id)
+        .eq('date', today);
+
+      // Log the auto-logout event
+      await supabase
+        .from('activity_logs')
+        .insert({
+          user_id: user!.id,
+          activity_type: session!.current_activity as any,
+          started_at: session!.current_activity_started_at,
+          ended_at: nowIso,
+          metadata: { 
+            auto_logout: true, 
+            auto_logout_reason: `5_min_rule_${activityLabel.toLowerCase().replace(' ', '_')}`,
+            supervisor_notified: true
+          },
+        });
+
+      // Alert supervisor
+      await alertSupervisor('five_min_auto_logout',
+        `Agent ${profile?.full_name || 'Unknown'} selected ${activityLabel} and was auto-logged out after 5 minutes.`,
+        { 
+          activity_type: session!.current_activity || '',
+          activity_label: activityLabel,
+          auto_logout_reason: `5 min rule – ${activityLabel}`,
+          supervisor_notified: true
+        }
+      );
+
+      toast.error(`You have been auto-logged out after 5 minutes on ${activityLabel}. To resume work, please log in again and press START.`);
+      
+      queryClient.invalidateQueries({ queryKey: ['activity-session'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    }
+
+    return () => {
+      if (fiveMinAutoLogoutTimerRef.current) {
+        clearTimeout(fiveMinAutoLogoutTimerRef.current);
+        fiveMinAutoLogoutTimerRef.current = null;
+      }
+    };
+  }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, user?.id, profile?.full_name, queryClient]);
 
   // Set up realtime subscription for session updates
   useEffect(() => {

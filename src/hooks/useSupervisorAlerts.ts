@@ -108,6 +108,7 @@ export function useSupervisorAlerts() {
     marketVisit: alerts.filter(a => a.alert_type === 'market_visit'),
     excessiveOthers: alerts.filter(a => a.alert_type === 'excessive_others'),
     breakOverrun: alerts.filter(a => a.alert_type === 'break_overrun'),
+    fiveMinAutoLogout: alerts.filter(a => a.alert_type === 'five_min_auto_logout'),
   };
 
   return {

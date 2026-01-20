@@ -13,6 +13,8 @@ import {
   CheckCheck,
   Coffee,
   FileQuestion,
+  Phone,
+  Users,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { SupervisorAlert } from '@/hooks/useSupervisorAlerts';
@@ -67,6 +69,14 @@ const getAlertConfig = (alertType: string) => {
         bgColor: 'bg-warning/10',
         borderColor: 'border-warning/20',
         label: 'Break Overrun',
+      };
+    case 'five_min_auto_logout':
+      return {
+        icon: Phone,
+        color: 'text-destructive',
+        bgColor: 'bg-destructive/10',
+        borderColor: 'border-destructive/20',
+        label: '5-Min Auto Logout',
       };
     default:
       return {

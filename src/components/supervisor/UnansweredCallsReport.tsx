@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PhoneMissed, Calendar, Clock, RefreshCw, User, Building2, ThumbsDown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PhoneMissed, Calendar, Clock, RefreshCw, User, Building2, ThumbsDown, Users } from 'lucide-react';
 import { useUnansweredCallsReport, UnansweredPeriod, CallFeedbackType } from '@/hooks/useUnansweredCallsReport';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,8 +18,9 @@ interface UnansweredCallsReportProps {
 export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ teamId }) => {
   const [period, setPeriod] = useState<UnansweredPeriod>('today');
   const [feedbackType, setFeedbackType] = useState<CallFeedbackType>('not_answered');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
   
-  const { data, isLoading, refetch } = useUnansweredCallsReport(period, teamId, feedbackType);
+  const { data, isLoading, refetch, teamAgents } = useUnansweredCallsReport(period, teamId, feedbackType, selectedAgentId);
 
   const feedbackTypeConfig = {
     not_answered: {
@@ -72,7 +74,25 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
               <CardDescription>{data.periodLabel}</CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Agent Filter */}
+            <Select 
+              value={selectedAgentId || '__all__'} 
+              onValueChange={(v) => setSelectedAgentId(v === '__all__' ? undefined : v)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <Users className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Agents</SelectItem>
+                {teamAgents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Badge variant={config.color} className="gap-1">
               <IconComponent className="w-3 h-3" />
               {data.totalCount} calls

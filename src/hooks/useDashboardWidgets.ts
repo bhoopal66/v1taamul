@@ -31,18 +31,58 @@ export interface TimelineActivity {
 }
 
 export const useDashboardWidgets = () => {
-  const { user } = useAuth();
+  const { user, userRole, ledTeamId, profile } = useAuth();
+
+  // Only admin, super_admin, operations_head can see ALL data
+  const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
+  const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
+
+  // Helper to get agent IDs for team filtering
+  const getTeamAgentIds = async (): Promise<string[] | null> => {
+    if (canSeeAllData) return null; // No filtering needed
+    
+    if (effectiveTeamId) {
+      const { data } = await supabase
+        .from('profiles_public')
+        .select('id')
+        .eq('team_id', effectiveTeamId)
+        .eq('is_active', true);
+      return data?.map(p => p.id) || [];
+    }
+    
+    if (user?.id) {
+      // Supervisor without team - get directly supervised agents
+      const { data } = await supabase
+        .from('profiles_public')
+        .select('id')
+        .eq('supervisor_id', user.id)
+        .eq('is_active', true);
+      return data?.map(p => p.id) || [];
+    }
+    
+    return [];
+  };
 
   // Call Volume Heatmap Data
   const { data: heatmapData, isLoading: heatmapLoading } = useQuery({
-    queryKey: ['call-heatmap', user?.id],
+    queryKey: ['call-heatmap', user?.id, effectiveTeamId, canSeeAllData],
     queryFn: async (): Promise<HeatmapData[]> => {
       const startDate = subDays(new Date(), 30);
+      const agentIds = await getTeamAgentIds();
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('call_feedback')
         .select('call_timestamp')
         .gte('call_timestamp', startDate.toISOString());
+
+      if (agentIds !== null && agentIds.length > 0) {
+        query = query.in('agent_id', agentIds);
+      } else if (agentIds !== null && agentIds.length === 0) {
+        // No agents to show
+        return [];
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -77,24 +117,45 @@ export const useDashboardWidgets = () => {
 
   // Lead Pipeline Funnel Data
   const { data: funnelData, isLoading: funnelLoading } = useQuery({
-    queryKey: ['lead-funnel', user?.id],
+    queryKey: ['lead-funnel', user?.id, effectiveTeamId, canSeeAllData],
     queryFn: async (): Promise<FunnelStage[]> => {
       const startDate = startOfWeek(new Date());
       const endDate = endOfWeek(new Date());
+      const agentIds = await getTeamAgentIds();
 
       // Get call feedback counts
-      const { data: calls } = await supabase
+      let callsQuery = supabase
         .from('call_feedback')
         .select('feedback_status')
         .gte('call_timestamp', startDate.toISOString())
         .lte('call_timestamp', endDate.toISOString());
 
+      if (agentIds !== null && agentIds.length > 0) {
+        callsQuery = callsQuery.in('agent_id', agentIds);
+      } else if (agentIds !== null && agentIds.length === 0) {
+        return [
+          { stage: 'Calls Made', value: 0, fill: 'hsl(var(--primary))' },
+          { stage: 'Interested', value: 0, fill: 'hsl(var(--chart-2))' },
+          { stage: 'Leads', value: 0, fill: 'hsl(var(--chart-3))' },
+          { stage: 'Qualified', value: 0, fill: 'hsl(var(--chart-4))' },
+          { stage: 'Converted', value: 0, fill: 'hsl(var(--chart-5))' },
+        ];
+      }
+
+      const { data: calls } = await callsQuery;
+
       // Get leads by status
-      const { data: leads } = await supabase
+      let leadsQuery = supabase
         .from('leads')
         .select('lead_status')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
+
+      if (agentIds !== null && agentIds.length > 0) {
+        leadsQuery = leadsQuery.in('agent_id', agentIds);
+      }
+
+      const { data: leads } = await leadsQuery;
 
       const totalCalls = calls?.length || 0;
       const interested = calls?.filter(c => c.feedback_status === 'interested').length || 0;
@@ -115,23 +176,33 @@ export const useDashboardWidgets = () => {
 
   // Performance Streak Data
   const { data: streakData, isLoading: streakLoading } = useQuery({
-    queryKey: ['performance-streak', user?.id],
+    queryKey: ['performance-streak', user?.id, effectiveTeamId, canSeeAllData],
     queryFn: async (): Promise<StreakData> => {
       const days = 14;
       const dailyCounts: { [key: string]: number } = {};
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayTotals: { [key: number]: number } = {};
+      const agentIds = await getTeamAgentIds();
 
       for (let i = 0; i < days; i++) {
         const date = subDays(new Date(), i);
         const start = startOfDay(date);
         const end = endOfDay(date);
 
-        const { count } = await supabase
+        let query = supabase
           .from('call_feedback')
           .select('*', { count: 'exact', head: true })
           .gte('call_timestamp', start.toISOString())
           .lte('call_timestamp', end.toISOString());
+
+        if (agentIds !== null && agentIds.length > 0) {
+          query = query.in('agent_id', agentIds);
+        } else if (agentIds !== null && agentIds.length === 0) {
+          dailyCounts[format(date, 'yyyy-MM-dd')] = 0;
+          continue;
+        }
+
+        const { count } = await query;
 
         dailyCounts[format(date, 'yyyy-MM-dd')] = count || 0;
         const dayOfWeek = getDay(date);
@@ -174,9 +245,11 @@ export const useDashboardWidgets = () => {
 
   // Team Activity Timeline
   const { data: timelineData, isLoading: timelineLoading } = useQuery({
-    queryKey: ['team-timeline', user?.id],
+    queryKey: ['team-timeline', user?.id, effectiveTeamId, canSeeAllData],
     queryFn: async (): Promise<TimelineActivity[]> => {
-      const { data: calls } = await supabase
+      const agentIds = await getTeamAgentIds();
+
+      let query = supabase
         .from('call_feedback')
         .select(`
           id,
@@ -187,6 +260,14 @@ export const useDashboardWidgets = () => {
         `)
         .order('call_timestamp', { ascending: false })
         .limit(20);
+
+      if (agentIds !== null && agentIds.length > 0) {
+        query = query.in('agent_id', agentIds);
+      } else if (agentIds !== null && agentIds.length === 0) {
+        return [];
+      }
+
+      const { data: calls } = await query;
 
       const { data: profiles } = await supabase
         .from('profiles_public')

@@ -36,19 +36,23 @@ interface UseAllAgentsPerformanceOptions {
 }
 
 export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions = {}) => {
-  const { user, userRole, ledTeamId } = useAuth();
+  const { user, userRole, ledTeamId, profile } = useAuth();
   const { 
     selectedAgentId = null, 
     dateFrom = startOfMonth(new Date()), 
     dateTo = endOfMonth(new Date()) 
   } = options;
 
-  // Check if user can see all agents (admin, super_admin, operations_head, supervisor)
-  const canSeeAllAgents = ['admin', 'super_admin', 'operations_head', 'supervisor'].includes(userRole || '');
+  // Only admin, super_admin, operations_head can see ALL agents
+  // Supervisors should only see their team (same as team leaders)
+  const canSeeAllAgents = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
+  
+  // Determine the team ID to filter by (for supervisors and team leaders)
+  const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
 
-  // Fetch all agents (filtered by team for team leaders)
+  // Fetch all agents (filtered by team for supervisors and team leaders)
   const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ['all-agents-list', ledTeamId, canSeeAllAgents],
+    queryKey: ['all-agents-list', effectiveTeamId, canSeeAllAgents, user?.id],
     queryFn: async (): Promise<AgentOption[]> => {
       let query = supabase
         .from('profiles_public')
@@ -56,9 +60,12 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
         .eq('is_active', true)
         .order('full_name');
 
-      // If user is a team leader (not admin/super_admin), filter by their team
-      if (ledTeamId && !canSeeAllAgents) {
-        query = query.eq('team_id', ledTeamId);
+      // If not admin/super_admin/ops_head, filter by their team
+      if (!canSeeAllAgents && effectiveTeamId) {
+        query = query.eq('team_id', effectiveTeamId);
+      } else if (!canSeeAllAgents && !effectiveTeamId && user?.id) {
+        // Supervisor without team - show directly supervised agents
+        query = query.eq('supervisor_id', user.id);
       }
 
       const { data: profiles, error } = await query;
@@ -82,13 +89,21 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
 
       // Get list of agent IDs we can view (for team filtering)
       let agentIds: string[] | null = null;
-      if (ledTeamId && !canSeeAllAgents) {
+      if (!canSeeAllAgents && effectiveTeamId) {
         const { data: teamProfiles } = await supabase
           .from('profiles_public')
           .select('id')
-          .eq('team_id', ledTeamId)
+          .eq('team_id', effectiveTeamId)
           .eq('is_active', true);
         agentIds = teamProfiles?.map(p => p.id) || [];
+      } else if (!canSeeAllAgents && !effectiveTeamId && user?.id) {
+        // Supervisor without team - get directly supervised agents
+        const { data: supervisedProfiles } = await supabase
+          .from('profiles_public')
+          .select('id')
+          .eq('supervisor_id', user.id)
+          .eq('is_active', true);
+        agentIds = supervisedProfiles?.map(p => p.id) || [];
       }
 
       // Build the query for call feedback

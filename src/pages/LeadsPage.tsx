@@ -49,6 +49,7 @@ import {
   Bell,
   Megaphone,
   History,
+  UserCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -69,6 +70,7 @@ export const LeadsPage = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<LeadTypeFilter>('all');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     dealValue: '',
     expectedCloseDate: '',
@@ -80,7 +82,7 @@ export const LeadsPage = () => {
     contactPersonName: '',
   });
 
-  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter);
+  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting, teamAgents, isTeamViewer } = useLeads(statusFilter, selectedAgentId);
   const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
@@ -207,6 +209,27 @@ export const LeadsPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Agent Filter - Only show for team viewers */}
+          {isTeamViewer && teamAgents.length > 0 && (
+            <Select 
+              value={selectedAgentId || '__all__'} 
+              onValueChange={(v) => setSelectedAgentId(v === '__all__' ? null : v)}
+            >
+              <SelectTrigger className="w-48 bg-background">
+                <UserCircle className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Agents</SelectItem>
+                {teamAgents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
           {/* View Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button

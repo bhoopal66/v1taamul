@@ -64,6 +64,15 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   isLoading = false,
   compact = false,
 }) => {
+  // Filter out 0-duration closed logs (cleanup noise from rapid auto-switches)
+  const filteredLogs = logs.filter(log => {
+    // Keep active logs (no ended_at)
+    if (!log.ended_at) return true;
+    // Keep logs with meaningful duration (> 0 minutes)
+    if (log.duration_minutes && log.duration_minutes > 0) return true;
+    return false;
+  });
+
   if (isLoading) {
     return (
       <Card>
@@ -87,7 +96,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     );
   }
 
-  if (logs.length === 0) {
+  if (filteredLogs.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -132,7 +141,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-border" />
             
             <div className="space-y-4">
-              {logs.map((log, index) => {
+              {filteredLogs.map((log, index) => {
                 const isActive = !log.ended_at;
                 const duration = log.duration_minutes || (isActive 
                   ? differenceInMinutes(new Date(), new Date(log.started_at))

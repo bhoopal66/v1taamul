@@ -964,6 +964,29 @@ export function useActivitySession() {
     };
   }, [user?.id, refetchSession]);
 
+  // Calculate 5-minute countdown for applicable activities
+  const fiveMinCountdown = useMemo(() => {
+    if (!isSessionActive || !session?.current_activity || !session?.current_activity_started_at) {
+      return null;
+    }
+
+    const isFiveMinActivity = session.current_activity === 'calling_telecalling' || 
+                              session.current_activity === 'client_meeting';
+    
+    if (!isFiveMinActivity) return null;
+
+    const activityStartedAt = new Date(session.current_activity_started_at).getTime();
+    const elapsed = currentTime.getTime() - activityStartedAt;
+    const remaining = Math.max(0, FIVE_MIN_AUTO_LOGOUT_MS - elapsed);
+    
+    return {
+      remaining,
+      remainingSeconds: Math.ceil(remaining / 1000),
+      activityLabel: FIVE_MIN_ACTIVITY_LABELS[session.current_activity] || 'Activity',
+      isActive: remaining > 0,
+    };
+  }, [isSessionActive, session?.current_activity, session?.current_activity_started_at, currentTime]);
+
   return {
     // State
     session,
@@ -978,6 +1001,7 @@ export function useActivitySession() {
     graceTimeRemaining: confirmationPendingSince 
       ? Math.max(0, GRACE_PERIOD_MS - (currentTime.getTime() - confirmationPendingSince.getTime()))
       : GRACE_PERIOD_MS,
+    fiveMinCountdown, // 5-minute auto-logout countdown
 
     // Loading states
     isLoading: sessionLoading,

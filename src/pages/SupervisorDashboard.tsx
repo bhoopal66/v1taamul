@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Shield, AlertTriangle, PhoneMissed } from 'lucide-react';
+import { RefreshCw, Shield, AlertTriangle, PhoneMissed, Activity } from 'lucide-react';
 import { TeamStatsCards } from '@/components/supervisor/TeamStatsCards';
 import { AgentPerformanceTable } from '@/components/supervisor/AgentPerformanceTable';
 import { UploadApprovalQueue } from '@/components/supervisor/UploadApprovalQueue';
@@ -15,8 +15,10 @@ import { PerformanceComparisonView } from '@/components/supervisor/PerformanceCo
 import { AgentDrillDownChart } from '@/components/supervisor/AgentDrillDownChart';
 import { TeamSubmissionsView } from '@/components/supervisor/TeamSubmissionsView';
 import { UnansweredCallsReport } from '@/components/supervisor/UnansweredCallsReport';
+import { AgentActivityMonitor } from '@/components/supervisor/AgentActivityMonitor';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
+import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -72,9 +74,16 @@ export const SupervisorDashboard: React.FC = () => {
     refetch: refetchTrends,
   } = useTeamPerformanceTrends({ days: trendDays, teamId: effectiveTeamId });
 
+  const {
+    agents: activityAgents,
+    isLoading: activityLoading,
+    refetch: refetchActivity,
+  } = useAgentActivity({ teamId: effectiveTeamId });
+
   const handleRefresh = () => {
     refetch();
     refetchTrends();
+    refetchActivity();
   };
 
   if (!isSupervisor) {
@@ -158,9 +167,13 @@ export const SupervisorDashboard: React.FC = () => {
       )}
 
       {/* Performance Tabs */}
-      <Tabs defaultValue="trends" className="space-y-6">
+      <Tabs defaultValue="activity" className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList className="flex-wrap">
+            <TabsTrigger value="activity" className="gap-1">
+              <Activity className="w-4 h-4" />
+              Live Activity
+            </TabsTrigger>
             <TabsTrigger value="trends">Team Trends</TabsTrigger>
             <TabsTrigger value="unanswered" className="gap-1">
               <PhoneMissed className="w-4 h-4" />
@@ -183,6 +196,10 @@ export const SupervisorDashboard: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
+
+        <TabsContent value="activity" className="space-y-6">
+          <AgentActivityMonitor agents={activityAgents} isLoading={activityLoading} />
+        </TabsContent>
 
         <TabsContent value="trends" className="space-y-6">
           {/* Trend Summary Cards */}

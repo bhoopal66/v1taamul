@@ -25,6 +25,7 @@ import {
   Zap,
   FileText,
   AlertTriangle,
+  User,
   ArrowUpCircle,
   Clock,
 } from 'lucide-react';
@@ -339,12 +340,20 @@ export const LeadKanbanBoard = ({
                               )}
                             </div>
 
-                            {/* Timestamps */}
+                            {/* Agent Name & Timestamps */}
                             <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted-foreground">
-                              <span className="flex items-center gap-0.5">
-                                <Clock className="w-2.5 h-2.5" />
-                                {format(new Date(lead.createdAt), 'MMM d, h:mm a')}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {lead.agentName && (
+                                  <span className="flex items-center gap-0.5 font-medium text-primary/80">
+                                    <User className="w-2.5 h-2.5" />
+                                    {lead.agentName}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {format(new Date(lead.createdAt), 'MMM d, h:mm a')}
+                                </span>
+                              </div>
                               {lead.updatedAt !== lead.createdAt && (
                                 <span className="flex items-center gap-0.5 opacity-70">
                                   Updated {format(new Date(lead.updatedAt), 'MMM d')}

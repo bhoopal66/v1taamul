@@ -78,6 +78,7 @@ export interface Lead {
   id: string;
   contactId: string;
   agentId?: string;
+  agentName?: string;
   companyName: string;
   contactPersonName: string;
   phoneNumber: string;
@@ -160,6 +161,10 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
                 trade_license_number,
                 city,
                 industry
+              ),
+              profiles_public!leads_agent_id_fkey (
+                full_name,
+                username
               )
             `)
             .order('created_at', { ascending: false });
@@ -172,10 +177,12 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
 
           return (data || []).map(item => {
             const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
+            const agentProfile = (item as any).profiles_public;
             return {
               id: item.id,
               contactId: item.contact_id,
               agentId: item.agent_id,
+              agentName: agentProfile?.full_name || agentProfile?.username || undefined,
               companyName: item.master_contacts?.company_name || 'Unknown',
               contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
               phoneNumber: item.master_contacts?.phone_number || '',
@@ -208,6 +215,10 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
             trade_license_number,
             city,
             industry
+          ),
+          profiles_public!leads_agent_id_fkey (
+            full_name,
+            username
           )
         `)
         .in('agent_id', teamMemberIds)
@@ -223,10 +234,12 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
 
       return (data || []).map(item => {
         const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
+        const agentProfile = (item as any).profiles_public;
         return {
           id: item.id,
           contactId: item.contact_id,
           agentId: item.agent_id,
+          agentName: agentProfile?.full_name || agentProfile?.username || undefined,
           companyName: item.master_contacts?.company_name || 'Unknown',
           contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
           phoneNumber: item.master_contacts?.phone_number || '',

@@ -22,6 +22,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
   { path: '/call-list', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Call List' },
   { path: '/upload', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Upload Contacts' },
   { path: '/leads', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Leads' },
+  { path: '/activity-monitor', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Activity Monitor' },
   { path: '/settings', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Settings' },
   
   // Management pages (supervisor and above)

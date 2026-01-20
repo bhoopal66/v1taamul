@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          created_at: string
+          description: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      activity_logs: {
+        Row: {
+          activity_type: Database["public"]["Enums"]["activity_type"]
+          created_at: string
+          duration_minutes: number | null
+          ended_at: string | null
+          id: string
+          is_system_enforced: boolean
+          metadata: Json | null
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: Database["public"]["Enums"]["activity_type"]
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          is_system_enforced?: boolean
+          metadata?: Json | null
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: Database["public"]["Enums"]["activity_type"]
+          created_at?: string
+          duration_minutes?: number | null
+          ended_at?: string | null
+          id?: string
+          is_system_enforced?: boolean
+          metadata?: Json | null
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_goals: {
         Row: {
           agent_id: string
@@ -184,6 +250,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      attendance_records: {
+        Row: {
+          created_at: string
+          daily_score: number | null
+          date: string
+          first_login: string | null
+          id: string
+          is_late: boolean | null
+          last_logout: string | null
+          late_by_minutes: number | null
+          status: Database["public"]["Enums"]["attendance_status"] | null
+          total_break_minutes: number | null
+          total_work_minutes: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_score?: number | null
+          date?: string
+          first_login?: string | null
+          id?: string
+          is_late?: boolean | null
+          last_logout?: string | null
+          late_by_minutes?: number | null
+          status?: Database["public"]["Enums"]["attendance_status"] | null
+          total_break_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_score?: number | null
+          date?: string
+          first_login?: string | null
+          id?: string
+          is_late?: boolean | null
+          last_logout?: string | null
+          late_by_minutes?: number | null
+          status?: Database["public"]["Enums"]["attendance_status"] | null
+          total_break_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       banker_contacts: {
         Row: {
@@ -703,6 +817,80 @@ export type Database = {
           },
         ]
       }
+      followup_logs: {
+        Row: {
+          activity_log_id: string
+          created_at: string
+          followup_count: number
+          id: string
+          remark: string | null
+          remark_time: string
+        }
+        Insert: {
+          activity_log_id: string
+          created_at?: string
+          followup_count?: number
+          id?: string
+          remark?: string | null
+          remark_time?: string
+        }
+        Update: {
+          activity_log_id?: string
+          created_at?: string
+          followup_count?: number
+          id?: string
+          remark?: string | null
+          remark_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_logs_activity_log_id_fkey"
+            columns: ["activity_log_id"]
+            isOneToOne: false
+            referencedRelation: "activity_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idle_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          alert_time: string
+          created_at: string
+          escalated_to: string | null
+          id: string
+          idle_duration_minutes: number
+          notes: string | null
+          severity: Database["public"]["Enums"]["idle_alert_severity"]
+          user_id: string
+          was_acknowledged: boolean | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          alert_time?: string
+          created_at?: string
+          escalated_to?: string | null
+          id?: string
+          idle_duration_minutes: number
+          notes?: string | null
+          severity: Database["public"]["Enums"]["idle_alert_severity"]
+          user_id: string
+          was_acknowledged?: boolean | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          alert_time?: string
+          created_at?: string
+          escalated_to?: string | null
+          id?: string
+          idle_duration_minutes?: number
+          notes?: string | null
+          severity?: Database["public"]["Enums"]["idle_alert_severity"]
+          user_id?: string
+          was_acknowledged?: boolean | null
+        }
+        Relationships: []
+      }
       lead_stage_transitions: {
         Row: {
           changed_at: string
@@ -856,6 +1044,41 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      meeting_logs: {
+        Row: {
+          activity_log_id: string
+          client_name: string
+          created_at: string
+          id: string
+          next_step: string
+          outcome: string
+        }
+        Insert: {
+          activity_log_id: string
+          client_name: string
+          created_at?: string
+          id?: string
+          next_step: string
+          outcome: string
+        }
+        Update: {
+          activity_log_id?: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          next_step?: string
+          outcome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_logs_activity_log_id_fkey"
+            columns: ["activity_log_id"]
+            isOneToOne: false
+            referencedRelation: "activity_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       performance_alerts: {
         Row: {
@@ -1580,6 +1803,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_daily_score: {
+        Args: { p_date?: string; p_user_id: string }
+        Returns: number
+      }
       can_access_sensitive_profile: {
         Args: { profile_id: string }
         Returns: boolean
@@ -1654,6 +1881,14 @@ export type Database = {
       mask_email: { Args: { email_text: string }; Returns: string }
       mask_phone: { Args: { phone_text: string }; Returns: string }
       move_old_contacts_to_pool: { Args: never; Returns: number }
+      switch_activity: {
+        Args: {
+          p_activity_type: Database["public"]["Enums"]["activity_type"]
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: string
+      }
       trigger_performance_check: { Args: never; Returns: undefined }
       update_login_streak: {
         Args: { user_id: string }
@@ -1667,6 +1902,18 @@ export type Database = {
     }
     Enums: {
       action_type: "upload" | "call" | "feedback" | "reassign" | "status_change"
+      activity_type:
+        | "data_collection"
+        | "customer_followup"
+        | "calling_telecalling"
+        | "calling_coldcalling"
+        | "calling_calllist_movement"
+        | "client_meeting"
+        | "admin_documentation"
+        | "training"
+        | "system_bank_portal"
+        | "break"
+        | "idle"
       alert_severity: "warning" | "critical"
       alert_status: "active" | "acknowledged" | "resolved"
       alert_type: "team" | "agent"
@@ -1678,6 +1925,7 @@ export type Database = {
         | "super_admin"
         | "sales_controller"
         | "coordinator"
+      attendance_status: "present" | "late" | "absent" | "half_day"
       audit_action:
         | "case_created"
         | "status_changed"
@@ -1730,6 +1978,7 @@ export type Database = {
         | "meeting"
         | "bank_visit"
         | "other"
+      idle_alert_severity: "warning" | "escalation" | "discipline_flag"
       lead_status:
         | "new"
         | "contacted"
@@ -1870,6 +2119,19 @@ export const Constants = {
   public: {
     Enums: {
       action_type: ["upload", "call", "feedback", "reassign", "status_change"],
+      activity_type: [
+        "data_collection",
+        "customer_followup",
+        "calling_telecalling",
+        "calling_coldcalling",
+        "calling_calllist_movement",
+        "client_meeting",
+        "admin_documentation",
+        "training",
+        "system_bank_portal",
+        "break",
+        "idle",
+      ],
       alert_severity: ["warning", "critical"],
       alert_status: ["active", "acknowledged", "resolved"],
       alert_type: ["team", "agent"],
@@ -1882,6 +2144,7 @@ export const Constants = {
         "sales_controller",
         "coordinator",
       ],
+      attendance_status: ["present", "late", "absent", "half_day"],
       audit_action: [
         "case_created",
         "status_changed",
@@ -1940,6 +2203,7 @@ export const Constants = {
         "bank_visit",
         "other",
       ],
+      idle_alert_severity: ["warning", "escalation", "discipline_flag"],
       lead_status: [
         "new",
         "contacted",

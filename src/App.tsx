@@ -23,6 +23,7 @@ import TeamManagementPage from "./pages/TeamManagementPage";
 import AlertHistoryPage from "./pages/AlertHistoryPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfileVisibilityTest from "./pages/ProfileVisibilityTest";
+import ActivityMonitorPage from "./pages/ActivityMonitorPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/user-management" element={<UserManagementPage />} />
               <Route path="/team-management" element={<TeamManagementPage />} />
               <Route path="/alert-history" element={<AlertHistoryPage />} />
+              <Route path="/activity-monitor" element={<ActivityMonitorPage />} />
               <Route path="/profile-visibility-test" element={<ProfileVisibilityTest />} />
             </Route>
             <Route path="*" element={<NotFound />} />

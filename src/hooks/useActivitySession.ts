@@ -70,10 +70,13 @@ export const OTHERS_FLAG_THRESHOLD_MINUTES = 30;
 
 // Break schedule (Asia/Dubai)
 export const BREAK_SCHEDULE = {
-  tea_morning: { start: '11:15', end: '11:30', label: 'Tea Break' },
-  lunch: { start: '13:15', end: '14:15', label: 'Lunch Break' },
-  tea_afternoon: { start: '16:30', end: '16:45', label: 'Tea Break' },
+  tea_morning: { start: '11:15', end: '11:30', label: 'Tea Break', durationMinutes: 15 },
+  lunch: { start: '13:15', end: '14:15', label: 'Lunch Break', durationMinutes: 60 },
+  tea_afternoon: { start: '16:30', end: '16:45', label: 'Tea Break', durationMinutes: 15 },
 };
+
+// Break overrun threshold - alert after X minutes past scheduled break end
+export const BREAK_OVERRUN_THRESHOLD_MINUTES = 5;
 
 export const WORK_HOURS = {
   start: '10:00',
@@ -111,12 +114,37 @@ export function isWithinWorkHours(now: Date): boolean {
   return currentTime >= WORK_HOURS.start && currentTime < WORK_HOURS.end;
 }
 
+// Helper to check if current time exceeds break end by threshold
+export function getBreakOverrunMinutes(now: Date): { overrunMinutes: number; breakLabel: string } | null {
+  const dubaiTime = getDubaiTime(now);
+  const currentMinutes = dubaiTime.getHours() * 60 + dubaiTime.getMinutes();
+  
+  for (const [, breakInfo] of Object.entries(BREAK_SCHEDULE)) {
+    const [endHour, endMin] = breakInfo.end.split(':').map(Number);
+    const breakEndMinutes = endHour * 60 + endMin;
+    const [startHour, startMin] = breakInfo.start.split(':').map(Number);
+    const breakStartMinutes = startHour * 60 + startMin;
+    
+    // Check if we're past break end but within a reasonable window (within 30 min of break end)
+    if (currentMinutes >= breakEndMinutes && currentMinutes < breakEndMinutes + 30) {
+      // Also verify we were within the break window recently (started after break start)
+      if (currentMinutes >= breakStartMinutes) {
+        const overrunMinutes = currentMinutes - breakEndMinutes;
+        return { overrunMinutes, breakLabel: breakInfo.label };
+      }
+    }
+  }
+  
+  return null;
+}
+
 export function useActivitySession() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showConfirmationPrompt, setShowConfirmationPrompt] = useState(false);
   const [confirmationPendingSince, setConfirmationPendingSince] = useState<Date | null>(null);
+  const [breakOverrunAlerted, setBreakOverrunAlerted] = useState<string | null>(null); // Track which break was alerted
   const confirmationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -711,6 +739,44 @@ export function useActivitySession() {
       endSessionMutation.mutate();
     }
   }, [currentTime, isSessionActive, endSessionMutation]);
+
+  // Break overrun detection and alerting
+  useEffect(() => {
+    if (!isSessionActive || !session?.current_activity) return;
+    
+    // Only check if agent is currently on break activity
+    const isOnBreakActivity = session.current_activity === 'break';
+    if (!isOnBreakActivity) {
+      // Reset alert tracking when not on break
+      if (breakOverrunAlerted) {
+        setBreakOverrunAlerted(null);
+      }
+      return;
+    }
+
+    const overrunInfo = getBreakOverrunMinutes(currentTime);
+    
+    if (overrunInfo && overrunInfo.overrunMinutes >= BREAK_OVERRUN_THRESHOLD_MINUTES) {
+      // Check if we already alerted for this break
+      const breakKey = `${new Date().toISOString().split('T')[0]}-${overrunInfo.breakLabel}`;
+      
+      if (breakOverrunAlerted !== breakKey) {
+        // Alert supervisor about break overrun
+        setBreakOverrunAlerted(breakKey);
+        
+        alertSupervisor('break_overrun',
+          `${profile?.full_name || 'Agent'} has exceeded their ${overrunInfo.breakLabel} by ${overrunInfo.overrunMinutes} minutes.`,
+          { 
+            break_label: overrunInfo.breakLabel, 
+            overrun_minutes: overrunInfo.overrunMinutes 
+          }
+        );
+        
+        // Also show a toast to the agent
+        toast.warning(`Your ${overrunInfo.breakLabel} has ended. Please resume work.`);
+      }
+    }
+  }, [isSessionActive, session?.current_activity, currentTime, breakOverrunAlerted, profile?.full_name]);
 
   // Set up realtime subscription for session updates
   useEffect(() => {

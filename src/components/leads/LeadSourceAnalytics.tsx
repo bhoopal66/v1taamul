@@ -46,7 +46,8 @@ export const LeadSourceAnalytics = ({ leads }: LeadSourceAnalyticsProps) => {
 
     leads.forEach(lead => {
       const parsed = parseLeadSource(lead.leadSource);
-      if (parsed) {
+      // Only process if parsed is valid AND the product type exists in our stats
+      if (parsed && stats[parsed.product]) {
         stats[parsed.product].total++;
         if (lead.leadStatus === 'converted') stats[parsed.product].converted++;
         stats[parsed.product].dealValue += lead.dealValue || 0;

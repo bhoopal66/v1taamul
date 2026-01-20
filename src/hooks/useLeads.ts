@@ -48,14 +48,25 @@ export const LEAD_SOURCES: { value: LeadSource; label: string; icon: string; pro
   })),
 ];
 
+// Valid product types and bank names for validation
+const VALID_PRODUCTS: ProductType[] = ['account', 'loan'];
+const VALID_BANKS: BankName[] = ['RAK', 'NBF', 'UBL', 'RUYA', 'MASHREQ', 'WIO'];
+
 // Helper to parse lead source
 export const parseLeadSource = (source: string | null): { product: ProductType; bank: BankName } | null => {
   if (!source) return null;
-  const [product, bank] = source.split('_') as [ProductType, BankName];
-  if (product && bank) {
-    return { product, bank };
+  const parts = source.split('_');
+  if (parts.length < 2) return null;
+  
+  const product = parts[0] as ProductType;
+  const bank = parts[1] as BankName;
+  
+  // Validate that the parsed values are actually valid
+  if (!VALID_PRODUCTS.includes(product) || !VALID_BANKS.includes(bank)) {
+    return null;
   }
-  return null;
+  
+  return { product, bank };
 };
 
 // Helper to create lead source string

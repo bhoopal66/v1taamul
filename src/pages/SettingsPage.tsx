@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
-import { Settings, Bell, Volume2, User, Shield, AlertCircle, BellOff, Edit2, Save, X } from 'lucide-react';
+import { Settings, Bell, Volume2, User, Shield, AlertCircle, BellOff, Edit2, Save, X, Key } from 'lucide-react';
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +38,7 @@ export const SettingsPage: React.FC = () => {
   });
   
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   
   // Initialize edit form when profile loads
   useEffect(() => {
@@ -286,14 +288,20 @@ export const SettingsPage: React.FC = () => {
             <CardDescription>Manage your account security</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" disabled>
+            <Button variant="outline" onClick={() => setChangePasswordOpen(true)}>
+              <Key className="w-4 h-4 mr-2" />
               Change Password
             </Button>
             <p className="text-sm text-muted-foreground">
-              Password changes are managed through your account provider.
+              Update your password to keep your account secure.
             </p>
           </CardContent>
         </Card>
+
+        <ChangePasswordDialog 
+          open={changePasswordOpen} 
+          onOpenChange={setChangePasswordOpen} 
+        />
 
         {/* Notification Preferences */}
         <Card>

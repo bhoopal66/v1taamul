@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { startOfDay, startOfWeek, startOfMonth, format } from 'date-fns';
 
 export type UnansweredPeriod = 'today' | 'weekly' | 'monthly';
+export type CallFeedbackType = 'not_answered' | 'not_interested';
 
 export interface UnansweredCallRecord {
   id: string;
@@ -14,6 +15,7 @@ export interface UnansweredCallRecord {
   phoneNumber: string;
   callTimestamp: string;
   notes: string | null;
+  feedbackType: CallFeedbackType;
 }
 
 export interface UnansweredCallsData {
@@ -24,13 +26,14 @@ export interface UnansweredCallsData {
 
 export const useUnansweredCallsReport = (
   period: UnansweredPeriod = 'today',
-  teamId?: string
+  teamId?: string,
+  feedbackType: CallFeedbackType = 'not_answered'
 ) => {
   const { user, ledTeamId, userRole } = useAuth();
   const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['unanswered-calls-report', period, teamId, ledTeamId, user?.id],
+    queryKey: ['unanswered-calls-report', period, teamId, ledTeamId, user?.id, feedbackType],
     queryFn: async (): Promise<UnansweredCallsData> => {
       // Calculate start date based on period
       const now = new Date();
@@ -80,7 +83,7 @@ export const useUnansweredCallsReport = (
         agentIds = supervisedAgents?.map(a => a.id) || [];
       }
 
-      // Build the query for unanswered calls
+      // Build the query for calls with specified feedback type
       let query = supabase
         .from('call_feedback')
         .select(`
@@ -89,13 +92,14 @@ export const useUnansweredCallsReport = (
           call_timestamp,
           notes,
           contact_id,
+          feedback_status,
           master_contacts!inner (
             company_name,
             contact_person_name,
             phone_number
           )
         `)
-        .eq('feedback_status', 'not_answered')
+        .eq('feedback_status', feedbackType)
         .gte('call_timestamp', startDate.toISOString())
         .order('call_timestamp', { ascending: false });
 
@@ -135,6 +139,7 @@ export const useUnansweredCallsReport = (
         phoneNumber: (call.master_contacts as any)?.phone_number || '',
         callTimestamp: call.call_timestamp || '',
         notes: call.notes,
+        feedbackType: call.feedback_status as CallFeedbackType,
       }));
 
       return {

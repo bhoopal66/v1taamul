@@ -5,8 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PhoneMissed, Calendar, Clock, RefreshCw, User, Building2 } from 'lucide-react';
-import { useUnansweredCallsReport, UnansweredPeriod } from '@/hooks/useUnansweredCallsReport';
+import { PhoneMissed, Calendar, Clock, RefreshCw, User, Building2, ThumbsDown } from 'lucide-react';
+import { useUnansweredCallsReport, UnansweredPeriod, CallFeedbackType } from '@/hooks/useUnansweredCallsReport';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -16,8 +16,28 @@ interface UnansweredCallsReportProps {
 
 export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ teamId }) => {
   const [period, setPeriod] = useState<UnansweredPeriod>('today');
+  const [feedbackType, setFeedbackType] = useState<CallFeedbackType>('not_answered');
   
-  const { data, isLoading, refetch } = useUnansweredCallsReport(period, teamId);
+  const { data, isLoading, refetch } = useUnansweredCallsReport(period, teamId, feedbackType);
+
+  const feedbackTypeConfig = {
+    not_answered: {
+      label: 'Unanswered',
+      icon: PhoneMissed,
+      color: 'destructive' as const,
+      emptyTitle: 'No unanswered calls',
+      emptySubtitle: 'Great job! All calls are being answered.',
+    },
+    not_interested: {
+      label: 'Not Interested',
+      icon: ThumbsDown,
+      color: 'secondary' as const,
+      emptyTitle: 'No "Not Interested" calls',
+      emptySubtitle: 'No rejections recorded for this period.',
+    },
+  };
+
+  const config = feedbackTypeConfig[feedbackType];
 
   const formatTimestamp = (timestamp: string) => {
     if (!timestamp) return '-';
@@ -37,22 +57,24 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
     return format(date, 'MMM d');
   };
 
+  const IconComponent = config.icon;
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10">
-              <PhoneMissed className="w-5 h-5 text-destructive" />
+            <div className={`p-2 rounded-lg ${feedbackType === 'not_answered' ? 'bg-destructive/10' : 'bg-muted'}`}>
+              <IconComponent className={`w-5 h-5 ${feedbackType === 'not_answered' ? 'text-destructive' : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <CardTitle className="text-lg">Unanswered Calls</CardTitle>
+              <CardTitle className="text-lg">Call Feedback Report</CardTitle>
               <CardDescription>{data.periodLabel}</CardDescription>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="gap-1">
-              <PhoneMissed className="w-3 h-3" />
+            <Badge variant={config.color} className="gap-1">
+              <IconComponent className="w-3 h-3" />
               {data.totalCount} calls
             </Badge>
             <Button
@@ -67,6 +89,21 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Feedback Type Tabs */}
+        <Tabs value={feedbackType} onValueChange={(v) => setFeedbackType(v as CallFeedbackType)}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="not_answered" className="gap-2">
+              <PhoneMissed className="w-4 h-4" />
+              Unanswered
+            </TabsTrigger>
+            <TabsTrigger value="not_interested" className="gap-2">
+              <ThumbsDown className="w-4 h-4" />
+              Not Interested
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Time Period Tabs */}
         <Tabs value={period} onValueChange={(v) => setPeriod(v as UnansweredPeriod)}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="today" className="gap-2">
@@ -82,8 +119,8 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
               This Month
             </TabsTrigger>
           </TabsList>
+        </Tabs>
 
-          <TabsContent value={period} className="mt-4">
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -92,9 +129,9 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
               </div>
             ) : data.records.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <PhoneMissed className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-lg font-medium">No unanswered calls</p>
-                <p className="text-sm">Great job! All calls are being answered.</p>
+                <IconComponent className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-lg font-medium">{config.emptyTitle}</p>
+                <p className="text-sm">{config.emptySubtitle}</p>
               </div>
             ) : (
               <ScrollArea className="h-[400px]">
@@ -164,8 +201,6 @@ export const UnansweredCallsReport: React.FC<UnansweredCallsReportProps> = ({ te
                 </Table>
               </ScrollArea>
             )}
-          </TabsContent>
-        </Tabs>
       </CardContent>
     </Card>
   );

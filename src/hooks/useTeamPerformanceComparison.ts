@@ -35,22 +35,38 @@ interface UseTeamPerformanceComparisonOptions {
   period2: DateRange | null;
 }
 
-const fetchPeriodData = async (from: Date, to: Date): Promise<Omit<PeriodPerformance, 'label' | 'dateRange'>> => {
+const fetchPeriodData = async (
+  from: Date, 
+  to: Date, 
+  agentIds: string[] | null
+): Promise<Omit<PeriodPerformance, 'label' | 'dateRange'>> => {
   const startDate = startOfDay(from).toISOString();
   const endDate = endOfDay(to).toISOString();
   const dayCount = differenceInDays(to, from) + 1;
 
+  // Build feedback query
+  let feedbackQuery = supabase
+    .from('call_feedback')
+    .select('agent_id, feedback_status')
+    .gte('call_timestamp', startDate)
+    .lte('call_timestamp', endDate);
+  
+  // Build leads query  
+  let leadsQuery = supabase
+    .from('leads')
+    .select('agent_id')
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  // Filter by agent IDs if provided (for team scoping)
+  if (agentIds && agentIds.length > 0) {
+    feedbackQuery = feedbackQuery.in('agent_id', agentIds);
+    leadsQuery = leadsQuery.in('agent_id', agentIds);
+  }
+
   const [feedbackResult, leadsResult] = await Promise.all([
-    supabase
-      .from('call_feedback')
-      .select('agent_id, feedback_status')
-      .gte('call_timestamp', startDate)
-      .lte('call_timestamp', endDate),
-    supabase
-      .from('leads')
-      .select('agent_id')
-      .gte('created_at', startDate)
-      .lte('created_at', endDate),
+    feedbackQuery,
+    leadsQuery,
   ]);
 
   const feedback = feedbackResult.data || [];
@@ -75,19 +91,40 @@ const fetchPeriodData = async (from: Date, to: Date): Promise<Omit<PeriodPerform
 };
 
 export const useTeamPerformanceComparison = (options: UseTeamPerformanceComparisonOptions) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const { period1, period2 } = options;
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
+  
+  // Check if user can see all teams (admin, super_admin, operations_head)
+  const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['team-performance-comparison', period1?.from, period1?.to, period2?.from, period2?.to],
+    queryKey: ['team-performance-comparison', period1?.from, period1?.to, period2?.from, period2?.to, ledTeamId, canSeeAllTeams, user?.id],
     queryFn: async () => {
       if (!period1 || !period2) return null;
 
+      // Get team member IDs for scoping (if not admin/ops_head)
+      let agentIds: string[] | null = null;
+      if (!canSeeAllTeams) {
+        let query = supabase
+          .from('profiles_public')
+          .select('id')
+          .eq('is_active', true);
+        
+        if (ledTeamId) {
+          query = query.or(`team_id.eq.${ledTeamId},supervisor_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+        
+        const { data: teamMembers } = await query;
+        agentIds = teamMembers?.map(m => m.id) || [];
+      }
+
       const [data1, data2] = await Promise.all([
-        fetchPeriodData(period1.from, period1.to),
-        fetchPeriodData(period2.from, period2.to),
+        fetchPeriodData(period1.from, period1.to, agentIds),
+        fetchPeriodData(period2.from, period2.to, agentIds),
       ]);
 
       const period1Data: PeriodPerformance = {

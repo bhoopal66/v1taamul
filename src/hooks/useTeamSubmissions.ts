@@ -27,11 +27,14 @@ export interface TeamSubmission {
 }
 
 export const useTeamSubmissions = (period: SubmissionPeriod = 'weekly') => {
-  const { user } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Check if user can see all teams (admin, super_admin, operations_head)
+  const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   const { data: submissions, isLoading, refetch } = useQuery({
-    queryKey: ['team-submissions', user?.id, period],
+    queryKey: ['team-submissions', user?.id, period, ledTeamId, canSeeAllTeams],
     queryFn: async (): Promise<TeamSubmission[]> => {
       let startDate: Date;
       
@@ -41,7 +44,26 @@ export const useTeamSubmissions = (period: SubmissionPeriod = 'weekly') => {
         startDate = startOfMonth(new Date());
       }
 
-      const { data, error } = await supabase
+      // First, get agent IDs for team scoping if needed
+      let agentIds: string[] | null = null;
+      if (!canSeeAllTeams) {
+        let query = supabase
+          .from('profiles_public')
+          .select('id')
+          .eq('is_active', true);
+        
+        if (ledTeamId) {
+          query = query.or(`team_id.eq.${ledTeamId},supervisor_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+        
+        const { data: teamMembers } = await query;
+        agentIds = teamMembers?.map(m => m.id) || [];
+      }
+
+      // Build submissions query
+      let submissionsQuery = supabase
         .from('agent_submissions')
         .select(`
           *,
@@ -49,6 +71,16 @@ export const useTeamSubmissions = (period: SubmissionPeriod = 'weekly') => {
         `)
         .gte('submission_date', format(startDate, 'yyyy-MM-dd'))
         .order('submission_date', { ascending: false });
+
+      // Filter by team member IDs if not admin/ops_head
+      if (agentIds !== null && agentIds.length > 0) {
+        submissionsQuery = submissionsQuery.in('agent_id', agentIds);
+      } else if (agentIds !== null && agentIds.length === 0) {
+        // No team members, return empty
+        return [];
+      }
+
+      const { data, error } = await submissionsQuery;
 
       if (error) throw error;
       return (data || []) as unknown as TeamSubmission[];

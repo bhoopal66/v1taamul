@@ -39,20 +39,34 @@ interface UseAgentPerformanceTrendsOptions {
 }
 
 export const useAgentPerformanceTrends = (options: UseAgentPerformanceTrendsOptions) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const { agentId, days = 14 } = options;
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
+  
+  // Check if user can see all agents (admin, super_admin, operations_head)
+  const canSeeAllAgents = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
-  // Fetch list of agents
+  // Fetch list of agents - filtered by team for supervisors
   const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ['agent-list-for-trends'],
+    queryKey: ['agent-list-for-trends', ledTeamId, canSeeAllAgents, user?.id],
     queryFn: async (): Promise<AgentOption[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles_public')
-        .select('id, full_name, username')
+        .select('id, full_name, username, team_id, supervisor_id')
         .eq('is_active', true)
         .order('full_name', { ascending: true });
+
+      // If supervisor role (not admin/ops_head), filter by their team or direct reports
+      if (!canSeeAllAgents) {
+        if (ledTeamId) {
+          query = query.or(`team_id.eq.${ledTeamId},supervisor_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

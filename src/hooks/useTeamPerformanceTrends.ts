@@ -32,26 +32,47 @@ interface UseTeamPerformanceTrendsOptions {
 }
 
 export const useTeamPerformanceTrends = (options: UseTeamPerformanceTrendsOptions = {}) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const { days = 14, teamId } = options;
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
+  
+  // Check if user can see all teams (admin, super_admin, operations_head)
+  const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   const { data: trendData, isLoading, refetch } = useQuery({
-    queryKey: ['team-performance-trends', days, teamId],
+    queryKey: ['team-performance-trends', days, teamId, ledTeamId, canSeeAllTeams, user?.id],
     queryFn: async (): Promise<{ dailyTrends: DailyTeamTrend[]; summary: TeamTrendSummary }> => {
       const endDate = new Date();
       const startDate = subDays(endDate, days - 1);
 
-      // Get agent IDs for the team if filtering by team
+      // Get agent IDs based on team filtering and role
       let agentIds: string[] | null = null;
+      
       if (teamId) {
+        // Specific team selected
         const { data: profiles } = await supabase
           .from('profiles_public')
           .select('id')
           .eq('team_id', teamId);
         agentIds = profiles?.map(p => p.id) || [];
+      } else if (!canSeeAllTeams) {
+        // Supervisor role without specific team - filter by their supervised agents or led team
+        let query = supabase
+          .from('profiles_public')
+          .select('id')
+          .eq('is_active', true);
+        
+        if (ledTeamId) {
+          query = query.or(`team_id.eq.${ledTeamId},supervisor_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+        
+        const { data: profiles } = await query;
+        agentIds = profiles?.map(p => p.id) || [];
       }
+      // If canSeeAllTeams is true and no teamId, agentIds remains null (no filtering)
 
       // Get all feedback in date range
       let feedbackQuery = supabase

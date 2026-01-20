@@ -21,22 +21,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const SupervisorDashboard: React.FC = () => {
-  const { profile, userRole, ledTeamId } = useAuth();
+  const { profile, userRole, ledTeamId, user } = useAuth();
   const [trendDays, setTrendDays] = useState<number>(14);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
-  // Fetch all teams for the filter
+  // Check if user can see all teams (admin, super_admin, operations_head)
+  const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
+
+  // Fetch teams for the filter - scope based on role
   const { data: teams } = useQuery({
-    queryKey: ['all-teams'],
+    queryKey: ['supervisor-teams', ledTeamId, canSeeAllTeams, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('teams')
         .select('id, name, team_type')
         .order('name');
+      
+      // If supervisor role and has a led team, only show their team
+      if (!canSeeAllTeams && ledTeamId) {
+        query = query.eq('id', ledTeamId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
+
+  // Determine effective team filter
+  const effectiveTeamId = selectedTeamId === 'all' 
+    ? (canSeeAllTeams ? undefined : ledTeamId || undefined)
+    : selectedTeamId;
 
   const {
     teamPerformance,
@@ -47,14 +62,14 @@ export const SupervisorDashboard: React.FC = () => {
     approveUpload,
     rejectUpload,
     refetch,
-  } = useSupervisorData(selectedTeamId === 'all' ? undefined : selectedTeamId);
+  } = useSupervisorData(effectiveTeamId);
 
   const {
     dailyTrends,
     summary: trendSummary,
     isLoading: trendsLoading,
     refetch: refetchTrends,
-  } = useTeamPerformanceTrends({ days: trendDays, teamId: selectedTeamId === 'all' ? undefined : selectedTeamId });
+  } = useTeamPerformanceTrends({ days: trendDays, teamId: effectiveTeamId });
 
   const handleRefresh = () => {
     refetch();
@@ -76,6 +91,11 @@ export const SupervisorDashboard: React.FC = () => {
   }
 
   const selectedTeam = teams?.find(t => t.id === selectedTeamId);
+  
+  // Determine display name for team
+  const teamDisplayName = selectedTeamId === 'all' 
+    ? (canSeeAllTeams ? 'All Teams' : (teams?.[0]?.name || 'Your Team'))
+    : (selectedTeam?.name || 'Team');
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -90,25 +110,27 @@ export const SupervisorDashboard: React.FC = () => {
               Team Overview
             </h1>
             <p className="text-muted-foreground mt-1">
-              {selectedTeamId === 'all' ? 'All Teams' : selectedTeam?.name || 'Team'} • {profile?.full_name || 'Supervisor'}
+              {teamDisplayName} • {profile?.full_name || 'Supervisor'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Team Filter */}
-          <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select team" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
-              {teams?.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Team Filter - Only show if user can see multiple teams */}
+          {canSeeAllTeams && (
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {teams?.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant="outline"
             onClick={handleRefresh}

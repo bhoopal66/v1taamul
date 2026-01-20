@@ -42,27 +42,41 @@ export interface TeamStats {
 }
 
 export const useSupervisorData = (teamId?: string) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
   const today = new Date();
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
+  
+  // Check if user can see all teams (admin, super_admin, operations_head)
+  const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   // Fetch team agents with their performance
   const { data: teamPerformance, isLoading: teamLoading, refetch: refetchTeam } = useQuery({
-    queryKey: ['team-performance', teamId],
+    queryKey: ['team-performance', teamId, ledTeamId, canSeeAllTeams, user?.id],
     queryFn: async (): Promise<AgentPerformance[]> => {
       const todayStart = startOfDay(today).toISOString();
       const todayEnd = endOfDay(today).toISOString();
 
-      // Get agent profiles - filter by team if specified (using profiles_public for non-sensitive data)
+      // Get agent profiles - filter by team based on user role
       let profilesQuery = supabase
         .from('profiles_public')
-        .select('id, full_name, username, is_active, team_id');
+        .select('id, full_name, username, is_active, team_id, supervisor_id');
       
       if (teamId) {
+        // Specific team selected
         profilesQuery = profilesQuery.eq('team_id', teamId);
+      } else if (!canSeeAllTeams) {
+        // Supervisor role - filter by their supervised agents or led team
+        if (ledTeamId) {
+          // Filter by team the supervisor leads OR agents they directly supervise
+          profilesQuery = profilesQuery.or(`team_id.eq.${ledTeamId},supervisor_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          // Only filter by direct reports if no led team
+          profilesQuery = profilesQuery.eq('supervisor_id', user.id);
+        }
       }
+      // If canSeeAllTeams is true and no teamId specified, show all
 
       const { data: profiles, error: profilesError } = await profilesQuery;
 

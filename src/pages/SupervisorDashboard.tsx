@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Shield, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Shield, AlertTriangle, PhoneMissed } from 'lucide-react';
 import { TeamStatsCards } from '@/components/supervisor/TeamStatsCards';
 import { AgentPerformanceTable } from '@/components/supervisor/AgentPerformanceTable';
 import { UploadApprovalQueue } from '@/components/supervisor/UploadApprovalQueue';
@@ -14,6 +14,7 @@ import { TeamTrendsSummaryCards } from '@/components/supervisor/TeamTrendsSummar
 import { PerformanceComparisonView } from '@/components/supervisor/PerformanceComparisonView';
 import { AgentDrillDownChart } from '@/components/supervisor/AgentDrillDownChart';
 import { TeamSubmissionsView } from '@/components/supervisor/TeamSubmissionsView';
+import { UnansweredCallsReport } from '@/components/supervisor/UnansweredCallsReport';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -161,6 +162,10 @@ export const SupervisorDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList className="flex-wrap">
             <TabsTrigger value="trends">Team Trends</TabsTrigger>
+            <TabsTrigger value="unanswered" className="gap-1">
+              <PhoneMissed className="w-4 h-4" />
+              Unanswered
+            </TabsTrigger>
             <TabsTrigger value="submissions">Submissions</TabsTrigger>
             <TabsTrigger value="agents">Agent Drill-Down</TabsTrigger>
             <TabsTrigger value="comparison">Compare Periods</TabsTrigger>
@@ -193,6 +198,10 @@ export const SupervisorDashboard: React.FC = () => {
             />
             <TeamConversionAreaChart data={dailyTrends} isLoading={trendsLoading} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="unanswered" className="space-y-6">
+          <UnansweredCallsReport teamId={effectiveTeamId} />
         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">

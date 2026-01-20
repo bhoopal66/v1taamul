@@ -77,6 +77,8 @@ export const BREAK_SCHEDULE = {
 
 // Break overrun threshold - alert after X minutes past scheduled break end
 export const BREAK_OVERRUN_THRESHOLD_MINUTES = 5;
+// Auto-switch to Calling after X minutes past scheduled break end
+export const BREAK_OVERRUN_AUTO_SWITCH_MINUTES = 10;
 
 export const WORK_HOURS = {
   start: '10:00',
@@ -740,9 +742,9 @@ export function useActivitySession() {
     }
   }, [currentTime, isSessionActive, endSessionMutation]);
 
-  // Break overrun detection and alerting
+  // Break overrun detection, alerting, and auto-switch
   useEffect(() => {
-    if (!isSessionActive || !session?.current_activity) return;
+    if (!isSessionActive || !session?.current_activity || !user?.id) return;
     
     // Only check if agent is currently on break activity
     const isOnBreakActivity = session.current_activity === 'break';
@@ -757,11 +759,56 @@ export function useActivitySession() {
     const overrunInfo = getBreakOverrunMinutes(currentTime);
     
     if (overrunInfo && overrunInfo.overrunMinutes >= BREAK_OVERRUN_THRESHOLD_MINUTES) {
-      // Check if we already alerted for this break
       const breakKey = `${new Date().toISOString().split('T')[0]}-${overrunInfo.breakLabel}`;
+      const autoSwitchKey = `${breakKey}-autoswitch`;
       
-      if (breakOverrunAlerted !== breakKey) {
-        // Alert supervisor about break overrun
+      // Check if we need to auto-switch (10+ minutes overrun)
+      if (overrunInfo.overrunMinutes >= BREAK_OVERRUN_AUTO_SWITCH_MINUTES && breakOverrunAlerted !== autoSwitchKey) {
+        setBreakOverrunAlerted(autoSwitchKey);
+        
+        // Auto-switch to Calling
+        const performAutoSwitch = async () => {
+          const now = new Date().toISOString();
+          
+          // Update session to Calling
+          await supabase
+            .from('activity_sessions')
+            .update({
+              current_activity: 'calling_telecalling',
+              current_activity_started_at: now,
+              last_confirmation_at: now,
+              updated_at: now,
+            })
+            .eq('id', session.id);
+          
+          // Log the activity change
+          await supabase
+            .from('activity_logs')
+            .insert({
+              user_id: user.id,
+              activity_type: 'calling_telecalling' as any,
+              started_at: now,
+              metadata: { auto_switched: true, reason: 'break_overrun' },
+            });
+          
+          // Alert supervisor about auto-switch
+          await alertSupervisor('break_overrun',
+            `${profile?.full_name || 'Agent'} was auto-switched to Calling after exceeding ${overrunInfo.breakLabel} by ${overrunInfo.overrunMinutes} minutes.`,
+            { 
+              break_label: overrunInfo.breakLabel, 
+              overrun_minutes: overrunInfo.overrunMinutes,
+              auto_switched: true
+            }
+          );
+          
+          toast.warning(`You've been auto-switched to Calling after exceeding your ${overrunInfo.breakLabel} by ${overrunInfo.overrunMinutes} minutes.`);
+          queryClient.invalidateQueries({ queryKey: ['activity-session'] });
+        };
+        
+        performAutoSwitch();
+      }
+      // First warning at 5 minutes
+      else if (breakOverrunAlerted !== breakKey && breakOverrunAlerted !== autoSwitchKey) {
         setBreakOverrunAlerted(breakKey);
         
         alertSupervisor('break_overrun',
@@ -772,11 +819,11 @@ export function useActivitySession() {
           }
         );
         
-        // Also show a toast to the agent
-        toast.warning(`Your ${overrunInfo.breakLabel} has ended. Please resume work.`);
+        const remainingMinutes = BREAK_OVERRUN_AUTO_SWITCH_MINUTES - overrunInfo.overrunMinutes;
+        toast.warning(`Your ${overrunInfo.breakLabel} has ended. You will be auto-switched to Calling in ${remainingMinutes} minutes.`);
       }
     }
-  }, [isSessionActive, session?.current_activity, currentTime, breakOverrunAlerted, profile?.full_name]);
+  }, [isSessionActive, session?.current_activity, session?.id, currentTime, breakOverrunAlerted, profile?.full_name, user?.id, queryClient]);
 
   // Set up realtime subscription for session updates
   useEffect(() => {

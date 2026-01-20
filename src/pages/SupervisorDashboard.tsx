@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Shield, AlertTriangle, PhoneMissed, Activity, UserCheck } from 'lucide-react';
+import { RefreshCw, Shield, AlertTriangle, PhoneMissed, Activity, UserCheck, Bell } from 'lucide-react';
 import { TeamStatsCards } from '@/components/supervisor/TeamStatsCards';
 import { AgentPerformanceTable } from '@/components/supervisor/AgentPerformanceTable';
 import { UploadApprovalQueue } from '@/components/supervisor/UploadApprovalQueue';
@@ -17,10 +17,12 @@ import { TeamSubmissionsView } from '@/components/supervisor/TeamSubmissionsView
 import { UnansweredCallsReport } from '@/components/supervisor/UnansweredCallsReport';
 import { TeamActivityMonitor } from '@/components/supervisor/TeamActivityMonitor';
 import { TeamWorkingStatusPanel } from '@/components/supervisor/TeamWorkingStatusPanel';
+import { SupervisorAlertsPanel } from '@/components/supervisor/SupervisorAlertsPanel';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { useTeamActivityMonitor } from '@/hooks/useTeamActivityMonitor';
 import { useTeamWorkingStatus } from '@/hooks/useTeamWorkingStatus';
+import { useSupervisorAlerts } from '@/hooks/useSupervisorAlerts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -89,10 +91,20 @@ export const SupervisorDashboard: React.FC = () => {
     refetch: refetchWorkingStatus,
   } = useTeamWorkingStatus(effectiveTeamId);
 
+  const {
+    alerts,
+    unreadCount,
+    isLoading: alertsLoading,
+    markAsRead,
+    markAllAsRead,
+    refetch: refetchAlerts,
+  } = useSupervisorAlerts();
+
   const handleRefresh = () => {
     refetch();
     refetchTrends();
     refetchWorkingStatus();
+    refetchAlerts();
   };
 
   if (!isSupervisor) {
@@ -183,6 +195,15 @@ export const SupervisorDashboard: React.FC = () => {
               <UserCheck className="w-4 h-4" />
               Working Status
             </TabsTrigger>
+            <TabsTrigger value="alerts" className="gap-1">
+              <Bell className="w-4 h-4" />
+              Alerts
+              {unreadCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-destructive text-destructive-foreground rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="activity" className="gap-1">
               <Activity className="w-4 h-4" />
               Live Activity
@@ -215,6 +236,16 @@ export const SupervisorDashboard: React.FC = () => {
             teamStatus={teamStatus} 
             stats={workingStats} 
             isLoading={workingStatusLoading} 
+          />
+        </TabsContent>
+
+        <TabsContent value="alerts" className="space-y-6">
+          <SupervisorAlertsPanel 
+            alerts={alerts} 
+            unreadCount={unreadCount} 
+            isLoading={alertsLoading}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
           />
         </TabsContent>
 

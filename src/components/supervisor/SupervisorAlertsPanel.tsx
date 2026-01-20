@@ -76,7 +76,7 @@ const getAlertConfig = (alertType: string) => {
         color: 'text-destructive',
         bgColor: 'bg-destructive/10',
         borderColor: 'border-destructive/20',
-        label: '10-Min Auto Logout',
+        label: '5-Min Auto Logout',
       };
     default:
       return {

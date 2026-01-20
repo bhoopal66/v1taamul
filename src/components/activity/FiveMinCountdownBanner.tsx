@@ -13,7 +13,7 @@ interface FiveMinCountdownBannerProps {
 export const FiveMinCountdownBanner: React.FC<FiveMinCountdownBannerProps> = ({
   remainingSeconds,
   activityLabel,
-  totalSeconds = 600, // 10 minutes
+  totalSeconds = 300, // 5 minutes
 }) => {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -61,7 +61,7 @@ export const FiveMinCountdownBanner: React.FC<FiveMinCountdownBannerProps> = ({
                   "font-semibold",
                   isCritical ? "text-destructive" : isUrgent ? "text-warning" : "text-amber-700"
                 )}>
-                  ⚠️ 10-Minute Auto-Logout Active
+                  ⚠️ 5-Minute Auto-Logout Active
                 </p>
                 <p className="text-sm text-muted-foreground">
                   You will be automatically logged out when the timer ends ({activityLabel})

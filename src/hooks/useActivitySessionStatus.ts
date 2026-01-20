@@ -11,7 +11,7 @@ export function useActivitySessionStatus() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['activity-session-status', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user?.id) return { hasStarted: false, isActive: false };
       
       const today = new Date().toISOString().split('T')[0];
@@ -20,9 +20,14 @@ export function useActivitySessionStatus() {
         .select('start_time, is_active')
         .eq('user_id', user.id)
         .eq('date', today)
+        .abortSignal(signal)
         .maybeSingle();
       
       if (error) {
+        // Ignore abort errors - they're expected during navigation
+        if (error.message?.includes('AbortError') || error.code === 'ABORT_ERR') {
+          return { hasStarted: false, isActive: false };
+        }
         console.error('Error checking session status:', error);
         return { hasStarted: false, isActive: false };
       }

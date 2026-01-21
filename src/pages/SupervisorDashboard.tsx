@@ -20,6 +20,7 @@ import { TeamWorkingStatusPanel } from '@/components/supervisor/TeamWorkingStatu
 import { SupervisorAlertsPanel } from '@/components/supervisor/SupervisorAlertsPanel';
 import { SupervisorCallVolumeHeatmap } from '@/components/supervisor/SupervisorCallVolumeHeatmap';
 import { SupervisorLeadsOverview } from '@/components/supervisor/SupervisorLeadsOverview';
+import { FailedUploadsRetryPanel } from '@/components/supervisor/FailedUploadsRetryPanel';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { useTeamActivityMonitor } from '@/hooks/useTeamActivityMonitor';
@@ -188,6 +189,9 @@ export const SupervisorDashboard: React.FC = () => {
           onReject={rejectUpload}
         />
       )}
+
+      {/* Failed Uploads Recovery Panel */}
+      <FailedUploadsRetryPanel />
 
       {/* Performance Tabs */}
       <Tabs defaultValue="working-status" className="space-y-6">

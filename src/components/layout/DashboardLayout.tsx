@@ -57,19 +57,6 @@ export const DashboardLayout: React.FC = () => {
   // If no access, redirect to appropriate page
   if (!hasAccess) {
     const redirectPath = getUnauthorizedRedirect(currentPath);
-    // Prevent redirect-to-self loops which can blank the screen.
-    if (redirectPath === currentPath) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="max-w-md w-full p-6 rounded-lg border bg-card text-card-foreground">
-            <h1 className="text-lg font-semibold">Access restricted</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              You don’t have permission to view this page.
-            </p>
-          </div>
-        </div>
-      );
-    }
     return <Navigate to={redirectPath} replace />;
   }
 

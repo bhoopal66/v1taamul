@@ -54,13 +54,10 @@ export const FEATURE_PERMISSIONS: FeaturePermission[] = [
 
 // Helper function to check if a role has access to a page
 export function canAccessPage(role: AppRole | null, path: string): boolean {
-  // If role isn't available yet (e.g. initial load / temporary backend timeout),
-  // default to the lowest privilege role to prevent redirect loops while
-  // avoiding accidental elevation.
-  const effectiveRole: AppRole = role ?? 'agent';
+  if (!role) return false;
   const permission = PAGE_PERMISSIONS.find(p => p.path === path);
   if (!permission) return true; // If no permission defined, allow access
-  return permission.allowedRoles.includes(effectiveRole);
+  return permission.allowedRoles.includes(role);
 }
 
 // Helper function to get redirect path for unauthorized access

@@ -280,10 +280,18 @@ export function useActivitySession() {
       queryClient.invalidateQueries({ queryKey: ['activity-session-status'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Ignore abort errors
-      if (error?.message?.includes('abort') || error?.name === 'AbortError') return;
-      toast.error(`Failed to start session: ${error.message}`);
+      const errorMessage = error?.message || String(error);
+      const errorName = error?.name || '';
+      if (
+        errorMessage.toLowerCase().includes('abort') ||
+        errorName === 'AbortError' ||
+        error?.code === 'ABORT_ERR'
+      ) {
+        return;
+      }
+      toast.error(`Failed to start session: ${errorMessage}`);
     },
   });
 
@@ -365,10 +373,18 @@ export function useActivitySession() {
       queryClient.invalidateQueries({ queryKey: ['activity-session'] });
       queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
     },
-    onError: (error) => {
-      // Ignore abort errors
-      if (error?.message?.includes('abort') || error?.name === 'AbortError') return;
-      toast.error(`Failed to switch activity: ${error.message}`);
+    onError: (error: any) => {
+      // Ignore abort errors - check multiple ways the abort error can manifest
+      const errorMessage = error?.message || String(error);
+      const errorName = error?.name || '';
+      if (
+        errorMessage.toLowerCase().includes('abort') ||
+        errorName === 'AbortError' ||
+        error?.code === 'ABORT_ERR'
+      ) {
+        return;
+      }
+      toast.error(`Failed to switch activity: ${errorMessage}`);
     },
   });
 
@@ -579,10 +595,18 @@ export function useActivitySession() {
       
       queryClient.invalidateQueries({ queryKey: ['activity-session'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Ignore abort errors
-      if (error?.message?.includes('abort') || error?.name === 'AbortError') return;
-      toast.error(`Failed to confirm activity: ${error.message}`);
+      const errorMessage = error?.message || String(error);
+      const errorName = error?.name || '';
+      if (
+        errorMessage.toLowerCase().includes('abort') ||
+        errorName === 'AbortError' ||
+        error?.code === 'ABORT_ERR'
+      ) {
+        return;
+      }
+      toast.error(`Failed to confirm activity: ${errorMessage}`);
     },
   });
 
@@ -707,10 +731,18 @@ export function useActivitySession() {
       queryClient.invalidateQueries({ queryKey: ['activity-session'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       // Ignore abort errors
-      if (error?.message?.includes('abort') || error?.name === 'AbortError') return;
-      toast.error(`Failed to end session: ${error.message}`);
+      const errorMessage = error?.message || String(error);
+      const errorName = error?.name || '';
+      if (
+        errorMessage.toLowerCase().includes('abort') ||
+        errorName === 'AbortError' ||
+        error?.code === 'ABORT_ERR'
+      ) {
+        return;
+      }
+      toast.error(`Failed to end session: ${errorMessage}`);
     },
   });
 

@@ -66,8 +66,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label }) => {
         )
       }
     >
-      {icon}
-      <span>{label}</span>
+      <span className="flex items-center gap-3">
+        {icon}
+        <span>{label}</span>
+      </span>
     </NavLink>
   );
 };

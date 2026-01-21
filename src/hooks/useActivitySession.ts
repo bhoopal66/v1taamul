@@ -177,7 +177,7 @@ export function useActivitySession() {
   // Fetch today's session
   const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery({
     queryKey: ['activity-session', user?.id],
-    queryFn: async (): Promise<ActivitySession | null> => {
+    queryFn: async ({ signal }): Promise<ActivitySession | null> => {
       if (!user?.id) return null;
       
       const today = new Date().toISOString().split('T')[0];
@@ -186,15 +186,25 @@ export function useActivitySession() {
         .select('*')
         .eq('user_id', user.id)
         .eq('date', today)
+        .abortSignal(signal)
         .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        // Ignore abort errors
+        if (error.message?.includes('abort') || error.code === 'AbortError') {
+          return null;
+        }
+        throw error;
+      }
       return data as ActivitySession | null;
     },
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds (was 10)
+    refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 15000, // Consider data fresh for 15 seconds
-    retry: 3,
+    retry: (failureCount, error) => {
+      if (error?.message?.includes('abort')) return false;
+      return failureCount < 3;
+    },
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 

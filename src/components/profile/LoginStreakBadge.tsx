@@ -1,5 +1,5 @@
-import React from 'react';
-import { Flame, Calendar, Zap, Trophy } from 'lucide-react';
+import React, { forwardRef } from 'react';
+import { Flame, Zap, Trophy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +9,34 @@ interface LoginStreakBadgeProps {
   variant?: 'compact' | 'full';
   className?: string;
 }
+
+// Separate component for the badge content that properly forwards refs
+interface BadgeContentProps {
+  currentStreak: number;
+  colors: { bg: string; text: string; border: string };
+  className?: string;
+}
+
+const BadgeContent = forwardRef<HTMLDivElement, BadgeContentProps>(
+  ({ currentStreak, colors, className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        'flex items-center gap-1.5 px-2 py-1 rounded-full border cursor-pointer transition-all hover:scale-105',
+        colors.bg,
+        colors.border,
+        className
+      )}
+      {...props}
+    >
+      <Flame className={cn('w-3.5 h-3.5', colors.text)} />
+      <span className={cn('text-xs font-bold', colors.text)}>
+        {currentStreak}
+      </span>
+    </div>
+  )
+);
+BadgeContent.displayName = 'BadgeContent';
 
 const getStreakTier = (streak: number) => {
   if (streak >= 100) return { name: 'Legendary', color: 'yellow', icon: '🏆' };
@@ -40,19 +68,11 @@ export const LoginStreakBadge: React.FC<LoginStreakBadgeProps> = ({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
-              className={cn(
-                'flex items-center gap-1.5 px-2 py-1 rounded-full border cursor-pointer transition-all hover:scale-105',
-                colors.bg,
-                colors.border,
-                className
-              )}
-            >
-              <Flame className={cn('w-3.5 h-3.5', colors.text)} />
-              <span className={cn('text-xs font-bold', colors.text)}>
-                {currentStreak}
-              </span>
-            </div>
+            <BadgeContent
+              currentStreak={currentStreak}
+              colors={colors}
+              className={className}
+            />
           </TooltipTrigger>
           <TooltipContent side="bottom">
             <div className="space-y-1">

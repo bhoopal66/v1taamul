@@ -796,7 +796,7 @@ export const useCallSheetUpload = () => {
       if (!user?.id) throw new Error('Not authenticated');
 
       // Start logging session
-      uploadLogger.startSession(user.id, file.name);
+      await uploadLogger.startSession(user.id, file.name);
       uploadLogger.info('validation', 'Starting upload submission', {
         totalEntries: validationResult.totalEntries,
         validEntries: validationResult.validEntries,
@@ -1171,8 +1171,8 @@ export const useCallSheetUpload = () => {
       
       // End logging session and get summary
       const logSummary = uploadLogger.getSummary();
-      uploadLogger.info('complete', 'Upload processing complete', logSummary || undefined);
-      uploadLogger.endSession();
+      uploadLogger.info('complete', 'Upload processing complete', logSummary ? { ...logSummary } : undefined);
+      await uploadLogger.endSession();
 
       return upload;
     },

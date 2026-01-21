@@ -1663,6 +1663,53 @@ export type Database = {
           },
         ]
       }
+      upload_processing_logs: {
+        Row: {
+          agent_id: string
+          created_at: string
+          ended_at: string | null
+          file_name: string
+          id: string
+          log_entries: Json
+          session_id: string
+          started_at: string
+          summary: Json | null
+          upload_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          ended_at?: string | null
+          file_name: string
+          id?: string
+          log_entries?: Json
+          session_id: string
+          started_at?: string
+          summary?: Json | null
+          upload_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          ended_at?: string | null
+          file_name?: string
+          id?: string
+          log_entries?: Json
+          session_id?: string
+          started_at?: string
+          summary?: Json | null
+          upload_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_processing_logs_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "call_sheet_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       upload_rejections: {
         Row: {
           company_name: string | null

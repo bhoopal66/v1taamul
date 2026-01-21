@@ -29,7 +29,9 @@ export const DashboardLayout: React.FC = () => {
   );
 
   // Show loading state
-  if (loading || sessionLoading) {
+  // NOTE: session status is only needed as a guard for non-exempt pages.
+  // If the backend is slow/unreachable, we still want /activity-monitor to render.
+  if (loading || (!isExemptPage && sessionLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

@@ -104,17 +104,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // THEN get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      }
-      
+    // THEN get initial session with timeout fallback
+    const sessionTimeout = setTimeout(() => {
+      // If session fetch takes too long, stop loading anyway
       setLoading(false);
-    });
+    }, 10000); // 10 second timeout
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(sessionTimeout);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          fetchUserData(session.user.id);
+        }
+        
+        setLoading(false);
+      })
+      .catch((error) => {
+        clearTimeout(sessionTimeout);
+        console.error('Error getting session:', error);
+        // On error, stop loading and let user access public pages
+        setLoading(false);
+      });
 
     return () => {
       subscription.unsubscribe();

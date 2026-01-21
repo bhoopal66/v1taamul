@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { uploadLogger } from '@/utils/uploadLogger';
 
 export interface ParsedContact {
   rowNumber: number;
@@ -794,12 +795,28 @@ export const useCallSheetUpload = () => {
     mutationFn: async ({ file, validationResult }: { file: File; validationResult: UploadValidationResult }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      // Start logging session
+      uploadLogger.startSession(user.id, file.name);
+      uploadLogger.info('validation', 'Starting upload submission', {
+        totalEntries: validationResult.totalEntries,
+        validEntries: validationResult.validEntries,
+        invalidEntries: validationResult.invalidEntries,
+        duplicateEntries: validationResult.duplicateEntries,
+      });
+
       const today = new Date().toISOString().split('T')[0];
       const validContacts = validationResult.contacts.filter(c => c.isValid);
       const totalSteps = validContacts.length + 3; // upload record + contacts + call list + rejections
 
+      uploadLogger.info('preparation', `Processing ${validContacts.length} valid contacts`, {
+        date: today,
+        totalSteps,
+        validContactPhones: validContacts.slice(0, 5).map(c => c.phoneNumber.slice(-4)), // Log last 4 digits of first 5
+      });
+
       // Server-side duplicate check - prevent same agent uploading same file within 5 minutes
       setUploadProgress({ stage: 'preparing', percentage: 2, message: 'Checking for duplicate uploads...' });
+      uploadLogger.info('duplicate_check', 'Checking for recent duplicate uploads');
       
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: recentDuplicate, error: dupCheckError } = await supabase
@@ -814,15 +831,26 @@ export const useCallSheetUpload = () => {
         .maybeSingle();
       
       if (dupCheckError) {
-        console.error('Duplicate check error:', dupCheckError);
+        uploadLogger.error('duplicate_check', 'Duplicate check query failed', {
+          error: dupCheckError.message,
+          code: dupCheckError.code,
+        });
       }
       
       if (recentDuplicate) {
+        uploadLogger.error('duplicate_check', 'Recent duplicate found - aborting', {
+          existingUploadId: recentDuplicate.id,
+          uploadTime: recentDuplicate.upload_timestamp,
+        });
+        uploadLogger.endSession();
         throw new Error('This file was already uploaded in the last 5 minutes. Please wait before uploading again.');
       }
 
+      uploadLogger.info('duplicate_check', 'No recent duplicates found - proceeding');
+
       // Step 1: Create upload record
       setUploadProgress({ stage: 'preparing', percentage: 5, message: 'Creating upload record...' });
+      uploadLogger.info('upload_record', 'Creating upload record in database');
       
       const { data: upload, error: uploadError } = await supabase
         .from('call_sheet_uploads')
@@ -841,13 +869,28 @@ export const useCallSheetUpload = () => {
         .select()
         .single();
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        uploadLogger.error('upload_record', 'Failed to create upload record', {
+          error: uploadError.message,
+          code: uploadError.code,
+          hint: uploadError.hint,
+        });
+        uploadLogger.endSession();
+        throw uploadError;
+      }
+
+      uploadLogger.setUploadId(upload.id);
+      uploadLogger.info('upload_record', 'Upload record created successfully', {
+        uploadId: upload.id,
+        approvedCount: validationResult.validEntries,
+      });
 
       setUploadProgress({ stage: 'uploading', percentage: 15, message: 'Upload record created...' });
 
       // Step 2: Insert valid contacts
       if (validContacts.length > 0) {
         setUploadProgress({ stage: 'processing', percentage: 20, message: `Processing ${validContacts.length} contacts...` });
+        uploadLogger.info('contacts_processing', `Starting to process ${validContacts.length} valid contacts`);
         
         const insertedContactIds: string[] = [];
         const existingContactIds: string[] = [];
@@ -865,6 +908,11 @@ export const useCallSheetUpload = () => {
               message: `Processing contact ${i + 1} of ${validContacts.length}...` 
             });
           }
+          
+          uploadLogger.debug('contact_insert', `Attempting to insert contact ${i + 1}/${validContacts.length}`, {
+            phone: c.phoneNumber.slice(-4),
+            company: c.companyName?.substring(0, 20),
+          });
           
           const { data: insertedContact, error: insertError } = await supabase
             .from('master_contacts')
@@ -885,6 +933,11 @@ export const useCallSheetUpload = () => {
           
           if (insertError) {
             if (insertError.code === '23505') {
+              uploadLogger.info('contact_duplicate', `Contact ${i + 1} already exists - looking up existing record`, {
+                phone: c.phoneNumber.slice(-4),
+                errorCode: insertError.code,
+              });
+              
               // Duplicate phone number - use security definer function to find existing contact
               const { data: existingContactId, error: findError } = await supabase
                 .rpc('find_contact_by_phone', { phone: c.phoneNumber });
@@ -892,11 +945,15 @@ export const useCallSheetUpload = () => {
               if (!findError && existingContactId) {
                 // Add to call list regardless of owner - agents can call any contact
                 existingContactIds.push(existingContactId);
-                console.log(`Found existing contact ${existingContactId} for phone ${c.phoneNumber}`);
+                uploadLogger.logContactProcessing(i, validContacts.length, c.phoneNumber, 'existing', existingContactId);
               } else {
                 // If RPC fails, try direct query as fallback (will only work if user has access)
-                console.warn(`RPC find_contact_by_phone failed for ${c.phoneNumber}, trying fallback...`);
-                const { data: fallbackContact } = await supabase
+                uploadLogger.warn('contact_rpc_fallback', `RPC find_contact_by_phone failed, trying fallback query`, {
+                  phone: c.phoneNumber.slice(-4),
+                  rpcError: findError?.message,
+                });
+                
+                const { data: fallbackContact, error: fallbackError } = await supabase
                   .from('master_contacts')
                   .select('id')
                   .eq('phone_number', c.phoneNumber)
@@ -904,24 +961,36 @@ export const useCallSheetUpload = () => {
                 
                 if (fallbackContact) {
                   existingContactIds.push(fallbackContact.id);
-                  console.log(`Fallback found contact ${fallbackContact.id} for phone ${c.phoneNumber}`);
+                  uploadLogger.logContactProcessing(i, validContacts.length, c.phoneNumber, 'existing', fallbackContact.id);
                 } else {
                   skippedContacts.push({ phone: c.phoneNumber, reason: 'Duplicate exists but could not locate' });
-                  console.error('Could not find existing contact:', findError, c.phoneNumber);
+                  uploadLogger.logContactProcessing(i, validContacts.length, c.phoneNumber, 'skipped', undefined, 
+                    `Duplicate exists but could not locate. RPC error: ${findError?.message}, Fallback error: ${fallbackError?.message}`);
                 }
               }
             } else {
               skippedContacts.push({ phone: c.phoneNumber, reason: insertError.message });
-              console.error('Error inserting contact:', insertError);
+              uploadLogger.logContactProcessing(i, validContacts.length, c.phoneNumber, 'error', undefined, 
+                `Insert failed: ${insertError.message} (code: ${insertError.code})`);
             }
           } else if (insertedContact) {
             insertedContactIds.push(insertedContact.id);
+            uploadLogger.logContactProcessing(i, validContacts.length, c.phoneNumber, 'inserted', insertedContact.id);
           }
         }
         
-        // Log skipped contacts summary
+        // Log contacts processing summary
+        uploadLogger.info('contacts_summary', 'Finished processing contacts', {
+          inserted: insertedContactIds.length,
+          existing: existingContactIds.length,
+          skipped: skippedContacts.length,
+          total: validContacts.length,
+        });
+        
         if (skippedContacts.length > 0) {
-          console.warn(`Skipped ${skippedContacts.length} contacts during upload:`, skippedContacts);
+          uploadLogger.warn('contacts_skipped', `Skipped ${skippedContacts.length} contacts during upload`, {
+            skippedDetails: skippedContacts.slice(0, 10), // Log first 10 skipped for debugging
+          });
         }
         
         const allContactIds = [...insertedContactIds, ...existingContactIds];
@@ -929,26 +998,44 @@ export const useCallSheetUpload = () => {
         // Step 3: Create call list entries
         if (allContactIds.length > 0) {
           setUploadProgress({ stage: 'creating_list', percentage: 75, message: 'Creating call list entries...' });
+          uploadLogger.info('call_list_start', `Starting to create call list entries for ${allContactIds.length} contacts`, {
+            allContactIds: allContactIds.slice(0, 5), // Log first 5 IDs
+          });
           
-          const { data: existingCallListEntries } = await supabase
+          const { data: existingCallListEntries, error: existingListError } = await supabase
             .from('approved_call_list')
             .select('contact_id')
             .eq('agent_id', user.id)
             .eq('list_date', today)
             .in('contact_id', allContactIds);
           
+          if (existingListError) {
+            uploadLogger.error('call_list_check', 'Failed to check existing call list entries', {
+              error: existingListError.message,
+              code: existingListError.code,
+            });
+          }
+          
           const existingContactIdsInCallList = new Set(
             (existingCallListEntries || []).map(e => e.contact_id)
           );
+          
+          uploadLogger.info('call_list_existing', `Found ${existingContactIdsInCallList.size} contacts already in today's call list`, {
+            existingCount: existingContactIdsInCallList.size,
+          });
           
           const contactsNeedingCallList = allContactIds.filter(
             id => !existingContactIdsInCallList.has(id)
           );
           
+          uploadLogger.info('call_list_needed', `Need to create ${contactsNeedingCallList.length} new call list entries`, {
+            contactsNeedingCallList: contactsNeedingCallList.slice(0, 5),
+          });
+          
           if (contactsNeedingCallList.length > 0) {
             setUploadProgress({ stage: 'creating_list', percentage: 85, message: `Adding ${contactsNeedingCallList.length} contacts to call list...` });
             
-            const { data: maxOrderData } = await supabase
+            const { data: maxOrderData, error: maxOrderError } = await supabase
               .from('approved_call_list')
               .select('call_order')
               .eq('agent_id', user.id)
@@ -957,7 +1044,14 @@ export const useCallSheetUpload = () => {
               .limit(1)
               .maybeSingle();
             
+            if (maxOrderError) {
+              uploadLogger.warn('call_list_order', 'Failed to get max call order', {
+                error: maxOrderError.message,
+              });
+            }
+            
             const startOrder = (maxOrderData?.call_order || 0) + 1;
+            uploadLogger.info('call_list_order', `Starting call order at ${startOrder}`);
             
             const callListEntries = contactsNeedingCallList.map((contactId, index) => ({
               agent_id: user.id,
@@ -968,26 +1062,53 @@ export const useCallSheetUpload = () => {
               call_status: 'pending' as const,
             }));
 
-            const { error: callListError } = await supabase
+            uploadLogger.info('call_list_insert', `Inserting ${callListEntries.length} call list entries`, {
+              uploadId: upload.id,
+              firstEntry: callListEntries[0],
+              lastEntry: callListEntries[callListEntries.length - 1],
+            });
+
+            const { error: callListError, data: insertedCallList } = await supabase
               .from('approved_call_list')
-              .insert(callListEntries);
+              .insert(callListEntries)
+              .select('id');
 
             if (callListError) {
-              console.error('Error creating call list:', callListError);
+              uploadLogger.error('call_list_insert', 'Failed to create call list entries', {
+                error: callListError.message,
+                code: callListError.code,
+                hint: callListError.hint,
+                details: callListError.details,
+              });
               throw new Error(`Failed to create call list: ${callListError.message}`);
             }
             
-            console.log(`Successfully created ${callListEntries.length} call list entries (${insertedContactIds.length} new, ${existingContactIds.length} existing)`);
+            const actualInserted = insertedCallList?.length || 0;
+            uploadLogger.info('call_list_success', `Successfully created ${actualInserted} call list entries`, {
+              expected: callListEntries.length,
+              actual: actualInserted,
+              newContacts: insertedContactIds.length,
+              existingContacts: existingContactIds.length,
+            });
             
             // Update upload record with actual call list count
-            await supabase
+            const { error: updateError } = await supabase
               .from('call_sheet_uploads')
               .update({ 
-                approved_count: callListEntries.length,
+                approved_count: actualInserted,
               })
               .eq('id', upload.id);
+            
+            if (updateError) {
+              uploadLogger.warn('upload_update', 'Failed to update approved_count on upload record', {
+                error: updateError.message,
+                uploadId: upload.id,
+              });
+            } else {
+              uploadLogger.info('upload_update', `Updated upload record approved_count to ${actualInserted}`);
+            }
           } else {
-            console.log('All contacts already in today\'s call list');
+            uploadLogger.info('call_list_skip', 'All contacts already in today\'s call list - no new entries needed');
             // Update upload to reflect 0 new entries added (all were duplicates)
             await supabase
               .from('call_sheet_uploads')
@@ -997,7 +1118,13 @@ export const useCallSheetUpload = () => {
               .eq('id', upload.id);
           }
         } else {
-          console.warn('No contacts were inserted or found - all may have been duplicates or errors occurred');
+          uploadLogger.error('contacts_none', 'No contacts were inserted or found - all may have been duplicates or errors occurred', {
+            validContactsCount: validContacts.length,
+            insertedCount: insertedContactIds.length,
+            existingCount: existingContactIds.length,
+            skippedCount: skippedContacts.length,
+          });
+          
           // Update upload record to reflect issue
           await supabase
             .from('call_sheet_uploads')
@@ -1018,6 +1145,7 @@ export const useCallSheetUpload = () => {
       setUploadProgress({ stage: 'complete', percentage: 95, message: 'Saving rejection records...' });
       
       const invalidContacts = validationResult.contacts.filter(c => !c.isValid);
+      uploadLogger.info('rejections', `Recording ${invalidContacts.length} rejected entries`);
       
       if (invalidContacts.length > 0) {
         const rejectionsToInsert = invalidContacts.map(c => ({
@@ -1028,12 +1156,23 @@ export const useCallSheetUpload = () => {
           rejection_reason: c.errors.join('; '),
         }));
 
-        await supabase
+        const { error: rejectionError } = await supabase
           .from('upload_rejections')
           .insert(rejectionsToInsert);
+        
+        if (rejectionError) {
+          uploadLogger.warn('rejections_insert', 'Failed to insert rejection records', {
+            error: rejectionError.message,
+          });
+        }
       }
 
       setUploadProgress({ stage: 'complete', percentage: 100, message: 'Upload complete!' });
+      
+      // End logging session and get summary
+      const logSummary = uploadLogger.getSummary();
+      uploadLogger.info('complete', 'Upload processing complete', logSummary || undefined);
+      uploadLogger.endSession();
 
       return upload;
     },
@@ -1048,6 +1187,10 @@ export const useCallSheetUpload = () => {
       queryClient.invalidateQueries({ queryKey: ['call-list'] });
     },
     onError: (error) => {
+      uploadLogger.error('mutation_error', 'Upload mutation failed', {
+        error: error.message,
+      });
+      uploadLogger.endSession();
       toast.error(`Upload failed: ${error.message}`);
       setUploadProgress(null);
     },

@@ -179,42 +179,24 @@ export function useActivitySession() {
     queryKey: ['activity-session', user?.id],
     queryFn: async ({ signal }): Promise<ActivitySession | null> => {
       if (!user?.id) return null;
-
-      // Prevent infinite loading if backend is slow/unreachable.
-      // Timeouts are treated as aborts and return null.
-      const controller = new AbortController();
-      const onAbort = () => controller.abort();
-      signal?.addEventListener?.('abort', onAbort);
-      const timeoutId = window.setTimeout(() => controller.abort(), 8000);
       
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const { data, error } = await supabase
-          .from('activity_sessions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('date', today)
-          .abortSignal(controller.signal)
-          .maybeSingle();
-        
-        if (error) {
-          // Ignore abort errors
-          if (error.message?.toLowerCase?.().includes('abort') || error.code === 'AbortError') {
-            return null;
-          }
-          throw error;
-        }
-        return data as ActivitySession | null;
-      } catch (e: any) {
-        const message = e?.message || String(e);
-        if (message.toLowerCase().includes('abort')) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('activity_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .abortSignal(signal)
+        .maybeSingle();
+      
+      if (error) {
+        // Ignore abort errors
+        if (error.message?.includes('abort') || error.code === 'AbortError') {
           return null;
         }
-        throw e;
-      } finally {
-        window.clearTimeout(timeoutId);
-        signal?.removeEventListener?.('abort', onAbort);
+        throw error;
       }
+      return data as ActivitySession | null;
     },
     enabled: !!user?.id,
     refetchInterval: 30000, // Refetch every 30 seconds

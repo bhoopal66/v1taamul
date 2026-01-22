@@ -27,6 +27,49 @@ interface MonthlyData {
   totalCalls: number;
 }
 
+interface GroupedMonthData {
+  month: string;
+  monthKey: string;
+  data: HeatmapData[];
+  count: number;
+}
+
+// Helper function to group data by month
+const groupByMonth = (data: HeatmapData[], dateRange: { from: Date; to: Date } | null): GroupedMonthData[] => {
+  if (!dateRange) return [];
+  
+  const grouped: Record<string, GroupedMonthData> = {};
+  
+  // Since heatmap data is aggregated by day/hour, we need to map it back to dates
+  // For proper monthly grouping, we iterate through the date range
+  let current = new Date(dateRange.from);
+  const end = new Date(dateRange.to);
+  
+  while (current <= end) {
+    const monthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+    const monthName = current.toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    if (!grouped[monthKey]) {
+      grouped[monthKey] = {
+        month: monthName,
+        monthKey,
+        data: [],
+        count: 0
+      };
+    }
+    
+    // Find data for this day of week
+    const dayOfWeek = current.getDay();
+    const dayData = data.filter(d => d.day === dayOfWeek);
+    grouped[monthKey].data.push(...dayData);
+    grouped[monthKey].count += dayData.reduce((sum, d) => sum + d.value, 0);
+    
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return Object.values(grouped).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+};
+
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 

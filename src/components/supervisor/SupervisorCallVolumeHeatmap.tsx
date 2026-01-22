@@ -249,7 +249,12 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                   {getDateDisplayText()}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 z-50" align="end" sideOffset={4}>
+              <PopoverContent 
+                className="w-auto p-0 z-50 bg-popover" 
+                align="end" 
+                sideOffset={4}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <div className="p-3 border-b">
                   <Tabs value={dateMode} onValueChange={(v) => setDateMode(v as DateMode)}>
                     <TabsList className="grid w-full grid-cols-2">

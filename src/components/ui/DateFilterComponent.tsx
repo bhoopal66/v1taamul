@@ -156,10 +156,17 @@ export const DateFilterComponent = ({
   return (
     <div className={cn("flex flex-col gap-6 p-4 bg-card border rounded-lg", className)}>
       {/* Step 1: Date Mode Selection */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mb-5 p-4 bg-muted/50 rounded-lg">
         <h3 className="text-sm font-semibold text-foreground">Step 1: Choose Date Selection Type</h3>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="flex gap-5 flex-wrap">
+          <label 
+            className={cn(
+              "flex items-center gap-2 cursor-pointer py-2.5 px-4 border-2 rounded-md bg-background transition-all duration-200",
+              selectionMode === 'single' 
+                ? "border-primary bg-primary/5" 
+                : "border-input hover:border-primary/50"
+            )}
+          >
             <input
               type="radio"
               name="dateMode"
@@ -168,10 +175,22 @@ export const DateFilterComponent = ({
               onChange={() => handleModeChange('single')}
               className="h-4 w-4 text-primary border-input focus:ring-ring focus:ring-2 accent-primary"
             />
-            <span className="text-sm">Pick a Single Day</span>
+            <span className={cn(
+              "text-sm transition-all",
+              selectionMode === 'single' ? "font-bold text-primary" : ""
+            )}>
+              Pick a Single Day
+            </span>
           </label>
           
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label 
+            className={cn(
+              "flex items-center gap-2 cursor-pointer py-2.5 px-4 border-2 rounded-md bg-background transition-all duration-200",
+              selectionMode === 'range' 
+                ? "border-primary bg-primary/5" 
+                : "border-input hover:border-primary/50"
+            )}
+          >
             <input
               type="radio"
               name="dateMode"
@@ -180,7 +199,12 @@ export const DateFilterComponent = ({
               onChange={() => handleModeChange('range')}
               className="h-4 w-4 text-primary border-input focus:ring-ring focus:ring-2 accent-primary"
             />
-            <span className="text-sm">Select Date Range (From - To)</span>
+            <span className={cn(
+              "text-sm transition-all",
+              selectionMode === 'range' ? "font-bold text-primary" : ""
+            )}>
+              Select Date Range (From - To)
+            </span>
           </label>
         </div>
       </div>
@@ -216,64 +240,66 @@ export const DateFilterComponent = ({
           </div>
         )}
 
-        {/* DATE RANGE MODE - Show TWO date pickers */}
+        {/* DATE RANGE MODE - Show TWO date pickers in grid */}
         {selectionMode === 'range' && (
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Label className="text-xs font-medium text-muted-foreground">From Date:</Label>
-              <DatePicker
-                selected={fromDate}
-                onChange={(date) => {
-                  setFromDate(date);
-                  if (toDate && date && toDate < date) {
-                    setToDate(null);
-                  }
-                }}
-                selectsStart
-                startDate={fromDate}
-                endDate={toDate}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Select start date"
-                isClearable
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-                maxDate={toDate || new Date()}
-                className={cn(
-                  "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                  dateError ? "border-destructive" : "border-input"
-                )}
-                wrapperClassName="w-full sm:w-auto"
-              />
-            </div>
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-medium text-muted-foreground">From Date:</Label>
+                <DatePicker
+                  selected={fromDate}
+                  onChange={(date) => {
+                    setFromDate(date);
+                    if (toDate && date && toDate < date) {
+                      setToDate(null);
+                    }
+                  }}
+                  selectsStart
+                  startDate={fromDate}
+                  endDate={toDate}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Select start date"
+                  isClearable
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  maxDate={toDate || new Date()}
+                  className={cn(
+                    "w-full py-2.5 px-3 rounded border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                    dateError ? "border-destructive" : "border-input"
+                  )}
+                  wrapperClassName="w-full"
+                />
+              </div>
 
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Label className="text-xs font-medium text-muted-foreground">To Date:</Label>
-              <DatePicker
-                selected={toDate}
-                onChange={(date) => setToDate(date)}
-                selectsEnd
-                startDate={fromDate}
-                endDate={toDate}
-                minDate={fromDate || undefined}
-                maxDate={new Date()}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Select end date"
-                isClearable
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-                disabled={!fromDate}
-                className={cn(
-                  "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                  !fromDate ? "opacity-50 cursor-not-allowed" : "",
-                  dateError ? "border-destructive" : "border-input"
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs font-medium text-muted-foreground">To Date:</Label>
+                <DatePicker
+                  selected={toDate}
+                  onChange={(date) => setToDate(date)}
+                  selectsEnd
+                  startDate={fromDate}
+                  endDate={toDate}
+                  minDate={fromDate || undefined}
+                  maxDate={new Date()}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Select end date"
+                  isClearable
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  disabled={!fromDate}
+                  className={cn(
+                    "w-full py-2.5 px-3 rounded border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                    !fromDate ? "bg-muted cursor-not-allowed opacity-50" : "",
+                    dateError ? "border-destructive" : "border-input"
+                  )}
+                  wrapperClassName="w-full"
+                />
+                {!fromDate && (
+                  <small className="text-xs text-muted-foreground">Please select From Date first</small>
                 )}
-                wrapperClassName="w-full sm:w-auto"
-              />
-              {!fromDate && (
-                <small className="text-xs text-muted-foreground">Please select From Date first</small>
-              )}
+              </div>
             </div>
 
             {/* Quick Select Buttons */}

@@ -33,30 +33,49 @@ const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeatmapProps) => {
   const { user, userRole, ledTeamId } = useAuth();
   
-  // Filter state
+  // Filter state (for UI inputs - not yet applied)
   const [filters, setFilters] = useState<DateFilterState>({
-    selectionMode: 'single',
-    singleDate: new Date(),
+    selectionMode: null,
+    singleDate: null,
     fromDate: null,
     toDate: null,
     selectedAgent: 'all',
     showMonthly: false,
   });
+  
+  // Applied filter state (used for actual data fetching)
+  const [appliedFilters, setAppliedFilters] = useState<DateFilterState>({
+    selectionMode: null,
+    singleDate: null,
+    fromDate: null,
+    toDate: null,
+    selectedAgent: 'all',
+    showMonthly: false,
+  });
+  
   const [isExporting, setIsExporting] = useState(false);
   
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = teamId || ledTeamId;
 
-  // Compute effective date range
+  // Helper function to format date as YYYY-MM-DD
+  const formatDateStr = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Compute effective date range from APPLIED filters only
   const effectiveDateRange = useMemo(() => {
-    if (filters.selectionMode === 'single' && filters.singleDate) {
-      return { from: filters.singleDate, to: filters.singleDate };
+    if (appliedFilters.selectionMode === 'single' && appliedFilters.singleDate) {
+      return { from: appliedFilters.singleDate, to: appliedFilters.singleDate };
     }
-    if (filters.selectionMode === 'range' && filters.fromDate && filters.toDate) {
-      return { from: filters.fromDate, to: filters.toDate };
+    if (appliedFilters.selectionMode === 'range' && appliedFilters.fromDate && appliedFilters.toDate) {
+      return { from: appliedFilters.fromDate, to: appliedFilters.toDate };
     }
     return null;
-  }, [filters.selectionMode, filters.singleDate, filters.fromDate, filters.toDate]);
+  }, [appliedFilters.selectionMode, appliedFilters.singleDate, appliedFilters.fromDate, appliedFilters.toDate]);
 
   // Fetch team agents for the filter dropdown
   const { data: agentOptions = [] } = useQuery({
@@ -84,9 +103,9 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     enabled: !!user?.id,
   });
 
-  // Fetch heatmap data
+  // Fetch heatmap data - uses APPLIED filters for agent selection
   const { data: heatmapData = [], isLoading, isFetching, error } = useQuery({
-    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, effectiveDateRange?.from?.toISOString(), effectiveDateRange?.to?.toISOString(), filters.selectedAgent],
+    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, effectiveDateRange?.from?.toISOString(), effectiveDateRange?.to?.toISOString(), appliedFilters.selectedAgent],
     queryFn: async (): Promise<HeatmapData[]> => {
       if (!effectiveDateRange?.from || !effectiveDateRange?.to) return [];
       
@@ -96,8 +115,8 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
       // Get agent IDs for filtering
       let agentIds: string[] | null = null;
       
-      if (filters.selectedAgent !== 'all') {
-        agentIds = [filters.selectedAgent];
+      if (appliedFilters.selectedAgent !== 'all') {
+        agentIds = [appliedFilters.selectedAgent];
       } else if (!canSeeAllData && effectiveTeamId) {
         const { data: teamMembers } = await supabase
           .from('profiles')
@@ -159,9 +178,9 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     enabled: !!user?.id && !!effectiveDateRange,
   });
 
-  // Calculate monthly data when showMonthly is enabled
+  // Calculate monthly data when showMonthly is enabled - uses APPLIED filters
   const monthlyData = useMemo((): MonthlyData[] => {
-    if (!filters.showMonthly || !effectiveDateRange?.from || !effectiveDateRange?.to) return [];
+    if (!appliedFilters.showMonthly || !effectiveDateRange?.from || !effectiveDateRange?.to) return [];
     
     // Group heatmap data by month - since we only have aggregated data, 
     // we'll display the total for the selected range grouped conceptually
@@ -197,7 +216,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     }
     
     return result;
-  }, [filters.showMonthly, effectiveDateRange, heatmapData]);
+  }, [appliedFilters.showMonthly, effectiveDateRange, heatmapData]);
 
   const maxValue = Math.max(...heatmapData.map(d => d.value), 1);
 
@@ -226,23 +245,46 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
   const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
 
   const getSelectedAgentName = () => {
-    if (filters.selectedAgent === 'all') return 'All Agents';
-    return agentOptions.find(a => a.id === filters.selectedAgent)?.name || 'Unknown Agent';
+    if (appliedFilters.selectedAgent === 'all') return 'All Agents';
+    return agentOptions.find(a => a.id === appliedFilters.selectedAgent)?.name || 'Unknown Agent';
   };
 
   const getDateDisplayText = () => {
-    if (filters.selectionMode === 'single' && filters.singleDate) {
-      return format(filters.singleDate, 'dd/MM/yyyy');
+    if (appliedFilters.selectionMode === 'single' && appliedFilters.singleDate) {
+      return format(appliedFilters.singleDate, 'dd/MM/yyyy');
     }
-    if (filters.selectionMode === 'range' && filters.fromDate && filters.toDate) {
-      return `${format(filters.fromDate, 'dd/MM/yyyy')} - ${format(filters.toDate, 'dd/MM/yyyy')}`;
+    if (appliedFilters.selectionMode === 'range' && appliedFilters.fromDate && appliedFilters.toDate) {
+      return `${format(appliedFilters.fromDate, 'dd/MM/yyyy')} - ${format(appliedFilters.toDate, 'dd/MM/yyyy')}`;
     }
     return 'No date selected';
   };
 
-  // Handle filter changes
+  // Handle filter changes (just updates UI state, doesn't trigger fetch)
   const handleFilterChange = useCallback((newFilters: DateFilterState) => {
     setFilters(newFilters);
+  }, []);
+
+  // Handle Apply Filter - applies the current UI filters to trigger data fetch
+  const handleApplyFilter = useCallback((newFilters: DateFilterState) => {
+    // Validate dates before applying
+    if (newFilters.selectionMode === 'single' && !newFilters.singleDate) {
+      toast.error('Please select a date');
+      return;
+    }
+    if (newFilters.selectionMode === 'range') {
+      if (!newFilters.fromDate || !newFilters.toDate) {
+        toast.error('Please select both From and To dates');
+        return;
+      }
+      if (newFilters.fromDate > newFilters.toDate) {
+        toast.error('From date must be before To date');
+        return;
+      }
+    }
+    
+    // Apply the filters - this will trigger data fetch
+    setAppliedFilters(newFilters);
+    toast.success('Filters applied successfully');
   }, []);
 
   // PDF Export function with autoTable
@@ -288,9 +330,9 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.text(`• Selection Mode: ${filters.selectionMode === 'single' ? 'Single Day' : 'Date Range'}`, margin + 4, yPos);
+      doc.text(`• Selection Mode: ${appliedFilters.selectionMode === 'single' ? 'Single Day' : 'Date Range'}`, margin + 4, yPos);
       yPos += 5;
-      doc.text(`• Monthly View: ${filters.showMonthly ? 'Enabled' : 'Disabled'}`, margin + 4, yPos);
+      doc.text(`• Monthly View: ${appliedFilters.showMonthly ? 'Enabled' : 'Disabled'}`, margin + 4, yPos);
       yPos += 10;
 
       // Summary card
@@ -441,7 +483,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
         <DateFilterComponent
           agents={agentOptions}
           onFilterChange={handleFilterChange}
-          onApplyFilter={handleFilterChange}
+          onApplyFilter={handleApplyFilter}
           onExportPDF={handleExportPDF}
           isLoading={isFetching}
           isExporting={isExporting}

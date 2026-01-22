@@ -4,8 +4,9 @@ import { WeeklyReportPDFGenerator } from '@/components/reports/WeeklyReportPDFGe
 import { TeamReportGenerator } from '@/components/reports/TeamReportGenerator';
 import { AgentHourlyCallReport } from '@/components/reports/AgentHourlyCallReport';
 import { BankSubmissionReport } from '@/components/reports/BankSubmissionReport';
+import { TeamDailyCallStatusReport } from '@/components/reports/TeamDailyCallStatusReport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Download, Users, Clock, Building } from 'lucide-react';
+import { Calendar, Download, Users, Clock, Building, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ReportsPage: React.FC = () => {
@@ -27,6 +28,12 @@ const ReportsPage: React.FC = () => {
             <TabsTrigger value="hourly" className="gap-2">
               <Clock className="h-4 w-4" />
               Hourly Report
+            </TabsTrigger>
+          )}
+          {isTeamLeader && (
+            <TabsTrigger value="daily-status" className="gap-2">
+              <Phone className="h-4 w-4" />
+              Daily Call Status
             </TabsTrigger>
           )}
           {isTeamLeader && (
@@ -54,6 +61,12 @@ const ReportsPage: React.FC = () => {
         {isTeamLeader && (
           <TabsContent value="hourly" className="space-y-4">
             <AgentHourlyCallReport />
+          </TabsContent>
+        )}
+
+        {isTeamLeader && (
+          <TabsContent value="daily-status" className="space-y-4">
+            <TeamDailyCallStatusReport />
           </TabsContent>
         )}
 

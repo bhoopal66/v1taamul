@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeamLeaderData } from '@/hooks/useTeamLeaderData';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -28,8 +27,6 @@ import {
   Phone,
   TrendingUp,
   Clock,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -47,19 +44,12 @@ interface HourlyData {
   [hour: number]: number;
 }
 
-interface AgentHourlyStats {
-  agentId: string;
-  agentName: string;
-  hourlyData: HourlyData;
-  totalCalls: number;
-}
-
-interface DateWiseData {
+interface DateRowData {
   date: string;
   dateLabel: string;
-  agents: AgentHourlyStats[];
-  hourlyTotals: HourlyData;
-  grandTotal: number;
+  dayName: string;
+  hourlyData: HourlyData;
+  totalCalls: number;
 }
 
 interface AgentOption {
@@ -72,9 +62,9 @@ interface SummaryStats {
   totalDays: number;
   peakHour: number;
   peakHourCalls: number;
-  topAgent: string;
-  topAgentCalls: number;
   avgCallsPerDay: number;
+  bestDay: string;
+  bestDayCalls: number;
 }
 
 // Hours from 8 AM to 8 PM
@@ -86,131 +76,11 @@ const formatHour = (hour: number): string => {
   return `${hour}AM`;
 };
 
-// Summary Card Component
-const SummaryCard: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  subtext?: string;
-  variant?: 'default' | 'primary' | 'success' | 'warning';
-}> = ({ icon, label, value, subtext, variant = 'default' }) => {
-  const bgClass = {
-    default: 'bg-muted/50',
-    primary: 'bg-primary/10',
-    success: 'bg-green-500/10',
-    warning: 'bg-amber-500/10',
-  }[variant];
-
-  return (
-    <div className={cn('rounded-lg p-4 transition-all', bgClass)}>
-      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-        {icon}
-        <span className="text-xs font-medium">{label}</span>
-      </div>
-      <div className="text-2xl font-bold">{value}</div>
-      {subtext && <div className="text-xs text-muted-foreground mt-1">{subtext}</div>}
-    </div>
-  );
-};
-
-// Collapsible Date Section Component
-const DateSection: React.FC<{
-  dateData: DateWiseData;
-  isExpanded: boolean;
-  onToggle: () => void;
-}> = ({ dateData, isExpanded, onToggle }) => {
-  return (
-    <div className="border rounded-lg overflow-hidden mb-4">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          )}
-          <CalendarDays className="h-5 w-5 text-primary" />
-          <span className="font-semibold">{dateData.dateLabel}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="gap-1">
-            <Users className="h-3 w-3" />
-            {dateData.agents.length} agents
-          </Badge>
-          <Badge variant="secondary" className="gap-1 font-bold">
-            <Phone className="h-3 w-3" />
-            {dateData.grandTotal} calls
-          </Badge>
-        </div>
-      </button>
-
-      {isExpanded && (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/20">
-                <TableHead className="font-bold sticky left-0 bg-muted/20 z-10 min-w-[140px]">
-                  Agent Name
-                </TableHead>
-                {HOURS.map(hour => (
-                  <TableHead key={hour} className="text-center font-bold min-w-[50px]">
-                    {formatHour(hour)}
-                  </TableHead>
-                ))}
-                <TableHead className="text-center font-bold bg-primary/10 min-w-[80px]">
-                  Total
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dateData.agents.map((agent, index) => (
-                <TableRow key={agent.agentId} className={index === 0 ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
-                  <TableCell className="font-medium sticky left-0 bg-background z-10">
-                    {agent.agentName}
-                  </TableCell>
-                  {HOURS.map(hour => (
-                    <TableCell key={hour} className="text-center">
-                      <span className={cn(
-                        (agent.hourlyData[hour] || 0) > 0 ? 'font-medium' : 'text-muted-foreground'
-                      )}>
-                        {agent.hourlyData[hour] || 0}
-                      </span>
-                    </TableCell>
-                  ))}
-                  <TableCell className="text-center font-bold bg-primary/5">
-                    {agent.totalCalls}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow className="bg-muted font-bold">
-                <TableCell className="sticky left-0 bg-muted z-10">DAY TOTAL</TableCell>
-                {HOURS.map(hour => (
-                  <TableCell key={hour} className="text-center">
-                    {dateData.hourlyTotals[hour] || 0}
-                  </TableCell>
-                ))}
-                <TableCell className="text-center bg-primary/10 text-lg">
-                  {dateData.grandTotal}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const AgentHourlyCallReport: React.FC = () => {
   const { ledTeamId, user } = useAuth();
   const { teamInfo, isTeamLeader } = useTeamLeaderData();
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   // Filter mode selection
   const [filterMode, setFilterMode] = useState<FilterMode>(null);
@@ -268,14 +138,12 @@ export const AgentHourlyCallReport: React.FC = () => {
       setAppliedStartDate(null);
       setAppliedEndDate(null);
       setAppliedAgent(selectedAgent);
-      setExpandedDates(new Set([format(singleDate, 'yyyy-MM-dd')]));
     } else if (filterMode === 'range' && startDate && endDate) {
       setAppliedMode('range');
       setAppliedStartDate(startDate);
       setAppliedEndDate(endDate);
       setAppliedSingleDate(null);
       setAppliedAgent(selectedAgent);
-      setExpandedDates(new Set());
     }
   };
 
@@ -290,7 +158,6 @@ export const AgentHourlyCallReport: React.FC = () => {
     setAppliedStartDate(null);
     setAppliedEndDate(null);
     setAppliedAgent('all');
-    setExpandedDates(new Set());
   };
 
   const handleChangeFilterType = () => {
@@ -298,28 +165,6 @@ export const AgentHourlyCallReport: React.FC = () => {
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
-  };
-
-  const toggleDateExpansion = (date: string) => {
-    setExpandedDates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(date)) {
-        newSet.delete(date);
-      } else {
-        newSet.add(date);
-      }
-      return newSet;
-    });
-  };
-
-  const expandAll = () => {
-    if (reportData) {
-      setExpandedDates(new Set(reportData.dateWiseData.map(d => d.date)));
-    }
-  };
-
-  const collapseAll = () => {
-    setExpandedDates(new Set());
   };
 
   const getAppliedDateRange = () => {
@@ -344,7 +189,7 @@ export const AgentHourlyCallReport: React.FC = () => {
     return agent?.name || 'Unknown';
   };
 
-  // Fetch hourly call data - now date-wise
+  // Fetch hourly call data - date-wise rows
   const { data: reportData, isLoading } = useQuery({
     queryKey: [
       'agent-hourly-report-datewise',
@@ -356,18 +201,28 @@ export const AgentHourlyCallReport: React.FC = () => {
       appliedAgent,
     ],
     queryFn: async (): Promise<{
-      dateWiseData: DateWiseData[];
-      overallHourlyTotals: HourlyData;
-      overallGrandTotal: number;
+      dateRows: DateRowData[];
+      hourlyTotals: HourlyData;
+      grandTotal: number;
       summary: SummaryStats;
     }> => {
       if (!ledTeamId || !hasAppliedFilter) {
-        return { dateWiseData: [], overallHourlyTotals: {}, overallGrandTotal: 0, summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, topAgent: '', topAgentCalls: 0, avgCallsPerDay: 0 } };
+        return { 
+          dateRows: [], 
+          hourlyTotals: {}, 
+          grandTotal: 0, 
+          summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, avgCallsPerDay: 0, bestDay: '', bestDayCalls: 0 } 
+        };
       }
 
       const dateRange = getAppliedDateRange();
       if (!dateRange) {
-        return { dateWiseData: [], overallHourlyTotals: {}, overallGrandTotal: 0, summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, topAgent: '', topAgentCalls: 0, avgCallsPerDay: 0 } };
+        return { 
+          dateRows: [], 
+          hourlyTotals: {}, 
+          grandTotal: 0, 
+          summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, avgCallsPerDay: 0, bestDay: '', bestDayCalls: 0 } 
+        };
       }
 
       // Get team members
@@ -379,7 +234,12 @@ export const AgentHourlyCallReport: React.FC = () => {
 
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) {
-        return { dateWiseData: [], overallHourlyTotals: {}, overallGrandTotal: 0, summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, topAgent: '', topAgentCalls: 0, avgCallsPerDay: 0 } };
+        return { 
+          dateRows: [], 
+          hourlyTotals: {}, 
+          grandTotal: 0, 
+          summary: { totalCalls: 0, totalDays: 0, peakHour: 0, peakHourCalls: 0, avgCallsPerDay: 0, bestDay: '', bestDayCalls: 0 } 
+        };
       }
 
       // Filter by specific agent if selected
@@ -389,7 +249,6 @@ export const AgentHourlyCallReport: React.FC = () => {
       }
 
       const memberIds = filteredProfiles.map(p => p.id);
-      const profileMap = new Map(filteredProfiles.map(p => [p.id, p.full_name || p.username || 'Unknown']));
 
       // Get call feedback with timestamps
       const { data: feedback, error: feedbackError } = await supabase
@@ -401,9 +260,8 @@ export const AgentHourlyCallReport: React.FC = () => {
 
       if (feedbackError) throw feedbackError;
 
-      // Group by date first, then by agent and hour
-      const dateMap = new Map<string, Map<string, AgentHourlyStats>>();
-      const overallAgentTotals = new Map<string, number>();
+      // Group by date and hour
+      const dateMap = new Map<string, HourlyData>();
 
       feedback?.forEach(f => {
         if (f.call_timestamp) {
@@ -412,102 +270,72 @@ export const AgentHourlyCallReport: React.FC = () => {
           const hour = callDate.getHours();
 
           if (hour >= 8 && hour <= 20) {
-            // Initialize date map if needed
             if (!dateMap.has(dateKey)) {
-              const agentMap = new Map<string, AgentHourlyStats>();
-              filteredProfiles.forEach(profile => {
-                agentMap.set(profile.id!, {
-                  agentId: profile.id!,
-                  agentName: profileMap.get(profile.id!) || 'Unknown',
-                  hourlyData: {},
-                  totalCalls: 0,
-                });
-              });
-              dateMap.set(dateKey, agentMap);
+              dateMap.set(dateKey, {});
             }
-
-            const agentMap = dateMap.get(dateKey)!;
-            const agent = agentMap.get(f.agent_id);
-            if (agent) {
-              agent.hourlyData[hour] = (agent.hourlyData[hour] || 0) + 1;
-              agent.totalCalls++;
-            }
-
-            // Track overall agent totals for summary
-            overallAgentTotals.set(f.agent_id, (overallAgentTotals.get(f.agent_id) || 0) + 1);
+            const hourlyData = dateMap.get(dateKey)!;
+            hourlyData[hour] = (hourlyData[hour] || 0) + 1;
           }
         }
       });
 
-      // Convert to DateWiseData array
-      const dateWiseData: DateWiseData[] = [];
-      const overallHourlyTotals: HourlyData = {};
-      let overallGrandTotal = 0;
+      // Convert to DateRowData array
+      const dateRows: DateRowData[] = [];
+      const hourlyTotals: HourlyData = {};
+      let grandTotal = 0;
+      let bestDay = '';
+      let bestDayCalls = 0;
 
       // Sort dates in descending order (most recent first)
       const sortedDates = Array.from(dateMap.keys()).sort((a, b) => b.localeCompare(a));
 
       sortedDates.forEach(dateKey => {
-        const agentMap = dateMap.get(dateKey)!;
-        const agents = Array.from(agentMap.values())
-          .filter(a => a.totalCalls > 0)
-          .sort((a, b) => b.totalCalls - a.totalCalls);
+        const hourlyData = dateMap.get(dateKey)!;
+        let totalCalls = 0;
 
-        if (agents.length > 0) {
-          const hourlyTotals: HourlyData = {};
-          let grandTotal = 0;
+        HOURS.forEach(hour => {
+          const count = hourlyData[hour] || 0;
+          totalCalls += count;
+          hourlyTotals[hour] = (hourlyTotals[hour] || 0) + count;
+        });
 
-          agents.forEach(agent => {
-            HOURS.forEach(hour => {
-              const count = agent.hourlyData[hour] || 0;
-              hourlyTotals[hour] = (hourlyTotals[hour] || 0) + count;
-              overallHourlyTotals[hour] = (overallHourlyTotals[hour] || 0) + count;
-            });
-            grandTotal += agent.totalCalls;
-          });
+        grandTotal += totalCalls;
 
-          overallGrandTotal += grandTotal;
-
-          dateWiseData.push({
-            date: dateKey,
-            dateLabel: format(parseISO(dateKey), 'EEEE, MMMM d, yyyy'),
-            agents,
-            hourlyTotals,
-            grandTotal,
-          });
+        if (totalCalls > bestDayCalls) {
+          bestDayCalls = totalCalls;
+          bestDay = format(parseISO(dateKey), 'EEE, MMM d');
         }
+
+        dateRows.push({
+          date: dateKey,
+          dateLabel: format(parseISO(dateKey), 'dd/MM/yyyy'),
+          dayName: format(parseISO(dateKey), 'EEE'),
+          hourlyData,
+          totalCalls,
+        });
       });
 
       // Calculate summary statistics
       let peakHour = 0;
       let peakHourCalls = 0;
       HOURS.forEach(hour => {
-        if ((overallHourlyTotals[hour] || 0) > peakHourCalls) {
+        if ((hourlyTotals[hour] || 0) > peakHourCalls) {
           peakHour = hour;
-          peakHourCalls = overallHourlyTotals[hour] || 0;
-        }
-      });
-
-      let topAgent = '';
-      let topAgentCalls = 0;
-      overallAgentTotals.forEach((calls, agentId) => {
-        if (calls > topAgentCalls) {
-          topAgent = profileMap.get(agentId) || 'Unknown';
-          topAgentCalls = calls;
+          peakHourCalls = hourlyTotals[hour] || 0;
         }
       });
 
       const summary: SummaryStats = {
-        totalCalls: overallGrandTotal,
-        totalDays: dateWiseData.length,
+        totalCalls: grandTotal,
+        totalDays: dateRows.length,
         peakHour,
         peakHourCalls,
-        topAgent,
-        topAgentCalls,
-        avgCallsPerDay: dateWiseData.length > 0 ? Math.round(overallGrandTotal / dateWiseData.length) : 0,
+        avgCallsPerDay: dateRows.length > 0 ? Math.round(grandTotal / dateRows.length) : 0,
+        bestDay,
+        bestDayCalls,
       };
 
-      return { dateWiseData, overallHourlyTotals, overallGrandTotal, summary };
+      return { dateRows, hourlyTotals, grandTotal, summary };
     },
     enabled: !!ledTeamId && !!user?.id && hasAppliedFilter,
   });
@@ -523,12 +351,11 @@ export const AgentHourlyCallReport: React.FC = () => {
   };
 
   const downloadPDF = () => {
-    if (!reportData || reportData.dateWiseData.length === 0) return;
+    if (!reportData || reportData.dateRows.length === 0) return;
     setIsDownloading(true);
 
     try {
       const doc = new jsPDF({ orientation: 'landscape' });
-      const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 10;
       let yPos = 15;
 
@@ -536,7 +363,7 @@ export const AgentHourlyCallReport: React.FC = () => {
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(41, 98, 255);
-      doc.text('Agent Performance Report - Hour-wise Call Volume', margin, yPos);
+      doc.text('Hour-wise Call Volume Report', margin, yPos);
       yPos += 8;
 
       doc.setFontSize(10);
@@ -551,127 +378,66 @@ export const AgentHourlyCallReport: React.FC = () => {
       yPos += 10;
 
       // Summary section
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
-      doc.text('Summary', margin, yPos);
-      yPos += 6;
+      doc.text('Summary:', margin, yPos);
+      yPos += 5;
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      const summaryText = `Total Calls: ${reportData.summary.totalCalls} | Days: ${reportData.summary.totalDays} | Avg/Day: ${reportData.summary.avgCallsPerDay} | Peak Hour: ${formatHour(reportData.summary.peakHour)} (${reportData.summary.peakHourCalls} calls)`;
-      doc.text(summaryText, margin, yPos);
+      doc.text(`Total Calls: ${reportData.summary.totalCalls} | Days: ${reportData.summary.totalDays} | Avg/Day: ${reportData.summary.avgCallsPerDay} | Peak Hour: ${formatHour(reportData.summary.peakHour)} (${reportData.summary.peakHourCalls} calls) | Best Day: ${reportData.summary.bestDay} (${reportData.summary.bestDayCalls} calls)`, margin, yPos);
       yPos += 10;
 
-      // For each date, create a table
-      reportData.dateWiseData.forEach((dateData, dateIndex) => {
-        // Check if we need a new page
-        if (yPos > 170) {
-          doc.addPage();
-          yPos = 15;
-        }
+      // Table headers
+      const headers = ['Date', 'Day', ...HOURS.map(formatHour), 'Total'];
 
-        // Date header
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(41, 98, 255);
-        doc.text(dateData.dateLabel, margin, yPos);
-        yPos += 6;
+      // Table data
+      const tableData = reportData.dateRows.map(row => [
+        row.dateLabel,
+        row.dayName,
+        ...HOURS.map(hour => (row.hourlyData[hour] || 0).toString()),
+        row.totalCalls.toString(),
+      ]);
 
-        // Table headers
-        const headers = ['Agent Name', ...HOURS.map(formatHour), 'Total'];
+      // Add totals row
+      tableData.push([
+        'TOTAL',
+        '',
+        ...HOURS.map(hour => (reportData.hourlyTotals[hour] || 0).toString()),
+        reportData.grandTotal.toString(),
+      ]);
 
-        // Table data
-        const tableData = dateData.agents.map(agent => [
-          agent.agentName,
-          ...HOURS.map(hour => (agent.hourlyData[hour] || 0).toString()),
-          agent.totalCalls.toString(),
-        ]);
-
-        // Add day totals row
-        tableData.push([
-          'DAY TOTAL',
-          ...HOURS.map(hour => (dateData.hourlyTotals[hour] || 0).toString()),
-          dateData.grandTotal.toString(),
-        ]);
-
-        autoTable(doc, {
-          startY: yPos,
-          head: [headers],
-          body: tableData,
-          theme: 'striped',
-          headStyles: {
-            fillColor: [41, 98, 255],
-            textColor: 255,
-            fontSize: 6,
-            fontStyle: 'bold',
-            halign: 'center',
-          },
-          bodyStyles: {
-            fontSize: 6,
-            halign: 'center',
-          },
-          columnStyles: {
-            0: { halign: 'left', cellWidth: 35 },
-          },
-          margin: { left: margin, right: margin },
-          didParseCell: (data) => {
-            // Style the totals row
-            if (data.row.index === tableData.length - 1) {
-              data.cell.styles.fontStyle = 'bold';
-              data.cell.styles.fillColor = [240, 240, 240];
-            }
-          },
-        });
-
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+      autoTable(doc, {
+        startY: yPos,
+        head: [headers],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [41, 98, 255],
+          textColor: 255,
+          fontSize: 7,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        bodyStyles: {
+          fontSize: 7,
+          halign: 'center',
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 22 },
+          1: { halign: 'center', cellWidth: 12 },
+        },
+        margin: { left: margin, right: margin },
+        didParseCell: (data) => {
+          if (data.row.index === tableData.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [240, 240, 240];
+          }
+        },
       });
 
-      // Overall Summary Table
-      if (reportData.dateWiseData.length > 1) {
-        if (yPos > 170) {
-          doc.addPage();
-          yPos = 15;
-        }
-
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(41, 98, 255);
-        doc.text('OVERALL SUMMARY', margin, yPos);
-        yPos += 6;
-
-        const overallHeaders = ['', ...HOURS.map(formatHour), 'Grand Total'];
-        const overallData = [[
-          'ALL DAYS TOTAL',
-          ...HOURS.map(hour => (reportData.overallHourlyTotals[hour] || 0).toString()),
-          reportData.overallGrandTotal.toString(),
-        ]];
-
-        autoTable(doc, {
-          startY: yPos,
-          head: [overallHeaders],
-          body: overallData,
-          theme: 'striped',
-          headStyles: {
-            fillColor: [76, 175, 80],
-            textColor: 255,
-            fontSize: 7,
-            fontStyle: 'bold',
-            halign: 'center',
-          },
-          bodyStyles: {
-            fontSize: 7,
-            halign: 'center',
-            fontStyle: 'bold',
-          },
-          columnStyles: {
-            0: { halign: 'left', cellWidth: 35 },
-          },
-          margin: { left: margin, right: margin },
-        });
-      }
-
-      const fileName = `Agent_Hourly_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      const fileName = `Hourly_Call_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
       doc.save(fileName);
       toast.success('PDF downloaded successfully');
     } catch (error) {
@@ -682,17 +448,36 @@ export const AgentHourlyCallReport: React.FC = () => {
     }
   };
 
+  // Get cell background based on value intensity
+  const getCellClass = (value: number, maxValue: number): string => {
+    if (value === 0) return 'text-muted-foreground';
+    const intensity = maxValue > 0 ? value / maxValue : 0;
+    if (intensity >= 0.8) return 'bg-primary/30 font-bold';
+    if (intensity >= 0.5) return 'bg-primary/20 font-medium';
+    if (intensity >= 0.2) return 'bg-primary/10';
+    return '';
+  };
+
   if (!isTeamLeader) {
     return (
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Team Leader Access Required</AlertTitle>
         <AlertDescription>
-          This report is only available to team leaders. Contact your administrator if you believe this is an error.
+          This report is only available to team leaders.
         </AlertDescription>
       </Alert>
     );
   }
+
+  // Calculate max value for heatmap coloring
+  const maxCellValue = reportData?.dateRows.reduce((max, row) => {
+    HOURS.forEach(hour => {
+      const val = row.hourlyData[hour] || 0;
+      if (val > max) max = val;
+    });
+    return max;
+  }, 0) || 0;
 
   return (
     <div className="space-y-6">
@@ -701,20 +486,16 @@ export const AgentHourlyCallReport: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Agent Performance Report - Hour-wise Call Volume
+                <Clock className="h-5 w-5 text-primary" />
+                Hour-wise Call Volume Report
               </CardTitle>
               <CardDescription>
-                Date-wise hourly breakdown of calls from 8 AM to 8 PM for {teamInfo?.name || 'your team'}
+                Date-wise hourly call breakdown (8 AM - 8 PM) for {teamInfo?.name || 'your team'}
               </CardDescription>
             </div>
-            {hasAppliedFilter && reportData && reportData.dateWiseData.length > 0 && (
+            {hasAppliedFilter && reportData && reportData.dateRows.length > 0 && (
               <Button onClick={downloadPDF} disabled={isLoading || isDownloading}>
-                {isDownloading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4" />
-                )}
+                {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                 <span className="ml-2">Download PDF</span>
               </Button>
             )}
@@ -761,12 +542,7 @@ export const AgentHourlyCallReport: React.FC = () => {
           {/* Step 2: Single Date Selection */}
           {filterMode === 'single' && !hasAppliedFilter && (
             <div className="space-y-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleChangeFilterType}
-                className="gap-1"
-              >
+              <Button variant="ghost" size="sm" onClick={handleChangeFilterType} className="gap-1">
                 <ArrowLeft className="h-4 w-4" />
                 Change Filter Type
               </Button>
@@ -798,9 +574,7 @@ export const AgentHourlyCallReport: React.FC = () => {
                       <SelectContent>
                         <SelectItem value="all">All Agents</SelectItem>
                         {teamAgents?.map(agent => (
-                          <SelectItem key={agent.id} value={agent.id}>
-                            {agent.name}
-                          </SelectItem>
+                          <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -814,15 +588,10 @@ export const AgentHourlyCallReport: React.FC = () => {
                 )}
                 
                 <div className="flex gap-2 mt-6">
-                  <Button
-                    onClick={handleApplyFilter}
-                    disabled={!canApplyFilter}
-                  >
+                  <Button onClick={handleApplyFilter} disabled={!canApplyFilter}>
                     Apply Filter & Show Data
                   </Button>
-                  <Button variant="outline" onClick={handleClearAll}>
-                    Clear
-                  </Button>
+                  <Button variant="outline" onClick={handleClearAll}>Clear</Button>
                 </div>
               </div>
             </div>
@@ -831,12 +600,7 @@ export const AgentHourlyCallReport: React.FC = () => {
           {/* Step 2: Date Range Selection */}
           {filterMode === 'range' && !hasAppliedFilter && (
             <div className="space-y-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleChangeFilterType}
-                className="gap-1"
-              >
+              <Button variant="ghost" size="sm" onClick={handleChangeFilterType} className="gap-1">
                 <ArrowLeft className="h-4 w-4" />
                 Change Filter Type
               </Button>
@@ -850,9 +614,7 @@ export const AgentHourlyCallReport: React.FC = () => {
                         selected={startDate}
                         onChange={(date) => {
                           setStartDate(date);
-                          if (endDate && date && date > endDate) {
-                            setEndDate(null);
-                          }
+                          if (endDate && date && date > endDate) setEndDate(null);
                         }}
                         selectsStart
                         startDate={startDate}
@@ -889,11 +651,7 @@ export const AgentHourlyCallReport: React.FC = () => {
                           !startDate && "opacity-50 cursor-not-allowed"
                         )}
                       />
-                      {!startDate && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Select From Date first
-                        </p>
-                      )}
+                      {!startDate && <p className="text-xs text-muted-foreground mt-1">Select From Date first</p>}
                     </div>
                   </div>
 
@@ -906,9 +664,7 @@ export const AgentHourlyCallReport: React.FC = () => {
                       <SelectContent>
                         <SelectItem value="all">All Agents</SelectItem>
                         {teamAgents?.map(agent => (
-                          <SelectItem key={agent.id} value={agent.id}>
-                            {agent.name}
-                          </SelectItem>
+                          <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -922,15 +678,10 @@ export const AgentHourlyCallReport: React.FC = () => {
                 )}
                 
                 <div className="flex gap-2 mt-6">
-                  <Button
-                    onClick={handleApplyFilter}
-                    disabled={!canApplyFilter}
-                  >
+                  <Button onClick={handleApplyFilter} disabled={!canApplyFilter}>
                     Apply Filter & Show Data
                   </Button>
-                  <Button variant="outline" onClick={handleClearAll}>
-                    Clear
-                  </Button>
+                  <Button variant="outline" onClick={handleClearAll}>Clear</Button>
                 </div>
               </div>
             </div>
@@ -940,12 +691,6 @@ export const AgentHourlyCallReport: React.FC = () => {
           {isLoading && hasAppliedFilter && (
             <div className="space-y-4">
               <Skeleton className="h-8 w-48" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-              </div>
               <Skeleton className="h-64 w-full" />
             </div>
           )}
@@ -953,128 +698,118 @@ export const AgentHourlyCallReport: React.FC = () => {
           {/* Results */}
           {hasAppliedFilter && !isLoading && reportData && (
             <div className="space-y-6">
-              {/* Filter Info & Actions */}
+              {/* Filter Info */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CalendarIcon className="h-4 w-4" />
                   <span>{getPeriodLabel()}</span>
                   <span className="mx-2">|</span>
-                  <span className="font-medium">Agent:</span>
+                  <Users className="h-4 w-4" />
                   <span>{getAgentName()}</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleClearAll}>
-                  Change Filter
-                </Button>
+                <Button variant="outline" size="sm" onClick={handleClearAll}>Change Filter</Button>
               </div>
 
-              {reportData.dateWiseData.length === 0 ? (
+              {reportData.dateRows.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <Phone className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <h3 className="text-lg font-medium mb-2">No Call Data Found</h3>
-                  <p className="text-sm text-muted-foreground">
-                    No calls were recorded for this date range.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No calls were recorded for this date range.</p>
                 </div>
               ) : (
                 <>
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <SummaryCard
-                      icon={<Phone className="h-4 w-4" />}
-                      label="Total Calls"
-                      value={reportData.summary.totalCalls}
-                      subtext={`${reportData.summary.totalDays} day(s)`}
-                      variant="primary"
-                    />
-                    <SummaryCard
-                      icon={<TrendingUp className="h-4 w-4" />}
-                      label="Avg Calls/Day"
-                      value={reportData.summary.avgCallsPerDay}
-                      variant="success"
-                    />
-                    <SummaryCard
-                      icon={<Clock className="h-4 w-4" />}
-                      label="Peak Hour"
-                      value={formatHour(reportData.summary.peakHour)}
-                      subtext={`${reportData.summary.peakHourCalls} calls`}
-                      variant="warning"
-                    />
-                    <SummaryCard
-                      icon={<Users className="h-4 w-4" />}
-                      label="Top Performer"
-                      value={reportData.summary.topAgentCalls}
-                      subtext={reportData.summary.topAgent}
-                      variant="default"
-                    />
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="rounded-lg p-3 bg-primary/10">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                        <Phone className="h-3 w-3" />
+                        Total Calls
+                      </div>
+                      <div className="text-xl font-bold">{reportData.summary.totalCalls}</div>
+                    </div>
+                    <div className="rounded-lg p-3 bg-muted/50">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                        <CalendarDays className="h-3 w-3" />
+                        Days
+                      </div>
+                      <div className="text-xl font-bold">{reportData.summary.totalDays}</div>
+                    </div>
+                    <div className="rounded-lg p-3 bg-muted/50">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Avg/Day
+                      </div>
+                      <div className="text-xl font-bold">{reportData.summary.avgCallsPerDay}</div>
+                    </div>
+                    <div className="rounded-lg p-3 bg-muted/50">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                        <Clock className="h-3 w-3" />
+                        Peak Hour
+                      </div>
+                      <div className="text-xl font-bold">{formatHour(reportData.summary.peakHour)}</div>
+                      <div className="text-xs text-muted-foreground">{reportData.summary.peakHourCalls} calls</div>
+                    </div>
+                    <div className="rounded-lg p-3 bg-muted/50">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Best Day
+                      </div>
+                      <div className="text-xl font-bold">{reportData.summary.bestDayCalls}</div>
+                      <div className="text-xs text-muted-foreground">{reportData.summary.bestDay}</div>
+                    </div>
                   </div>
 
-                  {/* Expand/Collapse Controls */}
-                  {reportData.dateWiseData.length > 1 && (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={expandAll}>
-                        Expand All ({reportData.dateWiseData.length})
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={collapseAll}>
-                        Collapse All
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Date-wise Sections */}
-                  {reportData.dateWiseData.map(dateData => (
-                    <DateSection
-                      key={dateData.date}
-                      dateData={dateData}
-                      isExpanded={expandedDates.has(dateData.date)}
-                      onToggle={() => toggleDateExpansion(dateData.date)}
-                    />
-                  ))}
-
-                  {/* Overall Summary Table (for range) */}
-                  {reportData.dateWiseData.length > 1 && (
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="p-4 bg-green-500/10 border-b">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-green-600" />
-                          Overall Summary (All Days)
-                        </h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-green-500/5">
-                              <TableHead className="font-bold sticky left-0 bg-green-500/5 z-10 min-w-[140px]">
-                                
-                              </TableHead>
-                              {HOURS.map(hour => (
-                                <TableHead key={hour} className="text-center font-bold min-w-[50px]">
-                                  {formatHour(hour)}
-                                </TableHead>
-                              ))}
-                              <TableHead className="text-center font-bold bg-green-500/20 min-w-[100px]">
-                                Grand Total
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow className="font-bold">
-                              <TableCell className="sticky left-0 bg-background z-10">
-                                ALL DAYS TOTAL
+                  {/* Main Table */}
+                  <div className="overflow-x-auto border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="font-bold sticky left-0 bg-muted/50 z-10 min-w-[90px]">Date</TableHead>
+                          <TableHead className="font-bold text-center min-w-[40px]">Day</TableHead>
+                          {HOURS.map(hour => (
+                            <TableHead key={hour} className="text-center font-bold min-w-[45px]">
+                              {formatHour(hour)}
+                            </TableHead>
+                          ))}
+                          <TableHead className="text-center font-bold bg-primary/10 min-w-[70px]">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.dateRows.map((row, idx) => (
+                          <TableRow key={row.date} className={idx === 0 ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+                            <TableCell className="font-medium sticky left-0 bg-background z-10">
+                              {row.dateLabel}
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground text-sm">
+                              {row.dayName}
+                            </TableCell>
+                            {HOURS.map(hour => (
+                              <TableCell key={hour} className={cn("text-center", getCellClass(row.hourlyData[hour] || 0, maxCellValue))}>
+                                {row.hourlyData[hour] || 0}
                               </TableCell>
-                              {HOURS.map(hour => (
-                                <TableCell key={hour} className="text-center text-lg">
-                                  {reportData.overallHourlyTotals[hour] || 0}
-                                </TableCell>
-                              ))}
-                              <TableCell className="text-center text-xl font-bold bg-green-500/10">
-                                {reportData.overallGrandTotal}
-                              </TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
+                            ))}
+                            <TableCell className="text-center font-bold bg-primary/5">
+                              {row.totalCalls}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow className="bg-muted font-bold">
+                          <TableCell className="sticky left-0 bg-muted z-10">TOTAL</TableCell>
+                          <TableCell></TableCell>
+                          {HOURS.map(hour => (
+                            <TableCell key={hour} className="text-center">
+                              {reportData.hourlyTotals[hour] || 0}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-center bg-primary/10 text-lg">
+                            {reportData.grandTotal}
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
                 </>
               )}
             </div>

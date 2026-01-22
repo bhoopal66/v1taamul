@@ -198,123 +198,140 @@ export const DateFilterComponent = ({
         </div>
       </div>
 
-      {/* Row 2: Date Pickers - Only show when mode is selected */}
-      {selectionMode === null ? (
-        <div className="text-sm text-muted-foreground py-2">
-          Please select a date mode above to continue
+      {/* Show NOTHING until user selects a mode */}
+      {selectionMode === null && (
+        <div className="text-sm text-muted-foreground py-4 text-center border border-dashed rounded-md">
+          Please select a date option above to continue
         </div>
-      ) : (
+      )}
+
+      {/* SINGLE DAY MODE - Show ONE date picker */}
+      {selectionMode === 'single' && (
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
+          <Label className="text-xs font-medium text-muted-foreground">Select Date:</Label>
+          <DatePicker
+            selected={singleDate}
+            onChange={(date) => setSingleDate(date)}
+            dateFormat="dd/MM/yyyy"
+            placeholderText="Click to select a date"
+            isClearable
+            showMonthDropdown
+            showYearDropdown
+            dropdownMode="select"
+            maxDate={new Date()}
+            className="h-10 w-full sm:w-[220px] px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            wrapperClassName="w-full sm:w-auto"
+          />
+        </div>
+      )}
+
+      {/* DATE RANGE MODE - Show TWO date pickers */}
+      {selectionMode === 'range' && (
         <div className="flex flex-col sm:flex-row gap-4 items-start">
-          {selectionMode === 'single' ? (
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Label className="text-xs font-medium text-muted-foreground">Select Date</Label>
-              <DatePicker
-                selected={singleDate}
-                onChange={(date) => setSingleDate(date)}
-                dateFormat="dd/MM/yyyy"
-                maxDate={new Date()}
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-                isClearable
-                placeholderText="Select Date"
-                className="h-10 w-full sm:w-[200px] px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                wrapperClassName="w-full sm:w-auto"
-              />
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <Label className="text-xs font-medium text-muted-foreground">From Date</Label>
-                <DatePicker
-                  selected={fromDate}
-                  onChange={handleFromDateChange}
-                  dateFormat="dd/MM/yyyy"
-                  maxDate={new Date()}
-                  showMonthDropdown
-                  showYearDropdown
-                  dropdownMode="select"
-                  isClearable
-                  placeholderText="DD/MM/YYYY"
-                  selectsStart
-                  startDate={fromDate}
-                  endDate={toDate}
-                  className={cn(
-                    "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                    dateError ? "border-destructive" : "border-input"
-                  )}
-                  wrapperClassName="w-full sm:w-auto"
-                />
-              </div>
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <Label className="text-xs font-medium text-muted-foreground">From Date:</Label>
+            <DatePicker
+              selected={fromDate}
+              onChange={(date) => {
+                setFromDate(date);
+                // If toDate is before new fromDate, clear toDate
+                if (toDate && date && toDate < date) {
+                  setToDate(null);
+                }
+              }}
+              selectsStart
+              startDate={fromDate}
+              endDate={toDate}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="Select start date"
+              isClearable
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              maxDate={toDate || new Date()}
+              className={cn(
+                "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                dateError ? "border-destructive" : "border-input"
+              )}
+              wrapperClassName="w-full sm:w-auto"
+            />
+          </div>
 
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <Label className="text-xs font-medium text-muted-foreground">To Date</Label>
-                <DatePicker
-                  selected={toDate}
-                  onChange={handleToDateChange}
-                  dateFormat="dd/MM/yyyy"
-                  maxDate={new Date()}
-                  minDate={fromDate || undefined}
-                  showMonthDropdown
-                  showYearDropdown
-                  dropdownMode="select"
-                  isClearable
-                  placeholderText="DD/MM/YYYY"
-                  selectsEnd
-                  startDate={fromDate}
-                  endDate={toDate}
-                  className={cn(
-                    "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                    dateError ? "border-destructive" : "border-input"
-                  )}
-                  wrapperClassName="w-full sm:w-auto"
-                />
-              </div>
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <Label className="text-xs font-medium text-muted-foreground">To Date:</Label>
+            <DatePicker
+              selected={toDate}
+              onChange={(date) => setToDate(date)}
+              selectsEnd
+              startDate={fromDate}
+              endDate={toDate}
+              minDate={fromDate || undefined}
+              maxDate={new Date()}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="Select end date"
+              isClearable
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              disabled={!fromDate}
+              className={cn(
+                "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                !fromDate ? "opacity-50 cursor-not-allowed" : "",
+                dateError ? "border-destructive" : "border-input"
+              )}
+              wrapperClassName="w-full sm:w-auto"
+            />
+            {!fromDate && (
+              <small className="text-xs text-muted-foreground">Please select From Date first</small>
+            )}
+          </div>
 
-              {/* Quick Select Buttons */}
-              <div className="flex flex-wrap gap-2 items-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 text-xs"
-                  onClick={() => {
-                    const today = new Date();
-                    setFromDate(new Date(today.setDate(today.getDate() - 6)));
-                    setToDate(new Date());
-                  }}
-                >
-                  Last 7 Days
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 text-xs"
-                  onClick={() => {
-                    const today = new Date();
-                    setFromDate(new Date(today.setDate(today.getDate() - 29)));
-                    setToDate(new Date());
-                  }}
-                >
-                  Last 30 Days
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 text-xs"
-                  onClick={() => {
-                    const today = new Date();
-                    setFromDate(new Date(today.getFullYear(), today.getMonth(), 1));
-                    setToDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
-                  }}
-                >
-                  This Month
-                </Button>
-              </div>
-            </>
-          )}
+          {/* Quick Select Buttons */}
+          <div className="flex flex-wrap gap-2 items-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 text-xs"
+              onClick={() => {
+                const today = new Date();
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(today.getDate() - 6);
+                setFromDate(sevenDaysAgo);
+                setToDate(today);
+              }}
+            >
+              Last 7 Days
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 text-xs"
+              onClick={() => {
+                const today = new Date();
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(today.getDate() - 29);
+                setFromDate(thirtyDaysAgo);
+                setToDate(today);
+              }}
+            >
+              Last 30 Days
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-10 text-xs"
+              onClick={() => {
+                const today = new Date();
+                setFromDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                setToDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+              }}
+            >
+              This Month
+            </Button>
+          </div>
         </div>
       )}
 

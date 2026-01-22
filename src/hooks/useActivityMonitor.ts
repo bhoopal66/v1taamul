@@ -209,9 +209,8 @@ export function useActivityMonitor() {
     mutationFn: async ({ activityType, metadata = {} }: { activityType: ActivityType; metadata?: Record<string, string | boolean | number> }) => {
       if (!user?.id) throw new Error('Not authenticated');
       
-      // Use the database function to switch activity
+      // Use the database function to switch activity (uses auth.uid() internally)
       const { data, error } = await supabase.rpc('switch_activity', {
-        p_user_id: user.id,
         p_activity_type: activityType,
         p_metadata: metadata,
       });

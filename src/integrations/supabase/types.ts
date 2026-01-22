@@ -2095,14 +2095,22 @@ export type Database = {
       mask_email: { Args: { email_text: string }; Returns: string }
       mask_phone: { Args: { phone_text: string }; Returns: string }
       move_old_contacts_to_pool: { Args: never; Returns: number }
-      switch_activity: {
-        Args: {
-          p_activity_type: Database["public"]["Enums"]["activity_type"]
-          p_metadata?: Json
-          p_user_id: string
-        }
-        Returns: string
-      }
+      switch_activity:
+        | {
+            Args: {
+              p_activity_type: Database["public"]["Enums"]["activity_type"]
+              p_metadata?: Json
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_activity_type: Database["public"]["Enums"]["activity_type"]
+              p_metadata?: Json
+              p_user_id: string
+            }
+            Returns: string
+          }
       trigger_performance_check: { Args: never; Returns: undefined }
       update_login_streak: {
         Args: { user_id: string }

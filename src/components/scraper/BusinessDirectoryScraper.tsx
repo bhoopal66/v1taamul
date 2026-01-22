@@ -160,19 +160,29 @@ export const BusinessDirectoryScraper = () => {
 
     for (const company of selectedList) {
       try {
-        // Check if phone number already exists in master_contacts
-        let { data: existing } = await supabase
-          .from('master_contacts')
-          .select('id')
-          .eq('phone_number', company.phone_number)
-          .maybeSingle();
+        // Check if phone number already exists using RPC (bypasses RLS for cross-agent check)
+        let contactId: string | null = null;
+        
+        const { data: existingContactId, error: rpcError } = await supabase
+          .rpc('find_contact_by_phone', { phone: company.phone_number });
 
-        let contactId: string;
-
-        if (existing) {
-          contactId = existing.id;
+        if (!rpcError && existingContactId) {
+          contactId = existingContactId;
         } else {
-          // Insert new contact first
+          // Fallback: direct query if RPC fails
+          const { data: existing } = await supabase
+            .from('master_contacts')
+            .select('id')
+            .eq('phone_number', company.phone_number)
+            .maybeSingle();
+
+          if (existing) {
+            contactId = existing.id;
+          }
+        }
+
+        if (!contactId) {
+          // Insert new contact
           const { data: newContact, error: insertError } = await supabase
             .from('master_contacts')
             .insert({

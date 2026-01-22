@@ -1,17 +1,112 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { HeatmapData } from '@/hooks/useDashboardWidgets';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { subDays, getDay, getHours, format, startOfDay, endOfDay } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
+import { CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
 
-interface CallVolumeHeatmapProps {
-  data: HeatmapData[];
-  isLoading: boolean;
+interface HeatmapData {
+  day: number;
+  hour: number;
+  value: number;
 }
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 
-export const CallVolumeHeatmap = ({ data, isLoading }: CallVolumeHeatmapProps) => {
-  const maxValue = Math.max(...data.map(d => d.value), 1);
+export const CallVolumeHeatmap = () => {
+  const { user, userRole, ledTeamId, profile } = useAuth();
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+
+  const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
+  const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
+
+  const { data: heatmapData = [], isLoading } = useQuery({
+    queryKey: ['call-heatmap', user?.id, effectiveTeamId, canSeeAllData, dateRange?.from, dateRange?.to],
+    queryFn: async (): Promise<HeatmapData[]> => {
+      const startDate = dateRange?.from ? startOfDay(dateRange.from) : subDays(new Date(), 30);
+      const endDate = dateRange?.to ? endOfDay(dateRange.to) : new Date();
+
+      // Get agent IDs for team filtering
+      let agentIds: string[] | null = null;
+
+      if (!canSeeAllData) {
+        if (effectiveTeamId) {
+          const { data } = await supabase
+            .from('profiles_public')
+            .select('id')
+            .eq('team_id', effectiveTeamId)
+            .eq('is_active', true);
+          agentIds = data?.map(p => p.id) || [];
+        } else if (user?.id) {
+          const { data } = await supabase
+            .from('profiles_public')
+            .select('id')
+            .eq('supervisor_id', user.id)
+            .eq('is_active', true);
+          agentIds = data?.map(p => p.id) || [];
+        } else {
+          agentIds = [];
+        }
+      }
+
+      let query = supabase
+        .from('call_feedback')
+        .select('call_timestamp')
+        .gte('call_timestamp', startDate.toISOString())
+        .lte('call_timestamp', endDate.toISOString());
+
+      if (agentIds !== null && agentIds.length > 0) {
+        query = query.in('agent_id', agentIds);
+      } else if (agentIds !== null && agentIds.length === 0) {
+        return [];
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Initialize heatmap grid
+      const heatmap: Map<string, number> = new Map();
+      for (let day = 0; day < 7; day++) {
+        for (let hour = 8; hour <= 20; hour++) {
+          heatmap.set(`${day}-${hour}`, 0);
+        }
+      }
+
+      // Aggregate calls by day and hour
+      data?.forEach(call => {
+        if (call.call_timestamp) {
+          const date = new Date(call.call_timestamp);
+          const day = getDay(date);
+          const hour = getHours(date);
+          if (hour >= 8 && hour <= 20) {
+            const key = `${day}-${hour}`;
+            heatmap.set(key, (heatmap.get(key) || 0) + 1);
+          }
+        }
+      });
+
+      return Array.from(heatmap.entries()).map(([key, value]) => {
+        const [day, hour] = key.split('-').map(Number);
+        return { day, hour, value };
+      });
+    },
+    enabled: !!user?.id,
+  });
+
+  const maxValue = Math.max(...heatmapData.map(d => d.value), 1);
 
   const getColor = (value: number) => {
     if (value === 0) return 'bg-muted';
@@ -23,22 +118,29 @@ export const CallVolumeHeatmap = ({ data, isLoading }: CallVolumeHeatmapProps) =
   };
 
   const getValue = (day: number, hour: number) => {
-    const cell = data.find(d => d.day === day && d.hour === hour);
+    const cell = heatmapData.find(d => d.day === day && d.hour === hour);
     return cell?.value || 0;
   };
 
-  // Calculate row totals (per day)
   const getDayTotal = (day: number) => {
     return hours.reduce((sum, hour) => sum + getValue(day, hour), 0);
   };
 
-  // Calculate column totals (per hour)
   const getHourTotal = (hour: number) => {
     return days.reduce((sum, _, dayIndex) => sum + getValue(dayIndex, hour), 0);
   };
 
-  // Calculate grand total
-  const grandTotal = data.reduce((sum, d) => sum + d.value, 0);
+  const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
+
+  const getDateRangeText = () => {
+    if (dateRange?.from && dateRange?.to) {
+      return `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+    }
+    if (dateRange?.from) {
+      return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
+    }
+    return 'Select date range';
+  };
 
   if (isLoading) {
     return (
@@ -57,8 +159,39 @@ export const CallVolumeHeatmap = ({ data, isLoading }: CallVolumeHeatmapProps) =
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">Call Volume Heatmap</CardTitle>
-        <CardDescription>Calls by day and hour (last 30 days) • Total: {grandTotal}</CardDescription>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <CardTitle className="text-base font-medium">Call Volume Heatmap</CardTitle>
+            <CardDescription>Calls by day and hour • Total: {grandTotal}</CardDescription>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {getDateRangeText()}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                disabled={(date) => date > new Date()}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

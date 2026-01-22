@@ -1001,7 +1001,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Call Volume Heatmap */}
-      <CallVolumeHeatmap data={heatmapData} isLoading={widgetsLoading} />
+      <CallVolumeHeatmap />
       
       {/* Agent Performance List */}
       <AgentPerformanceList 

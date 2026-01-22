@@ -20,6 +20,7 @@ interface HeatmapData {
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
+const todayIndex = getDay(new Date()); // Get today's day index (0-6)
 
 export const CallVolumeHeatmap = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
@@ -210,9 +211,12 @@ export const CallVolumeHeatmap = () => {
             {/* Heatmap grid */}
             {days.map((day, dayIndex) => {
               const dayTotal = getDayTotal(dayIndex);
+              const isToday = dayIndex === todayIndex;
               return (
-                <div key={day} className="flex items-center gap-1 mb-1">
-                  <div className="w-12 text-xs text-muted-foreground font-medium">{day}</div>
+                <div key={day} className={cn("flex items-center gap-1 mb-1", isToday && "bg-accent/30 rounded-md -mx-1 px-1")}>
+                  <div className={cn("w-12 text-xs font-medium", isToday ? "text-primary font-semibold" : "text-muted-foreground")}>
+                    {day}{isToday && " •"}
+                  </div>
                   {hours.map(hour => {
                     const value = getValue(dayIndex, hour);
                     return (

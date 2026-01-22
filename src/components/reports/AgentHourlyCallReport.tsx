@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -47,6 +48,11 @@ interface AgentHourlyStats {
   totalCalls: number;
 }
 
+interface AgentOption {
+  id: string;
+  name: string;
+}
+
 // Hours from 8 AM to 8 PM
 const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
@@ -60,6 +66,7 @@ export const AgentHourlyCallReport: React.FC = () => {
   const { ledTeamId, user } = useAuth();
   const { teamInfo, isTeamLeader } = useTeamLeaderData();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<string>('all');
 
   // Filter mode selection
   const [filterMode, setFilterMode] = useState<FilterMode>(null);
@@ -74,6 +81,7 @@ export const AgentHourlyCallReport: React.FC = () => {
   const [appliedSingleDate, setAppliedSingleDate] = useState<Date | null>(null);
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
+  const [appliedAgent, setAppliedAgent] = useState<string>('all');
 
   const hasAppliedFilter = appliedMode === 'single' 
     ? !!appliedSingleDate 
@@ -87,17 +95,41 @@ export const AgentHourlyCallReport: React.FC = () => {
       ? !!startDate && !!endDate
       : false;
 
+  // Fetch team agents for filter dropdown
+  const { data: teamAgents } = useQuery({
+    queryKey: ['team-agents-for-hourly-report', ledTeamId],
+    queryFn: async (): Promise<AgentOption[]> => {
+      if (!ledTeamId) return [];
+
+      const { data: profiles, error } = await supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('team_id', ledTeamId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      return (profiles || []).map(p => ({
+        id: p.id!,
+        name: p.full_name || p.username || 'Unknown',
+      }));
+    },
+    enabled: !!ledTeamId,
+  });
+
   const handleApplyFilter = () => {
     if (filterMode === 'single' && singleDate) {
       setAppliedMode('single');
       setAppliedSingleDate(singleDate);
       setAppliedStartDate(null);
       setAppliedEndDate(null);
+      setAppliedAgent(selectedAgent);
     } else if (filterMode === 'range' && startDate && endDate) {
       setAppliedMode('range');
       setAppliedStartDate(startDate);
       setAppliedEndDate(endDate);
       setAppliedSingleDate(null);
+      setAppliedAgent(selectedAgent);
     }
   };
 
@@ -106,10 +138,12 @@ export const AgentHourlyCallReport: React.FC = () => {
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
+    setSelectedAgent('all');
     setAppliedMode(null);
     setAppliedSingleDate(null);
     setAppliedStartDate(null);
     setAppliedEndDate(null);
+    setAppliedAgent('all');
   };
 
   const handleChangeFilterType = () => {
@@ -135,6 +169,12 @@ export const AgentHourlyCallReport: React.FC = () => {
     return null;
   };
 
+  const getAgentName = () => {
+    if (appliedAgent === 'all') return 'All Agents';
+    const agent = teamAgents?.find(a => a.id === appliedAgent);
+    return agent?.name || 'Unknown';
+  };
+
   // Fetch hourly call data
   const { data: reportData, isLoading } = useQuery({
     queryKey: [
@@ -144,6 +184,7 @@ export const AgentHourlyCallReport: React.FC = () => {
       appliedSingleDate?.toISOString(),
       appliedStartDate?.toISOString(),
       appliedEndDate?.toISOString(),
+      appliedAgent,
     ],
     queryFn: async (): Promise<{ agents: AgentHourlyStats[]; hourlyTotals: HourlyData; grandTotal: number }> => {
       if (!ledTeamId || !hasAppliedFilter) {
@@ -159,14 +200,21 @@ export const AgentHourlyCallReport: React.FC = () => {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles_public')
         .select('id, full_name, username')
-        .eq('team_id', ledTeamId);
+        .eq('team_id', ledTeamId)
+        .eq('is_active', true);
 
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) {
         return { agents: [], hourlyTotals: {}, grandTotal: 0 };
       }
 
-      const memberIds = profiles.map(p => p.id);
+      // Filter by specific agent if selected
+      let filteredProfiles = profiles;
+      if (appliedAgent !== 'all') {
+        filteredProfiles = profiles.filter(p => p.id === appliedAgent);
+      }
+
+      const memberIds = filteredProfiles.map(p => p.id);
 
       // Get call feedback with timestamps
       const { data: feedback, error: feedbackError } = await supabase
@@ -181,9 +229,9 @@ export const AgentHourlyCallReport: React.FC = () => {
       // Aggregate by agent and hour
       const agentMap = new Map<string, AgentHourlyStats>();
 
-      profiles.forEach(profile => {
-        agentMap.set(profile.id, {
-          agentId: profile.id,
+      filteredProfiles.forEach(profile => {
+        agentMap.set(profile.id!, {
+          agentId: profile.id!,
           agentName: profile.full_name || profile.username || 'Unknown',
           hourlyData: {},
           totalCalls: 0,
@@ -414,20 +462,39 @@ export const AgentHourlyCallReport: React.FC = () => {
               </Button>
               
               <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-full max-w-xs">
-                  <label className="block text-sm font-medium mb-2">Select a Date:</label>
-                  <DatePicker
-                    selected={singleDate}
-                    onChange={(date) => setSingleDate(date)}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText="Click to select a date"
-                    maxDate={new Date()}
-                    isClearable
-                    showMonthDropdown
-                    showYearDropdown
-                    dropdownMode="select"
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  />
+                <div className="w-full max-w-md space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Select a Date:</label>
+                    <DatePicker
+                      selected={singleDate}
+                      onChange={(date) => setSingleDate(date)}
+                      dateFormat="dd/MM/yyyy"
+                      placeholderText="Click to select a date"
+                      maxDate={new Date()}
+                      isClearable
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Filter by Agent:</label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        {teamAgents?.map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
                 {singleDate && (
@@ -465,57 +532,76 @@ export const AgentHourlyCallReport: React.FC = () => {
               </Button>
               
               <div className="flex flex-col items-center justify-center py-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-lg">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">From Date:</label>
-                    <DatePicker
-                      selected={startDate}
-                      onChange={(date) => {
-                        setStartDate(date);
-                        if (endDate && date && date > endDate) {
-                          setEndDate(null);
-                        }
-                      }}
-                      selectsStart
-                      startDate={startDate}
-                      endDate={endDate}
-                      maxDate={endDate || new Date()}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="Select start date"
-                      isClearable
-                      showMonthDropdown
-                      showYearDropdown
-                      dropdownMode="select"
-                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">To Date:</label>
-                    <DatePicker
-                      selected={endDate}
-                      onChange={(date) => setEndDate(date)}
-                      selectsEnd
-                      startDate={startDate}
-                      endDate={endDate}
-                      minDate={startDate}
-                      maxDate={new Date()}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="Select end date"
-                      disabled={!startDate}
-                      isClearable
-                      showMonthDropdown
-                      showYearDropdown
-                      dropdownMode="select"
-                      className={cn(
-                        "w-full px-3 py-2 border border-input rounded-md bg-background text-sm",
-                        !startDate && "opacity-50 cursor-not-allowed"
+                <div className="w-full max-w-lg space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">From Date:</label>
+                      <DatePicker
+                        selected={startDate}
+                        onChange={(date) => {
+                          setStartDate(date);
+                          if (endDate && date && date > endDate) {
+                            setEndDate(null);
+                          }
+                        }}
+                        selectsStart
+                        startDate={startDate}
+                        endDate={endDate}
+                        maxDate={endDate || new Date()}
+                        dateFormat="dd/MM/yyyy"
+                        placeholderText="Select start date"
+                        isClearable
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">To Date:</label>
+                      <DatePicker
+                        selected={endDate}
+                        onChange={(date) => setEndDate(date)}
+                        selectsEnd
+                        startDate={startDate}
+                        endDate={endDate}
+                        minDate={startDate}
+                        maxDate={new Date()}
+                        dateFormat="dd/MM/yyyy"
+                        placeholderText="Select end date"
+                        disabled={!startDate}
+                        isClearable
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        className={cn(
+                          "w-full px-3 py-2 border border-input rounded-md bg-background text-sm",
+                          !startDate && "opacity-50 cursor-not-allowed"
+                        )}
+                      />
+                      {!startDate && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Select From Date first
+                        </p>
                       )}
-                    />
-                    {!startDate && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Select From Date first
-                      </p>
-                    )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Filter by Agent:</label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        {teamAgents?.map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
@@ -556,9 +642,12 @@ export const AgentHourlyCallReport: React.FC = () => {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CalendarIcon className="h-4 w-4" />
                   <span>{getPeriodLabel()}</span>
+                  <span className="mx-2">|</span>
+                  <span className="font-medium">Agent:</span>
+                  <span>{getAgentName()}</span>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleClearAll}>
-                  Change Date Filter
+                  Change Filter
                 </Button>
               </div>
 

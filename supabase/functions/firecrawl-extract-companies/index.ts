@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
     console.log('Extracting companies from:', formattedUrl);
 
     // Use Firecrawl with JSON extraction for structured company data
+    // Set a longer timeout for LLM-based extraction
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -78,6 +79,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         url: formattedUrl,
         formats: ['json'],
+        timeout: 60000, // 60 second timeout for complex pages
+        waitFor: 3000, // Wait 3 seconds for dynamic content to load
         jsonOptions: {
           schema: {
             type: 'object',
@@ -111,8 +114,15 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       console.error('Firecrawl API error:', data);
+      
+      // Provide user-friendly error messages
+      let errorMessage = data.error || 'Failed to scrape page';
+      if (data.code === 'SCRAPE_TIMEOUT' || errorMessage.includes('timed out')) {
+        errorMessage = 'The page took too long to load. Try a different URL or a page with fewer items.';
+      }
+      
       return new Response(
-        JSON.stringify({ success: false, error: data.error || 'Failed to scrape page' }),
+        JSON.stringify({ success: false, error: errorMessage }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -24,6 +24,7 @@ import AlertHistoryPage from "./pages/AlertHistoryPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfileVisibilityTest from "./pages/ProfileVisibilityTest";
 import ActivityMonitorPage from "./pages/ActivityMonitorPage";
+import ScraperPage from "./pages/ScraperPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/team-management" element={<TeamManagementPage />} />
               <Route path="/alert-history" element={<AlertHistoryPage />} />
               <Route path="/activity-monitor" element={<ActivityMonitorPage />} />
+              <Route path="/scraper" element={<ScraperPage />} />
               <Route path="/profile-visibility-test" element={<ProfileVisibilityTest />} />
             </Route>
             <Route path="*" element={<NotFound />} />

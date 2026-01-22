@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Globe, Loader2, Download, Upload, RefreshCw, PhoneCall } from 'lucide-react';
+import { Globe, Loader2, RefreshCw, PhoneCall } from 'lucide-react';
 import { firecrawlApi, ExtractedCompany } from '@/lib/api/firecrawl';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ export const BusinessDirectoryScraper = () => {
   const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
+  
   const [isAddingToCallList, setIsAddingToCallList] = useState(false);
   const [companies, setCompanies] = useState<ExtractedCompany[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<number>>(new Set());
@@ -80,72 +80,6 @@ export const BusinessDirectoryScraper = () => {
     }
   };
 
-  const handleImport = async () => {
-    if (!user?.id || selectedCompanies.size === 0) return;
-
-    setIsImporting(true);
-    const selectedList = companies.filter((_, i) => selectedCompanies.has(i));
-    
-    let imported = 0;
-    let duplicates = 0;
-    let errors = 0;
-
-    for (const company of selectedList) {
-      try {
-        // Check if phone number already exists
-        const { data: existing } = await supabase
-          .from('master_contacts')
-          .select('id')
-          .eq('phone_number', company.phone_number)
-          .maybeSingle();
-
-        if (existing) {
-          duplicates++;
-          continue;
-        }
-
-        // Insert new contact
-        const { error } = await supabase
-          .from('master_contacts')
-          .insert({
-            company_name: company.company_name,
-            phone_number: company.phone_number,
-            contact_person_name: company.contact_person_name || null,
-            industry: company.industry || null,
-            city: company.city || null,
-            area: company.area || null,
-            first_uploaded_by: user.id,
-            current_owner_agent_id: user.id,
-            first_upload_date: new Date().toISOString(),
-          });
-
-        if (error) {
-          console.error('Import error:', error);
-          errors++;
-        } else {
-          imported++;
-        }
-      } catch (err) {
-        console.error('Import error:', err);
-        errors++;
-      }
-    }
-
-    setIsImporting(false);
-
-    toast({
-      title: 'Import Complete',
-      description: `Imported: ${imported}, Duplicates: ${duplicates}, Errors: ${errors}`,
-      variant: errors > 0 ? 'destructive' : 'default',
-    });
-
-    if (imported > 0) {
-      // Clear imported companies from the list
-      const remainingCompanies = companies.filter((_, i) => !selectedCompanies.has(i));
-      setCompanies(remainingCompanies);
-      setSelectedCompanies(new Set());
-    }
-  };
 
   const handleAddToCallList = async () => {
     if (!user?.id || selectedCompanies.size === 0) return;
@@ -271,30 +205,6 @@ export const BusinessDirectoryScraper = () => {
     }
   };
 
-  const exportToCSV = () => {
-    const selectedList = companies.filter((_, i) => selectedCompanies.has(i));
-    if (selectedList.length === 0) return;
-
-    const headers = ['Company Name', 'Phone Number', 'Contact Person', 'Industry', 'City', 'Area'];
-    const rows = selectedList.map(c => [
-      c.company_name,
-      c.phone_number,
-      c.contact_person_name || '',
-      c.industry || '',
-      c.city || '',
-      c.area || '',
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `scraped-companies-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
 
   return (
     <Card>
@@ -345,42 +255,18 @@ export const BusinessDirectoryScraper = () => {
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportToCSV}
-                  disabled={selectedCompanies.size === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleImport}
-                  disabled={selectedCompanies.size === 0 || isImporting || isAddingToCallList}
-                >
-                  {isImporting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4 mr-2" />
-                  )}
-                  Import to Contacts
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleAddToCallList}
-                  disabled={selectedCompanies.size === 0 || isImporting || isAddingToCallList}
-                >
-                  {isAddingToCallList ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <PhoneCall className="h-4 w-4 mr-2" />
-                  )}
-                  Add to Call List
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                onClick={handleAddToCallList}
+                disabled={selectedCompanies.size === 0 || isAddingToCallList}
+              >
+                {isAddingToCallList ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <PhoneCall className="h-4 w-4 mr-2" />
+                )}
+                Add to Call List
+              </Button>
             </div>
 
             <div className="border rounded-md max-h-[400px] overflow-auto">

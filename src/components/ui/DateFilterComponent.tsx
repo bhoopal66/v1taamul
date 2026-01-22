@@ -81,6 +81,27 @@ export const DateFilterComponent = ({
     }
   };
 
+  // Handle Clear All Filters
+  const handleClearFilters = () => {
+    setSelectionMode(null);
+    setSingleDate(null);
+    setFromDate(null);
+    setToDate(null);
+    setSelectedAgent('all');
+    setShowMonthly(false);
+    setDateError(null);
+    
+    // Notify parent with cleared state
+    onFilterChange({
+      selectionMode: null,
+      singleDate: null,
+      fromDate: null,
+      toDate: null,
+      selectedAgent: 'all',
+      showMonthly: false,
+    });
+  };
+
   // Validate and update error state
   useEffect(() => {
     if (selectionMode === 'range' && fromDate && toDate) {
@@ -215,6 +236,17 @@ export const DateFilterComponent = ({
             ) : (
               'Apply Filter'
             )}
+          </Button>
+          
+          {/* Clear All Filters Button */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="default"
+            onClick={handleClearFilters}
+            className="h-10 min-w-[120px] text-muted-foreground hover:text-foreground"
+          >
+            Clear All Filters
           </Button>
         </div>
 

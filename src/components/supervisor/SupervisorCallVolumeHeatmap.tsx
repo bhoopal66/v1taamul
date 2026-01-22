@@ -394,12 +394,12 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
               {/* Agent Selector */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs font-medium text-muted-foreground">Agent Filter</Label>
-                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
                   <SelectTrigger className="w-[200px] h-9">
                     <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                     <SelectValue placeholder="All Agents" />
                   </SelectTrigger>
-                  <SelectContent>
+                    <SelectContent className="z-[200]">
                     <SelectItem value="all">All Agents</SelectItem>
                     {agentOptions.map(agent => (
                       <SelectItem key={agent.id} value={agent.id}>
@@ -430,7 +430,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                         {format(singleDate, 'PPP')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-[200]" align="start">
                       <Calendar
                         mode="single"
                         selected={singleDate}
@@ -464,15 +464,17 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                           {fromDate ? format(fromDate, 'PPP') : 'Pick a date'}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
                         <Calendar
                           mode="single"
                           selected={fromDate}
                           onSelect={(date) => {
+                            if (!date) return;
                             setFromDate(date);
+                            if (toDate && isBefore(toDate, date)) setToDate(date);
                             setFromDateOpen(false);
                           }}
-                          disabled={(date) => date > new Date() || (toDate ? date > toDate : false)}
+                          disabled={(date) => date > new Date()}
                           className="pointer-events-auto"
                         />
                       </PopoverContent>
@@ -495,15 +497,17 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                           {toDate ? format(toDate, 'PPP') : 'Pick a date'}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
                         <Calendar
                           mode="single"
                           selected={toDate}
                           onSelect={(date) => {
+                            if (!date) return;
                             setToDate(date);
+                            if (fromDate && isBefore(date, fromDate)) setFromDate(date);
                             setToDateOpen(false);
                           }}
-                          disabled={(date) => date > new Date() || (fromDate ? date < fromDate : false)}
+                          disabled={(date) => date > new Date()}
                           className="pointer-events-auto"
                         />
                       </PopoverContent>

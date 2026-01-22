@@ -24,6 +24,7 @@ export interface DateFilterState {
 interface DateFilterComponentProps {
   agents: AgentOption[];
   onFilterChange: (filters: DateFilterState) => void;
+  onApplyFilter: (filters: DateFilterState) => void;
   onExportPDF: () => void;
   isLoading?: boolean;
   isExporting?: boolean;
@@ -34,6 +35,7 @@ interface DateFilterComponentProps {
 export const DateFilterComponent = ({
   agents,
   onFilterChange,
+  onApplyFilter,
   onExportPDF,
   isLoading = false,
   isExporting = false,
@@ -49,13 +51,35 @@ export const DateFilterComponent = ({
   const [showMonthly, setShowMonthly] = useState<boolean>(false);
   const [dateError, setDateError] = useState<string | null>(null);
 
-  // Date range validation
+  // Validation function - checks if dates are valid for current mode
+  const isDateValid = (): boolean => {
+    if (selectionMode === 'single') {
+      return singleDate !== null;
+    }
+    if (selectionMode === 'range') {
+      return fromDate !== null && toDate !== null && fromDate <= toDate;
+    }
+    return false;
+  };
+
+  // Date range validation (for UI state)
   const isDateRangeValid = useMemo(() => {
-    if (selectionMode === null) return false;
-    if (selectionMode === 'single') return singleDate !== null;
-    if (!fromDate || !toDate) return false;
-    return toDate >= fromDate;
+    return isDateValid();
   }, [selectionMode, singleDate, fromDate, toDate]);
+
+  // Handle Apply Filter
+  const handleApplyFilter = () => {
+    if (isDateValid()) {
+      onApplyFilter({
+        selectionMode,
+        singleDate,
+        fromDate,
+        toDate,
+        selectedAgent,
+        showMonthly,
+      });
+    }
+  };
 
   // Validate and update error state
   useEffect(() => {
@@ -171,6 +195,27 @@ export const DateFilterComponent = ({
               Show Monthly Summary
             </Label>
           </div>
+        </div>
+
+        {/* Apply Filter Button */}
+        <div className="flex flex-col gap-2 justify-end">
+          <Button
+            type="button"
+            variant="default"
+            size="default"
+            onClick={handleApplyFilter}
+            disabled={!isDateValid() || isLoading}
+            className="h-10 min-w-[120px]"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              'Apply Filter'
+            )}
+          </Button>
         </div>
 
         {/* Export PDF Button */}

@@ -217,7 +217,7 @@ export const BusinessDirectoryScraper = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Globe className="h-5 w-5" />
-          Business Directory Scraper
+          Data Collector
         </CardTitle>
         <CardDescription>
           Extract company data from business directories and import directly into your contacts

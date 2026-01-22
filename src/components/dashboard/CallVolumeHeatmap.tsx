@@ -25,10 +25,7 @@ const todayIndex = getDay(new Date()); // Get today's day index (0-6)
 export const CallVolumeHeatmap = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
 
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
@@ -36,8 +33,10 @@ export const CallVolumeHeatmap = () => {
   const { data: heatmapData = [], isLoading } = useQuery({
     queryKey: ['call-heatmap', user?.id, effectiveTeamId, canSeeAllData, dateRange?.from, dateRange?.to],
     queryFn: async (): Promise<HeatmapData[]> => {
-      const startDate = dateRange?.from ? startOfDay(dateRange.from) : subDays(new Date(), 30);
-      const endDate = dateRange?.to ? endOfDay(dateRange.to) : new Date();
+      if (!dateRange?.from) return [];
+      
+      const startDate = startOfDay(dateRange.from);
+      const endDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
 
       // Get agent IDs for team filtering
       let agentIds: string[] | null = null;
@@ -104,7 +103,7 @@ export const CallVolumeHeatmap = () => {
         return { day, hour, value };
       });
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!dateRange?.from,
   });
 
   const maxValue = Math.max(...heatmapData.map(d => d.value), 1);
@@ -138,10 +137,12 @@ export const CallVolumeHeatmap = () => {
       return `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
     }
     if (dateRange?.from) {
-      return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
+      return format(dateRange.from, 'MMM d, yyyy');
     }
     return 'Select date range';
   };
+
+  const hasNoDateSelected = !dateRange?.from;
 
   if (isLoading) {
     return (
@@ -195,6 +196,13 @@ export const CallVolumeHeatmap = () => {
         </div>
       </CardHeader>
       <CardContent>
+        {hasNoDateSelected ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground font-medium">Select a date range to view call volume data</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Use the calendar above to pick a date range</p>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[500px]">
             {/* Hour labels */}
@@ -271,6 +279,7 @@ export const CallVolumeHeatmap = () => {
             </div>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   );

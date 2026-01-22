@@ -441,6 +441,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
         <DateFilterComponent
           agents={agentOptions}
           onFilterChange={handleFilterChange}
+          onApplyFilter={handleFilterChange}
           onExportPDF={handleExportPDF}
           isLoading={isFetching}
           isExporting={isExporting}

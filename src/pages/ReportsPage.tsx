@@ -2,8 +2,9 @@ import React from 'react';
 import { ScheduledReportsManager } from '@/components/reports/ScheduledReportsManager';
 import { WeeklyReportPDFGenerator } from '@/components/reports/WeeklyReportPDFGenerator';
 import { TeamReportGenerator } from '@/components/reports/TeamReportGenerator';
+import { AgentHourlyCallReport } from '@/components/reports/AgentHourlyCallReport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Download, Users } from 'lucide-react';
+import { Calendar, Download, Users, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ReportsPage: React.FC = () => {
@@ -19,8 +20,14 @@ const ReportsPage: React.FC = () => {
         </p>
       </div>
 
-      <Tabs defaultValue={isTeamLeader ? "team" : "generate"} className="space-y-4">
+      <Tabs defaultValue={isTeamLeader ? "hourly" : "generate"} className="space-y-4">
         <TabsList>
+          {isTeamLeader && (
+            <TabsTrigger value="hourly" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Hourly Report
+            </TabsTrigger>
+          )}
           {isTeamLeader && (
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
@@ -36,6 +43,12 @@ const ReportsPage: React.FC = () => {
             Scheduled Reports
           </TabsTrigger>
         </TabsList>
+
+        {isTeamLeader && (
+          <TabsContent value="hourly" className="space-y-4">
+            <AgentHourlyCallReport />
+          </TabsContent>
+        )}
 
         {isTeamLeader && (
           <TabsContent value="team" className="space-y-4">

@@ -1004,12 +1004,7 @@ export const Dashboard: React.FC = () => {
       <CallVolumeHeatmap />
       
       {/* Agent Performance List */}
-      <AgentPerformanceList 
-        agents={agentStats} 
-        isLoading={allAgentsLoading} 
-        summary={allAgentsSummary}
-        dateRangeLabel={dateRangeLabel}
-      />
+      <AgentPerformanceList />
 
     </div>
   );

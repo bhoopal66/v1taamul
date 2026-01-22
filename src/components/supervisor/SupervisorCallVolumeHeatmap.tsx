@@ -235,7 +235,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                 ))}
               </SelectContent>
             </Select>
-            <Popover modal={true}>
+            <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -250,12 +250,11 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                 </Button>
               </PopoverTrigger>
               <PopoverContent 
-                className="w-auto p-0 z-50 bg-popover" 
+                className="w-auto p-0 z-[100]" 
                 align="end" 
                 sideOffset={4}
-                onOpenAutoFocus={(e) => e.preventDefault()}
               >
-                <div className="p-3 border-b">
+                <div className="p-3 border-b bg-popover">
                   <Tabs value={dateMode} onValueChange={(v) => setDateMode(v as DateMode)}>
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="single" className="text-xs">Single Date</TabsTrigger>
@@ -264,74 +263,71 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                   </Tabs>
                 </div>
                 
-                {dateMode === 'single' ? (
-                  <Calendar
-                    mode="single"
-                    selected={singleDate}
-                    onSelect={(date) => {
-                      setSingleDate(date);
-                    }}
-                    disabled={(date) => date > new Date()}
-                    className="p-3 pointer-events-auto"
-                  />
-                ) : (
-                  <div className="flex">
-                    <div className="flex flex-col gap-1 p-3 border-r">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Quick Select</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start text-xs"
-                        onClick={() => setDateRange({ from: new Date(), to: new Date() })}
-                      >
-                        Today
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start text-xs"
-                        onClick={() => setDateRange({ from: subDays(new Date(), 6), to: new Date() })}
-                      >
-                        Last 7 Days
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start text-xs"
-                        onClick={() => setDateRange({ from: subDays(new Date(), 29), to: new Date() })}
-                      >
-                        Last 30 Days
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start text-xs"
-                        onClick={() => setDateRange({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}
-                      >
-                        This Week
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start text-xs"
-                        onClick={() => setDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}
-                      >
-                        This Month
-                      </Button>
-                    </div>
+                <div className="bg-popover">
+                  {dateMode === 'single' ? (
                     <Calendar
-                      mode="range"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange}
-                      onSelect={(range) => {
-                        setDateRange(range);
-                      }}
-                      numberOfMonths={2}
+                      mode="single"
+                      selected={singleDate}
+                      onSelect={setSingleDate}
                       disabled={(date) => date > new Date()}
-                      className="p-3 pointer-events-auto"
+                      numberOfMonths={1}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex">
+                      <div className="flex flex-col gap-1 p-3 border-r">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Quick Select</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-xs h-8"
+                          onClick={() => setDateRange({ from: new Date(), to: new Date() })}
+                        >
+                          Today
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-xs h-8"
+                          onClick={() => setDateRange({ from: subDays(new Date(), 6), to: new Date() })}
+                        >
+                          Last 7 Days
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-xs h-8"
+                          onClick={() => setDateRange({ from: subDays(new Date(), 29), to: new Date() })}
+                        >
+                          Last 30 Days
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-xs h-8"
+                          onClick={() => setDateRange({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}
+                        >
+                          This Week
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-xs h-8"
+                          onClick={() => setDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}
+                        >
+                          This Month
+                        </Button>
+                      </div>
+                      <Calendar
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={1}
+                        disabled={(date) => date > new Date()}
+                      />
+                    </div>
+                  )}
+                </div>
               </PopoverContent>
             </Popover>
           </div>

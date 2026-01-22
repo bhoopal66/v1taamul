@@ -4,18 +4,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Users, Download, FileSpreadsheet, FileText, CalendarIcon } from 'lucide-react';
+import { Users, Download, FileSpreadsheet, FileText, CalendarDays, CalendarRange, ArrowLeft, Calendar, RotateCcw, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfMonth, endOfMonth, startOfDay, endOfDay, format, subDays } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { DateRange } from 'react-day-picker';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 interface AgentDailyStats {
   agentId: string;
@@ -38,24 +37,53 @@ interface AllAgentsSummary {
   avgConversionRate: number;
 }
 
+type FilterMode = 'single' | 'range' | null;
+
 export const AgentPerformanceList: React.FC = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
   
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  // Draft filter state (UI selection)
+  const [filterMode, setFilterMode] = useState<FilterMode>(null);
+  const [singleDate, setSingleDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  
+  // Applied filter state (triggers query)
+  const [appliedMode, setAppliedMode] = useState<FilterMode>(null);
+  const [appliedSingleDate, setAppliedSingleDate] = useState<Date | null>(null);
+  const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
+  const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
+
+  // Check if filter has been applied
+  const hasAppliedFilter = appliedMode === 'single' 
+    ? appliedSingleDate !== null 
+    : appliedMode === 'range' 
+      ? appliedStartDate !== null && appliedEndDate !== null 
+      : false;
 
   // All users now scoped to their team only
   const effectiveTeamId = ledTeamId || profile?.team_id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-performance-list', user?.id, effectiveTeamId, dateRange?.from, dateRange?.to],
+    queryKey: ['agent-performance-list', user?.id, effectiveTeamId, appliedMode, appliedSingleDate?.toISOString(), appliedStartDate?.toISOString(), appliedEndDate?.toISOString()],
     queryFn: async () => {
-      const startDate = dateRange?.from ? startOfDay(dateRange.from) : startOfMonth(new Date());
-      const endDate = dateRange?.to ? endOfDay(dateRange.to) : endOfMonth(new Date());
-      const start = startDate.toISOString();
-      const end = endDate.toISOString();
+      if (!hasAppliedFilter) return { agentStats: [], summary: null };
+
+      let queryStart: Date;
+      let queryEnd: Date;
+
+      if (appliedMode === 'single' && appliedSingleDate) {
+        queryStart = startOfDay(appliedSingleDate);
+        queryEnd = endOfDay(appliedSingleDate);
+      } else if (appliedMode === 'range' && appliedStartDate && appliedEndDate) {
+        queryStart = startOfDay(appliedStartDate);
+        queryEnd = endOfDay(appliedEndDate);
+      } else {
+        return { agentStats: [], summary: null };
+      }
+
+      const start = queryStart.toISOString();
+      const end = queryEnd.toISOString();
 
       // Get list of agent IDs in user's team
       let agentIds: string[] | null = null;
@@ -177,24 +205,80 @@ export const AgentPerformanceList: React.FC = () => {
         summary,
       };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && hasAppliedFilter,
     refetchInterval: 30000,
   });
 
   const agents = data?.agentStats || [];
   const summary = data?.summary;
 
-  const getDateRangeText = () => {
-    if (dateRange?.from && dateRange?.to) {
-      return `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+  // Validation for apply button
+  const canApplyFilter = () => {
+    if (filterMode === 'single') {
+      return singleDate !== null;
     }
-    if (dateRange?.from) {
-      return `From ${format(dateRange.from, 'MMM d, yyyy')}`;
+    if (filterMode === 'range') {
+      return startDate !== null && endDate !== null;
     }
-    return 'Select date range';
+    return false;
   };
 
-  const dateRangeLabel = getDateRangeText();
+  // Apply filter handler
+  const handleApplyFilter = () => {
+    if (filterMode === 'single' && singleDate) {
+      setAppliedMode('single');
+      setAppliedSingleDate(singleDate);
+      setAppliedStartDate(null);
+      setAppliedEndDate(null);
+      toast.success('Filter applied successfully');
+    } else if (filterMode === 'range' && startDate && endDate) {
+      setAppliedMode('range');
+      setAppliedSingleDate(null);
+      setAppliedStartDate(startDate);
+      setAppliedEndDate(endDate);
+      toast.success('Filter applied successfully');
+    }
+  };
+
+  // Clear all filters
+  const handleClearAll = () => {
+    setFilterMode(null);
+    setSingleDate(null);
+    setStartDate(null);
+    setEndDate(null);
+    setAppliedMode(null);
+    setAppliedSingleDate(null);
+    setAppliedStartDate(null);
+    setAppliedEndDate(null);
+  };
+
+  // Change filter type (go back)
+  const handleChangeFilterType = () => {
+    setFilterMode(null);
+    setSingleDate(null);
+    setStartDate(null);
+    setEndDate(null);
+  };
+
+  // Handle start date change
+  const handleStartDateChange = (date: Date | null) => {
+    setStartDate(date);
+    if (endDate && date && date > endDate) {
+      setEndDate(null);
+    }
+  };
+
+  const getAppliedDateRangeText = () => {
+    if (appliedMode === 'single' && appliedSingleDate) {
+      return format(appliedSingleDate, 'MMM d, yyyy');
+    }
+    if (appliedMode === 'range' && appliedStartDate && appliedEndDate) {
+      return `${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
+    }
+    return 'No filter applied';
+  };
+
+  const dateRangeLabel = getAppliedDateRangeText();
 
   const exportToExcel = () => {
     if (agents.length === 0) {
@@ -298,112 +382,19 @@ export const AgentPerformanceList: React.FC = () => {
     toast.success('CSV file downloaded successfully');
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Agent Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-12 bg-muted animate-pulse rounded" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (agents.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Agent Performance
-            </CardTitle>
-            <CardDescription>No activity recorded</CardDescription>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "justify-start text-left font-normal",
-                  !dateRange && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {getDateRangeText()}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                disabled={(date) => date > new Date()}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No activity recorded for the selected period
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Agent Performance ({agents.length} agents)
+            Agent Performance {hasAppliedFilter && agents.length > 0 && `(${agents.length} agents)`}
           </CardTitle>
-          <CardDescription>Performance metrics by agent</CardDescription>
+          <CardDescription>
+            {hasAppliedFilter ? `Showing data for: ${dateRangeLabel}` : 'Select a date filter to view performance'}
+          </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "justify-start text-left font-normal",
-                  !dateRange && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {getDateRangeText()}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                disabled={(date) => date > new Date()}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+        {hasAppliedFilter && agents.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -422,61 +413,282 @@ export const AgentPerformanceList: React.FC = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        )}
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Agent</TableHead>
-              <TableHead className="text-right">Calls</TableHead>
-              <TableHead className="text-right">Interested</TableHead>
-              <TableHead className="text-right">Not Interested</TableHead>
-              <TableHead className="text-right">Not Answered</TableHead>
-              <TableHead className="text-right">Leads</TableHead>
-              <TableHead className="w-32">Conversion</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {agents.map((agent, index) => (
-              <TableRow key={agent.agentId}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center p-0">
-                      {index + 1}
-                    </Badge>
-                    <span className="font-medium">{agent.agentName}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-medium">{agent.totalCalls}</TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="secondary" className="bg-success/10 text-success">
-                    {agent.interested}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="secondary" className="bg-destructive/10 text-destructive">
-                    {agent.notInterested}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="secondary" className="bg-warning/10 text-warning">
-                    {agent.notAnswered}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Badge variant="default">{agent.leadsGenerated}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Progress value={agent.conversionRate} className="h-2 flex-1" />
-                    <span className="text-xs font-medium w-8">{agent.conversionRate}%</span>
-                  </div>
-                </TableCell>
-              </TableRow>
+        {/* Step 1: Filter Mode Selection */}
+        {filterMode === null && (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <h3 className="text-lg font-medium mb-2">Select Date Filter Type</h3>
+              <p className="text-sm text-muted-foreground mb-6">Choose how you want to filter the performance data</p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+                <Button
+                  variant="outline"
+                  onClick={() => setFilterMode('single')}
+                  className="flex-1 h-auto py-4 px-6 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                >
+                  <CalendarDays className="w-8 h-8 text-primary" />
+                  <span className="font-medium">Single Day</span>
+                  <span className="text-xs text-muted-foreground">Pick one specific date</span>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setFilterMode('range')}
+                  className="flex-1 h-auto py-4 px-6 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                >
+                  <CalendarRange className="w-8 h-8 text-primary" />
+                  <span className="font-medium">Date Range</span>
+                  <span className="text-xs text-muted-foreground">From date to date</span>
+                </Button>
+              </div>
+            </div>
+            
+            {hasAppliedFilter && (
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">
+                  Currently showing: <span className="font-medium text-foreground">{dateRangeLabel}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 2: Single Date Selection */}
+        {filterMode === 'single' && (
+          <div className="space-y-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleChangeFilterType}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Change Filter Type
+            </Button>
+            
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm font-medium mb-2">Select a Date:</label>
+              <DatePicker
+                selected={singleDate}
+                onChange={(date) => setSingleDate(date)}
+                dateFormat="dd/MM/yyyy"
+                placeholderText="Click to select a date"
+                maxDate={new Date()}
+                isClearable
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+              />
+              
+              {singleDate && (
+                <div className="mt-3 p-3 bg-primary/10 rounded-lg">
+                  <p className="text-sm font-medium">
+                    Selected: {format(singleDate, 'MMMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2 justify-center pt-4">
+              <Button
+                onClick={handleApplyFilter}
+                disabled={!canApplyFilter()}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Apply Filter
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear All
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Date Range Selection */}
+        {filterMode === 'range' && (
+          <div className="space-y-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleChangeFilterType}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Change Filter Type
+            </Button>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto">
+              <div>
+                <label className="block text-sm font-medium mb-2">From Date:</label>
+                <DatePicker
+                  selected={startDate}
+                  onChange={handleStartDateChange}
+                  selectsStart
+                  startDate={startDate}
+                  endDate={endDate}
+                  maxDate={endDate || new Date()}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Select start date"
+                  isClearable
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">To Date:</label>
+                <DatePicker
+                  selected={endDate}
+                  onChange={(date) => setEndDate(date)}
+                  selectsEnd
+                  startDate={startDate}
+                  endDate={endDate}
+                  minDate={startDate || undefined}
+                  maxDate={new Date()}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Select end date"
+                  disabled={!startDate}
+                  isClearable
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  className={cn(
+                    "w-full px-3 py-2 border border-input rounded-md bg-background text-foreground",
+                    !startDate && "opacity-50 cursor-not-allowed"
+                  )}
+                />
+                {!startDate && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select "From Date" first
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {startDate && endDate && (
+              <div className="max-w-lg mx-auto p-3 bg-primary/10 rounded-lg text-center">
+                <p className="text-sm font-medium">
+                  Selected Range: {format(startDate, 'MMM d, yyyy')} - {format(endDate, 'MMM d, yyyy')}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex gap-2 justify-center pt-4">
+              <Button
+                onClick={handleApplyFilter}
+                disabled={!canApplyFilter()}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Apply Filter
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear All
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && hasAppliedFilter && (
+          <div className="space-y-3 mt-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-12 bg-muted animate-pulse rounded" />
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        )}
+
+        {/* Results Table */}
+        {hasAppliedFilter && !isLoading && agents.length > 0 && (
+          <div className="mt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Interested</TableHead>
+                  <TableHead className="text-right">Not Interested</TableHead>
+                  <TableHead className="text-right">Not Answered</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="w-32">Conversion</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {agents.map((agent, index) => (
+                  <TableRow key={agent.agentId}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="w-6 h-6 rounded-full flex items-center justify-center p-0">
+                          {index + 1}
+                        </Badge>
+                        <span className="font-medium">{agent.agentName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{agent.totalCalls}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="secondary" className="bg-success/10 text-success">
+                        {agent.interested}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="secondary" className="bg-destructive/10 text-destructive">
+                        {agent.notInterested}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="secondary" className="bg-warning/10 text-warning">
+                        {agent.notAnswered}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="default">{agent.leadsGenerated}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={agent.conversionRate} className="h-2 flex-1" />
+                        <span className="text-xs font-medium w-8">{agent.conversionRate}%</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* No Results State */}
+        {hasAppliedFilter && !isLoading && agents.length === 0 && (
+          <div className="mt-6 text-center py-8">
+            <Calendar className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-muted-foreground">No activity recorded for the selected period</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAll}
+              className="mt-4 gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Try Different Dates
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -183,7 +183,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                 {getDateRangeText()}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent className="w-auto p-0 z-50" align="end">
               <Calendar
                 initialFocus
                 mode="range"
@@ -192,7 +192,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
                 onSelect={setDateRange}
                 numberOfMonths={2}
                 disabled={(date) => date > new Date()}
-                className={cn("p-3 pointer-events-auto")}
+                className="p-3 pointer-events-auto"
               />
             </PopoverContent>
           </Popover>

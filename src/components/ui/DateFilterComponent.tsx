@@ -13,7 +13,7 @@ export interface AgentOption {
 }
 
 export interface DateFilterState {
-  selectionMode: 'single' | 'range';
+  selectionMode: 'single' | 'range' | null;
   singleDate: Date | null;
   fromDate: Date | null;
   toDate: Date | null;
@@ -41,7 +41,7 @@ export const DateFilterComponent = ({
   className,
 }: DateFilterComponentProps) => {
   // State management
-  const [selectionMode, setSelectionMode] = useState<'single' | 'range'>('single');
+  const [selectionMode, setSelectionMode] = useState<'single' | 'range' | null>(null);
   const [singleDate, setSingleDate] = useState<Date | null>(null);
   const [fromDate, setFromDate] = useState<Date | null>(null);
   const [toDate, setToDate] = useState<Date | null>(null);
@@ -51,10 +51,11 @@ export const DateFilterComponent = ({
 
   // Date range validation
   const isDateRangeValid = useMemo(() => {
-    if (selectionMode === 'single') return true;
+    if (selectionMode === null) return false;
+    if (selectionMode === 'single') return singleDate !== null;
     if (!fromDate || !toDate) return false;
     return toDate >= fromDate;
-  }, [selectionMode, fromDate, toDate]);
+  }, [selectionMode, singleDate, fromDate, toDate]);
 
   // Validate and update error state
   useEffect(() => {
@@ -81,17 +82,14 @@ export const DateFilterComponent = ({
     });
   }, [selectionMode, singleDate, fromDate, toDate, selectedAgent, showMonthly, onFilterChange]);
 
-  // Handle mode switch - clear all dates when switching
+  // Handle mode switch - clear appropriate dates when switching
   const handleModeChange = (mode: 'single' | 'range') => {
     setSelectionMode(mode);
     if (mode === 'single') {
-      setSingleDate(null);
-      setFromDate(null);
+      setFromDate(null);  // Clear range dates when switching
       setToDate(null);
     } else {
-      setSingleDate(null);
-      setFromDate(null);
-      setToDate(null);
+      setSingleDate(null);  // Clear single date when switching
     }
     setDateError(null);
   };
@@ -200,119 +198,125 @@ export const DateFilterComponent = ({
         </div>
       </div>
 
-      {/* Row 2: Date Pickers */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start">
-        {selectionMode === 'single' ? (
-          <div className="flex flex-col gap-2 w-full sm:w-auto">
-            <Label className="text-xs font-medium text-muted-foreground">Select Date</Label>
-            <DatePicker
-              selected={singleDate}
-              onChange={(date) => setSingleDate(date)}
-              dateFormat="dd/MM/yyyy"
-              maxDate={new Date()}
-              showMonthDropdown
-              showYearDropdown
-              dropdownMode="select"
-              isClearable
-              placeholderText="Select Date"
-              className="h-10 w-full sm:w-[200px] px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              wrapperClassName="w-full sm:w-auto"
-            />
-          </div>
-        ) : (
-          <>
+      {/* Row 2: Date Pickers - Only show when mode is selected */}
+      {selectionMode === null ? (
+        <div className="text-sm text-muted-foreground py-2">
+          Please select a date mode above to continue
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {selectionMode === 'single' ? (
             <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Label className="text-xs font-medium text-muted-foreground">From Date</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Select Date</Label>
               <DatePicker
-                selected={fromDate}
-                onChange={handleFromDateChange}
+                selected={singleDate}
+                onChange={(date) => setSingleDate(date)}
                 dateFormat="dd/MM/yyyy"
                 maxDate={new Date()}
                 showMonthDropdown
                 showYearDropdown
                 dropdownMode="select"
                 isClearable
-                placeholderText="DD/MM/YYYY"
-                selectsStart
-                startDate={fromDate}
-                endDate={toDate}
-                className={cn(
-                  "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                  dateError ? "border-destructive" : "border-input"
-                )}
+                placeholderText="Select Date"
+                className="h-10 w-full sm:w-[200px] px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 wrapperClassName="w-full sm:w-auto"
               />
             </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <Label className="text-xs font-medium text-muted-foreground">From Date</Label>
+                <DatePicker
+                  selected={fromDate}
+                  onChange={handleFromDateChange}
+                  dateFormat="dd/MM/yyyy"
+                  maxDate={new Date()}
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  placeholderText="DD/MM/YYYY"
+                  selectsStart
+                  startDate={fromDate}
+                  endDate={toDate}
+                  className={cn(
+                    "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                    dateError ? "border-destructive" : "border-input"
+                  )}
+                  wrapperClassName="w-full sm:w-auto"
+                />
+              </div>
 
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <Label className="text-xs font-medium text-muted-foreground">To Date</Label>
-              <DatePicker
-                selected={toDate}
-                onChange={handleToDateChange}
-                dateFormat="dd/MM/yyyy"
-                maxDate={new Date()}
-                minDate={fromDate || undefined}
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-                isClearable
-                placeholderText="DD/MM/YYYY"
-                selectsEnd
-                startDate={fromDate}
-                endDate={toDate}
-                className={cn(
-                  "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-                  dateError ? "border-destructive" : "border-input"
-                )}
-                wrapperClassName="w-full sm:w-auto"
-              />
-            </div>
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <Label className="text-xs font-medium text-muted-foreground">To Date</Label>
+                <DatePicker
+                  selected={toDate}
+                  onChange={handleToDateChange}
+                  dateFormat="dd/MM/yyyy"
+                  maxDate={new Date()}
+                  minDate={fromDate || undefined}
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  placeholderText="DD/MM/YYYY"
+                  selectsEnd
+                  startDate={fromDate}
+                  endDate={toDate}
+                  className={cn(
+                    "h-10 w-full sm:w-[180px] px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                    dateError ? "border-destructive" : "border-input"
+                  )}
+                  wrapperClassName="w-full sm:w-auto"
+                />
+              </div>
 
-            {/* Quick Select Buttons */}
-            <div className="flex flex-wrap gap-2 items-end">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-10 text-xs"
-                onClick={() => {
-                  const today = new Date();
-                  setFromDate(new Date(today.setDate(today.getDate() - 6)));
-                  setToDate(new Date());
-                }}
-              >
-                Last 7 Days
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-10 text-xs"
-                onClick={() => {
-                  const today = new Date();
-                  setFromDate(new Date(today.setDate(today.getDate() - 29)));
-                  setToDate(new Date());
-                }}
-              >
-                Last 30 Days
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-10 text-xs"
-                onClick={() => {
-                  const today = new Date();
-                  setFromDate(new Date(today.getFullYear(), today.getMonth(), 1));
-                  setToDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
-                }}
-              >
-                This Month
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+              {/* Quick Select Buttons */}
+              <div className="flex flex-wrap gap-2 items-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 text-xs"
+                  onClick={() => {
+                    const today = new Date();
+                    setFromDate(new Date(today.setDate(today.getDate() - 6)));
+                    setToDate(new Date());
+                  }}
+                >
+                  Last 7 Days
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 text-xs"
+                  onClick={() => {
+                    const today = new Date();
+                    setFromDate(new Date(today.setDate(today.getDate() - 29)));
+                    setToDate(new Date());
+                  }}
+                >
+                  Last 30 Days
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 text-xs"
+                  onClick={() => {
+                    const today = new Date();
+                    setFromDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                    setToDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+                  }}
+                >
+                  This Month
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Error Message */}
       {dateError && (

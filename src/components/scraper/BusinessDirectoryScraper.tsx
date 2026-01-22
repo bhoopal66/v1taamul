@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Globe, Loader2, Download, Upload, RefreshCw } from 'lucide-react';
+import { Globe, Loader2, Download, Upload, RefreshCw, PhoneCall } from 'lucide-react';
 import { firecrawlApi, ExtractedCompany } from '@/lib/api/firecrawl';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
 
 export const BusinessDirectoryScraper = () => {
   const { toast } = useToast();
@@ -17,6 +18,7 @@ export const BusinessDirectoryScraper = () => {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAddingToCallList, setIsAddingToCallList] = useState(false);
   const [companies, setCompanies] = useState<ExtractedCompany[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<number>>(new Set());
   const [sourceUrl, setSourceUrl] = useState<string>('');
@@ -145,6 +147,120 @@ export const BusinessDirectoryScraper = () => {
     }
   };
 
+  const handleAddToCallList = async () => {
+    if (!user?.id || selectedCompanies.size === 0) return;
+
+    setIsAddingToCallList(true);
+    const selectedList = companies.filter((_, i) => selectedCompanies.has(i));
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    let addedToList = 0;
+    let duplicates = 0;
+    let errors = 0;
+
+    for (const company of selectedList) {
+      try {
+        // Check if phone number already exists in master_contacts
+        let { data: existing } = await supabase
+          .from('master_contacts')
+          .select('id')
+          .eq('phone_number', company.phone_number)
+          .maybeSingle();
+
+        let contactId: string;
+
+        if (existing) {
+          contactId = existing.id;
+        } else {
+          // Insert new contact first
+          const { data: newContact, error: insertError } = await supabase
+            .from('master_contacts')
+            .insert({
+              company_name: company.company_name,
+              phone_number: company.phone_number,
+              contact_person_name: company.contact_person_name || null,
+              industry: company.industry || null,
+              city: company.city || null,
+              area: company.area || null,
+              first_uploaded_by: user.id,
+              current_owner_agent_id: user.id,
+              first_upload_date: new Date().toISOString(),
+            })
+            .select('id')
+            .single();
+
+          if (insertError || !newContact) {
+            console.error('Contact insert error:', insertError);
+            errors++;
+            continue;
+          }
+          contactId = newContact.id;
+        }
+
+        // Check if already in today's call list for this agent
+        const { data: existingInList } = await supabase
+          .from('approved_call_list')
+          .select('id')
+          .eq('agent_id', user.id)
+          .eq('contact_id', contactId)
+          .eq('list_date', today)
+          .maybeSingle();
+
+        if (existingInList) {
+          duplicates++;
+          continue;
+        }
+
+        // Get current max call_order for today
+        const { data: maxOrderData } = await supabase
+          .from('approved_call_list')
+          .select('call_order')
+          .eq('agent_id', user.id)
+          .eq('list_date', today)
+          .order('call_order', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const nextOrder = (maxOrderData?.call_order || 0) + 1;
+
+        // Add to call list
+        const { error: listError } = await supabase
+          .from('approved_call_list')
+          .insert({
+            agent_id: user.id,
+            contact_id: contactId,
+            list_date: today,
+            call_order: nextOrder,
+            call_status: 'pending',
+          });
+
+        if (listError) {
+          console.error('Call list insert error:', listError);
+          errors++;
+        } else {
+          addedToList++;
+        }
+      } catch (err) {
+        console.error('Add to call list error:', err);
+        errors++;
+      }
+    }
+
+    setIsAddingToCallList(false);
+
+    toast({
+      title: 'Added to Call List',
+      description: `Added: ${addedToList}, Already in list: ${duplicates}, Errors: ${errors}`,
+      variant: errors > 0 ? 'destructive' : 'default',
+    });
+
+    if (addedToList > 0) {
+      const remainingCompanies = companies.filter((_, i) => !selectedCompanies.has(i));
+      setCompanies(remainingCompanies);
+      setSelectedCompanies(new Set());
+    }
+  };
+
   const exportToCSV = () => {
     const selectedList = companies.filter((_, i) => selectedCompanies.has(i));
     if (selectedList.length === 0) return;
@@ -230,9 +346,10 @@ export const BusinessDirectoryScraper = () => {
                   Export CSV
                 </Button>
                 <Button
+                  variant="outline"
                   size="sm"
                   onClick={handleImport}
-                  disabled={selectedCompanies.size === 0 || isImporting}
+                  disabled={selectedCompanies.size === 0 || isImporting || isAddingToCallList}
                 >
                   {isImporting ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -240,6 +357,18 @@ export const BusinessDirectoryScraper = () => {
                     <Upload className="h-4 w-4 mr-2" />
                   )}
                   Import to Contacts
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddToCallList}
+                  disabled={selectedCompanies.size === 0 || isImporting || isAddingToCallList}
+                >
+                  {isAddingToCallList ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <PhoneCall className="h-4 w-4 mr-2" />
+                  )}
+                  Add to Call List
                 </Button>
               </div>
             </div>

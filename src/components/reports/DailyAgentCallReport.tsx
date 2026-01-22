@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -73,6 +74,11 @@ interface AgentCallTotals {
   wrongNumber: number;
   callBack: number;
   whatsappSent: number;
+}
+
+interface AgentOption {
+  id: string;
+  name: string;
 }
 
 // Summary Card Component
@@ -249,6 +255,7 @@ export const DailyAgentCallReport: React.FC = () => {
   const { ledTeamId, user } = useAuth();
   const { teamInfo, isTeamLeader } = useTeamLeaderData();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<string>('all');
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('totalCalls');
@@ -270,6 +277,7 @@ export const DailyAgentCallReport: React.FC = () => {
   const [appliedSingleDate, setAppliedSingleDate] = useState<Date | null>(null);
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
+  const [appliedAgent, setAppliedAgent] = useState<string>('all');
 
   const hasAppliedFilter = appliedMode === 'single'
     ? !!appliedSingleDate
@@ -283,6 +291,28 @@ export const DailyAgentCallReport: React.FC = () => {
       ? !!startDate && !!endDate
       : false;
 
+  // Fetch team agents for filter dropdown
+  const { data: teamAgents } = useQuery({
+    queryKey: ['team-agents-for-daily-agent-report', ledTeamId],
+    queryFn: async (): Promise<AgentOption[]> => {
+      if (!ledTeamId) return [];
+
+      const { data: profiles, error } = await supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('team_id', ledTeamId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      return (profiles || []).map(p => ({
+        id: p.id!,
+        name: p.full_name || p.username || 'Unknown',
+      }));
+    },
+    enabled: !!ledTeamId,
+  });
+
   // Fetch team agents with call data
   const { data: reportData, isLoading } = useQuery({
     queryKey: [
@@ -292,6 +322,7 @@ export const DailyAgentCallReport: React.FC = () => {
       appliedSingleDate?.toISOString(),
       appliedStartDate?.toISOString(),
       appliedEndDate?.toISOString(),
+      appliedAgent,
     ],
     queryFn: async (): Promise<{ rows: AgentCallRow[]; totals: AgentCallTotals }> => {
       if (!ledTeamId || !hasAppliedFilter) {
@@ -333,10 +364,16 @@ export const DailyAgentCallReport: React.FC = () => {
         };
       }
 
-      const memberIds = profiles.map(p => p.id);
-      const agentMap = new Map(profiles.map(p => [p.id, p.full_name || p.username || 'Unknown']));
+      // Filter by specific agent if selected
+      let filteredProfiles = profiles;
+      if (appliedAgent !== 'all') {
+        filteredProfiles = profiles.filter(p => p.id === appliedAgent);
+      }
 
-      // Fetch call feedback for all team members
+      const memberIds = filteredProfiles.map(p => p.id);
+      const agentMap = new Map(filteredProfiles.map(p => [p.id, p.full_name || p.username || 'Unknown']));
+
+      // Fetch call feedback for filtered team members
       const { data: feedback, error } = await supabase
         .from('call_feedback')
         .select('*')
@@ -349,8 +386,8 @@ export const DailyAgentCallReport: React.FC = () => {
       // Group by agent
       const agentDataMap = new Map<string, AgentCallRow>();
 
-      // Initialize all agents with zero values
-      profiles.forEach(p => {
+      // Initialize filtered agents with zero values
+      filteredProfiles.forEach(p => {
         agentDataMap.set(p.id!, {
           agentId: p.id!,
           agentName: p.full_name || p.username || 'Unknown',
@@ -509,11 +546,13 @@ export const DailyAgentCallReport: React.FC = () => {
       setAppliedSingleDate(singleDate);
       setAppliedStartDate(null);
       setAppliedEndDate(null);
+      setAppliedAgent(selectedAgent);
     } else if (filterMode === 'range' && startDate && endDate) {
       setAppliedMode('range');
       setAppliedStartDate(startDate);
       setAppliedEndDate(endDate);
       setAppliedSingleDate(null);
+      setAppliedAgent(selectedAgent);
     }
     setExpandedRows(new Set());
   };
@@ -523,10 +562,12 @@ export const DailyAgentCallReport: React.FC = () => {
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
+    setSelectedAgent('all');
     setAppliedMode(null);
     setAppliedSingleDate(null);
     setAppliedStartDate(null);
     setAppliedEndDate(null);
+    setAppliedAgent('all');
     setExpandedRows(new Set());
   };
 
@@ -535,6 +576,12 @@ export const DailyAgentCallReport: React.FC = () => {
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
+  };
+
+  const getAgentName = () => {
+    if (appliedAgent === 'all') return 'All Agents';
+    const agent = teamAgents?.find(a => a.id === appliedAgent);
+    return agent?.name || 'Unknown';
   };
 
   const SortableHeader: React.FC<{ field: SortField; children: React.ReactNode; className?: string }> = ({
@@ -787,6 +834,23 @@ export const DailyAgentCallReport: React.FC = () => {
                       className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Filter by Agent:</label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        {teamAgents?.map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {singleDate && (
@@ -873,6 +937,23 @@ export const DailyAgentCallReport: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Filter by Agent:</label>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        {teamAgents?.map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {startDate && endDate && (
@@ -902,6 +983,9 @@ export const DailyAgentCallReport: React.FC = () => {
               <div className="text-sm">
                 <span className="font-medium">Showing data for:</span>{' '}
                 <span className="text-muted-foreground">{getPeriodLabel()}</span>
+                <span className="mx-2 text-muted-foreground">|</span>
+                <span className="font-medium">Agent:</span>{' '}
+                <span className="text-muted-foreground">{getAgentName()}</span>
               </div>
               <Button variant="outline" size="sm" onClick={handleClearAll}>
                 Change Filter

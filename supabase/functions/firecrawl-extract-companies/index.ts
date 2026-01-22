@@ -77,34 +77,32 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: [
-          {
-            type: 'json',
-            schema: {
-              type: 'object',
-              properties: {
-                companies: {
-                  type: 'array',
-                  description: 'List of companies found on the page',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      company_name: { type: 'string', description: 'The name of the company' },
-                      phone_number: { type: 'string', description: 'Phone number with country code if available' },
-                      contact_person_name: { type: 'string', description: 'Name of contact person if available' },
-                      industry: { type: 'string', description: 'Industry or business type' },
-                      city: { type: 'string', description: 'City location' },
-                      area: { type: 'string', description: 'Area or district within the city' },
-                    },
-                    required: ['company_name', 'phone_number']
-                  }
+        formats: ['json'],
+        jsonOptions: {
+          schema: {
+            type: 'object',
+            properties: {
+              companies: {
+                type: 'array',
+                description: 'List of companies found on the page',
+                items: {
+                  type: 'object',
+                  properties: {
+                    company_name: { type: 'string', description: 'The name of the company' },
+                    phone_number: { type: 'string', description: 'Phone number with country code if available' },
+                    contact_person_name: { type: 'string', description: 'Name of contact person if available' },
+                    industry: { type: 'string', description: 'Industry or business type' },
+                    city: { type: 'string', description: 'City location' },
+                    area: { type: 'string', description: 'Area or district within the city' },
+                  },
+                  required: ['company_name', 'phone_number']
                 }
-              },
-              required: ['companies']
+              }
             },
-            prompt: 'Extract all company/business listings from this page. For each company, extract the company name, phone number (with country code if shown), contact person name, industry/business type, city, and area/district. Focus on business directory listings, company profiles, or contact information.'
-          }
-        ],
+            required: ['companies']
+          },
+          prompt: 'Extract all company/business listings from this page. For each company, extract the company name, phone number (with country code if shown), contact person name, industry/business type, city, and area/district. Focus on business directory listings, company profiles, or contact information.'
+        },
         onlyMainContent: true,
       }),
     });

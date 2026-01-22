@@ -4,14 +4,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, getDay, getHours, format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
-import { Separator } from '@/components/ui/separator';
 
 interface SupervisorCallVolumeHeatmapProps {
   teamId?: string;
@@ -21,6 +21,11 @@ interface HeatmapData {
   day: number;
   hour: number;
   value: number;
+}
+
+interface AgentOption {
+  id: string;
+  name: string;
 }
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -33,20 +38,50 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = teamId || ledTeamId;
 
+  // Fetch team agents for the filter dropdown
+  const { data: agentOptions = [] } = useQuery({
+    queryKey: ['heatmap-agents', user?.id, effectiveTeamId, canSeeAllData],
+    queryFn: async (): Promise<AgentOption[]> => {
+      let query = supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('is_active', true);
+
+      if (!canSeeAllData && effectiveTeamId) {
+        query = query.eq('team_id', effectiveTeamId);
+      } else if (!canSeeAllData && user?.id) {
+        query = query.eq('supervisor_id', user.id);
+      }
+
+      const { data, error } = await query.order('full_name');
+      if (error) throw error;
+
+      return (data || []).map(agent => ({
+        id: agent.id,
+        name: agent.full_name || agent.username || 'Unknown Agent'
+      }));
+    },
+    enabled: !!user?.id,
+  });
+
   const { data: heatmapData = [], isLoading } = useQuery({
-    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, dateRange?.from, dateRange?.to],
+    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, dateRange?.from, dateRange?.to, selectedAgentId],
     queryFn: async (): Promise<HeatmapData[]> => {
       const startDate = dateRange?.from ? startOfDay(dateRange.from) : subDays(new Date(), 30);
       const endDate = dateRange?.to ? endOfDay(dateRange.to) : new Date();
       
-      // Get agent IDs for team filtering
+      // Get agent IDs for filtering
       let agentIds: string[] | null = null;
       
-      if (!canSeeAllData && effectiveTeamId) {
+      if (selectedAgentId !== 'all') {
+        // Filter by specific agent
+        agentIds = [selectedAgentId];
+      } else if (!canSeeAllData && effectiveTeamId) {
         const { data: teamMembers } = await supabase
           .from('profiles')
           .select('id')
@@ -168,9 +203,26 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <CardTitle className="text-lg font-semibold">Call Volume Heatmap</CardTitle>
-            <CardDescription>Team calls by day and hour • Total: {grandTotal}</CardDescription>
+            <CardDescription>
+              {selectedAgentId === 'all' ? 'Team' : agentOptions.find(a => a.id === selectedAgentId)?.name || 'Agent'} calls by day and hour • Total: {grandTotal}
+            </CardDescription>
           </div>
-          <Popover>
+          <div className="flex items-center gap-2">
+            <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+              <SelectTrigger className="w-[180px] h-9">
+                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {agentOptions.map(agent => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -242,6 +294,7 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
               </div>
             </PopoverContent>
           </Popover>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./styles/datepicker.css";
 
 // Suppress AbortError from Supabase queries when components unmount
 // These are expected errors and shouldn't be shown to users

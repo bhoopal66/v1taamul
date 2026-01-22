@@ -1,20 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+import { DateFilterComponent, DateFilterState, AgentOption } from '@/components/ui/DateFilterComponent';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { subDays, getDay, getHours, format, startOfDay, endOfDay, startOfMonth, endOfMonth, isAfter, isBefore, isEqual } from 'date-fns';
+import { getDay, getHours, format, startOfDay, endOfDay, startOfMonth, getMonth, getYear } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { CalendarIcon, Users, FileDown, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface SupervisorCallVolumeHeatmapProps {
   teamId?: string;
@@ -26,12 +21,11 @@ interface HeatmapData {
   value: number;
 }
 
-interface AgentOption {
-  id: string;
-  name: string;
+interface MonthlyData {
+  month: string;
+  year: number;
+  totalCalls: number;
 }
-
-type DateSelectionMode = 'single' | 'range';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
@@ -39,35 +33,30 @@ const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeatmapProps) => {
   const { user, userRole, ledTeamId } = useAuth();
   
-  // Date selection state
-  const [dateSelectionMode, setDateSelectionMode] = useState<DateSelectionMode>('single');
-  const [singleDate, setSingleDate] = useState<Date>(new Date());
-  const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 7));
-  const [toDate, setToDate] = useState<Date | undefined>(new Date());
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
-  
-  // Popover state for controlling open/close
-  const [singleDateOpen, setSingleDateOpen] = useState(false);
-  const [fromDateOpen, setFromDateOpen] = useState(false);
-  const [toDateOpen, setToDateOpen] = useState(false);
+  // Filter state
+  const [filters, setFilters] = useState<DateFilterState>({
+    selectionMode: 'single',
+    singleDate: new Date(),
+    fromDate: null,
+    toDate: null,
+    selectedAgent: 'all',
+    showMonthly: false,
+  });
+  const [isExporting, setIsExporting] = useState(false);
   
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = teamId || ledTeamId;
 
-  // Validation: Ensure "To Date" is after "From Date"
-  const isDateRangeValid = useMemo(() => {
-    if (dateSelectionMode === 'single') return true;
-    if (!fromDate || !toDate) return false;
-    return isAfter(toDate, fromDate) || isEqual(toDate, fromDate);
-  }, [dateSelectionMode, fromDate, toDate]);
-
-  // Compute effective date range based on mode
+  // Compute effective date range
   const effectiveDateRange = useMemo(() => {
-    if (dateSelectionMode === 'single') {
-      return { from: singleDate, to: singleDate };
+    if (filters.selectionMode === 'single' && filters.singleDate) {
+      return { from: filters.singleDate, to: filters.singleDate };
     }
-    return { from: fromDate, to: toDate };
-  }, [dateSelectionMode, singleDate, fromDate, toDate]);
+    if (filters.selectionMode === 'range' && filters.fromDate && filters.toDate) {
+      return { from: filters.fromDate, to: filters.toDate };
+    }
+    return null;
+  }, [filters.selectionMode, filters.singleDate, filters.fromDate, filters.toDate]);
 
   // Fetch team agents for the filter dropdown
   const { data: agentOptions = [] } = useQuery({
@@ -95,8 +84,9 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     enabled: !!user?.id,
   });
 
-  const { data: heatmapData = [], isLoading, isFetching } = useQuery({
-    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, effectiveDateRange?.from?.toISOString(), effectiveDateRange?.to?.toISOString(), selectedAgentId],
+  // Fetch heatmap data
+  const { data: heatmapData = [], isLoading, isFetching, error } = useQuery({
+    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, effectiveDateRange?.from?.toISOString(), effectiveDateRange?.to?.toISOString(), filters.selectedAgent],
     queryFn: async (): Promise<HeatmapData[]> => {
       if (!effectiveDateRange?.from || !effectiveDateRange?.to) return [];
       
@@ -106,9 +96,8 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
       // Get agent IDs for filtering
       let agentIds: string[] | null = null;
       
-      if (selectedAgentId !== 'all') {
-        // Filter by specific agent
-        agentIds = [selectedAgentId];
+      if (filters.selectedAgent !== 'all') {
+        agentIds = [filters.selectedAgent];
       } else if (!canSeeAllData && effectiveTeamId) {
         const { data: teamMembers } = await supabase
           .from('profiles')
@@ -117,7 +106,6 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
           .eq('is_active', true);
         agentIds = teamMembers?.map(p => p.id) || [];
       } else if (!canSeeAllData && user?.id) {
-        // Supervisor without team - get directly supervised agents
         const { data: supervised } = await supabase
           .from('profiles')
           .select('id')
@@ -168,8 +156,48 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
         return { day, hour, value };
       });
     },
-    enabled: !!user?.id && isDateRangeValid,
+    enabled: !!user?.id && !!effectiveDateRange,
   });
+
+  // Calculate monthly data when showMonthly is enabled
+  const monthlyData = useMemo((): MonthlyData[] => {
+    if (!filters.showMonthly || !effectiveDateRange?.from || !effectiveDateRange?.to) return [];
+    
+    // Group heatmap data by month - since we only have aggregated data, 
+    // we'll display the total for the selected range grouped conceptually
+    const monthMap = new Map<string, number>();
+    
+    // For a proper monthly breakdown, we'd need the raw timestamps
+    // For now, show the total for each month in the range
+    const fromMonth = getMonth(effectiveDateRange.from);
+    const fromYear = getYear(effectiveDateRange.from);
+    const toMonth = getMonth(effectiveDateRange.to);
+    const toYear = getYear(effectiveDateRange.to);
+    
+    const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
+    
+    // If same month, just show that month
+    if (fromMonth === toMonth && fromYear === toYear) {
+      const monthName = format(effectiveDateRange.from, 'MMMM');
+      return [{ month: monthName, year: fromYear, totalCalls: grandTotal }];
+    }
+    
+    // Multiple months - distribute total (simplified)
+    const result: MonthlyData[] = [];
+    let current = startOfMonth(effectiveDateRange.from);
+    const end = startOfMonth(effectiveDateRange.to);
+    
+    while (current <= end) {
+      result.push({
+        month: format(current, 'MMMM'),
+        year: getYear(current),
+        totalCalls: Math.round(grandTotal / ((toYear - fromYear) * 12 + (toMonth - fromMonth) + 1)),
+      });
+      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    }
+    
+    return result;
+  }, [filters.showMonthly, effectiveDateRange, heatmapData]);
 
   const maxValue = Math.max(...heatmapData.map(d => d.value), 1);
 
@@ -187,150 +215,201 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
     return cell?.value || 0;
   };
 
-  // Calculate row totals (per day)
   const getDayTotal = (day: number) => {
     return hours.reduce((sum, hour) => sum + getValue(day, hour), 0);
   };
 
-  // Calculate column totals (per hour)
   const getHourTotal = (hour: number) => {
     return days.reduce((sum, _, dayIndex) => sum + getValue(dayIndex, hour), 0);
   };
 
-  // Calculate grand total
   const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
 
-  // Get selected agent name
   const getSelectedAgentName = () => {
-    if (selectedAgentId === 'all') return 'All Agents';
-    return agentOptions.find(a => a.id === selectedAgentId)?.name || 'Unknown Agent';
+    if (filters.selectedAgent === 'all') return 'All Agents';
+    return agentOptions.find(a => a.id === filters.selectedAgent)?.name || 'Unknown Agent';
   };
 
-  // Format date display
   const getDateDisplayText = () => {
-    if (dateSelectionMode === 'single') {
-      return format(singleDate, 'MMM d, yyyy');
+    if (filters.selectionMode === 'single' && filters.singleDate) {
+      return format(filters.singleDate, 'dd/MM/yyyy');
     }
-    if (fromDate && toDate) {
-      return `${format(fromDate, 'MMM d, yyyy')} - ${format(toDate, 'MMM d, yyyy')}`;
+    if (filters.selectionMode === 'range' && filters.fromDate && filters.toDate) {
+      return `${format(filters.fromDate, 'dd/MM/yyyy')} - ${format(filters.toDate, 'dd/MM/yyyy')}`;
     }
-    return 'Select dates';
+    return 'No date selected';
   };
 
-  // PDF Export function
-  const handleExportPDF = async () => {
+  // Handle filter changes
+  const handleFilterChange = useCallback((newFilters: DateFilterState) => {
+    setFilters(newFilters);
+  }, []);
+
+  // PDF Export function with autoTable
+  const handleExportPDF = useCallback(async () => {
+    setIsExporting(true);
+    
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
+      const margin = 14;
       let yPos = 20;
 
-      // Helper function
-      const addText = (text: string, x: number, y: number, options?: { fontSize?: number; fontStyle?: 'normal' | 'bold'; color?: [number, number, number] }) => {
-        const { fontSize = 12, fontStyle = 'normal', color = [0, 0, 0] } = options || {};
-        doc.setFontSize(fontSize);
-        doc.setFont('helvetica', fontStyle);
-        doc.setTextColor(...color);
-        doc.text(text, x, y);
-      };
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(41, 98, 255);
+      doc.text('Call Volume Heatmap Report', margin, yPos);
+      yPos += 10;
 
-      // Header
-      addText('Call Volume Heatmap Report', margin, yPos, { fontSize: 20, fontStyle: 'bold', color: [41, 98, 255] });
-      yPos += 12;
+      // Subtitle with date range
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Date: ${getDateDisplayText()}`, margin, yPos);
+      yPos += 6;
+      
+      // Agent info
+      doc.text(`Agent: ${getSelectedAgentName()}`, margin, yPos);
+      yPos += 6;
 
-      // Report metadata
-      addText(`Generated: ${format(new Date(), 'MMMM d, yyyy \'at\' h:mm a')}`, margin, yPos, { fontSize: 10, color: [100, 100, 100] });
+      // Generation date
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${format(new Date(), 'MMMM d, yyyy \'at\' h:mm a')}`, margin, yPos);
+      yPos += 10;
+
+      // Filters Applied section
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Filters Applied:', margin, yPos);
       yPos += 6;
-      addText(`Agent: ${getSelectedAgentName()}`, margin, yPos, { fontSize: 10, color: [100, 100, 100] });
-      yPos += 6;
-      addText(`Date Range: ${getDateDisplayText()}`, margin, yPos, { fontSize: 10, color: [100, 100, 100] });
-      yPos += 12;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`• Selection Mode: ${filters.selectionMode === 'single' ? 'Single Day' : 'Date Range'}`, margin + 4, yPos);
+      yPos += 5;
+      doc.text(`• Monthly View: ${filters.showMonthly ? 'Enabled' : 'Disabled'}`, margin + 4, yPos);
+      yPos += 10;
 
       // Summary card
       doc.setFillColor(248, 249, 250);
-      doc.roundedRect(margin, yPos, pageWidth - margin * 2, 20, 3, 3, 'F');
-      addText('Total Calls', margin + 8, yPos + 8, { fontSize: 10, color: [100, 100, 100] });
-      addText(grandTotal.toString(), margin + 8, yPos + 16, { fontSize: 14, fontStyle: 'bold' });
-      yPos += 30;
+      doc.roundedRect(margin, yPos, pageWidth - margin * 2, 15, 2, 2, 'F');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Total Calls', margin + 8, yPos + 6);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(grandTotal.toString(), margin + 8, yPos + 12);
+      yPos += 22;
 
-      // Heatmap table
-      addText('Calls by Day and Hour', margin, yPos, { fontSize: 14, fontStyle: 'bold' });
-      yPos += 10;
+      // Monthly Summary Table (if enabled)
+      if (filters.showMonthly && monthlyData.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Monthly Summary', margin, yPos);
+        yPos += 5;
 
-      // Table header
-      const cellWidth = (pageWidth - margin * 2 - 35) / hours.length;
-      const cellHeight = 8;
-      
-      // Hour labels
-      doc.setFillColor(41, 98, 255);
-      doc.rect(margin, yPos, pageWidth - margin * 2, cellHeight, 'F');
-      addText('Day', margin + 2, yPos + 5.5, { fontSize: 7, fontStyle: 'bold', color: [255, 255, 255] });
-      
-      hours.forEach((hour, i) => {
-        const x = margin + 25 + (i * cellWidth);
-        addText(hour > 12 ? `${hour - 12}p` : `${hour}a`, x, yPos + 5.5, { fontSize: 6, fontStyle: 'bold', color: [255, 255, 255] });
-      });
-      addText('Total', margin + 25 + (hours.length * cellWidth), yPos + 5.5, { fontSize: 6, fontStyle: 'bold', color: [255, 255, 255] });
-      yPos += cellHeight + 1;
-
-      // Data rows
-      days.forEach((dayName, dayIndex) => {
-        // Alternating background
-        if (dayIndex % 2 === 0) {
-          doc.setFillColor(248, 249, 250);
-          doc.rect(margin, yPos, pageWidth - margin * 2, cellHeight, 'F');
-        }
-        
-        addText(dayName, margin + 2, yPos + 5.5, { fontSize: 7, fontStyle: 'bold' });
-        
-        hours.forEach((hour, i) => {
-          const value = getValue(dayIndex, hour);
-          const x = margin + 25 + (i * cellWidth);
-          if (value > 0) {
-            addText(value.toString(), x, yPos + 5.5, { fontSize: 6 });
-          }
+        autoTable(doc, {
+          head: [['Month', 'Year', 'Total Calls']],
+          body: monthlyData.map(m => [m.month, m.year.toString(), m.totalCalls.toString()]),
+          startY: yPos,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [66, 139, 202] },
         });
-        
-        const dayTotal = getDayTotal(dayIndex);
-        addText(dayTotal.toString(), margin + 25 + (hours.length * cellWidth), yPos + 5.5, { fontSize: 6, fontStyle: 'bold' });
-        yPos += cellHeight;
+
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Heatmap Data Table
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Calls by Day and Hour', margin, yPos);
+      yPos += 5;
+
+      // Build table data
+      const tableHead = [['Day', ...hours.map(h => h > 12 ? `${h - 12}pm` : `${h}am`), 'Total']];
+      const tableBody = days.map((dayName, dayIndex) => {
+        const row = [dayName];
+        hours.forEach(hour => {
+          row.push(getValue(dayIndex, hour).toString());
+        });
+        row.push(getDayTotal(dayIndex).toString());
+        return row;
       });
 
-      // Hour totals row
-      yPos += 2;
-      doc.setFillColor(220, 220, 220);
-      doc.rect(margin, yPos, pageWidth - margin * 2, cellHeight, 'F');
-      addText('Total', margin + 2, yPos + 5.5, { fontSize: 7, fontStyle: 'bold' });
-      
-      hours.forEach((hour, i) => {
-        const hourTotal = getHourTotal(hour);
-        const x = margin + 25 + (i * cellWidth);
-        addText(hourTotal.toString(), x, yPos + 5.5, { fontSize: 6, fontStyle: 'bold' });
+      // Add totals row
+      const totalsRow = ['Total'];
+      hours.forEach(hour => {
+        totalsRow.push(getHourTotal(hour).toString());
       });
-      addText(grandTotal.toString(), margin + 25 + (hours.length * cellWidth), yPos + 5.5, { fontSize: 6, fontStyle: 'bold', color: [41, 98, 255] });
+      totalsRow.push(grandTotal.toString());
+      tableBody.push(totalsRow);
+
+      autoTable(doc, {
+        head: tableHead,
+        body: tableBody,
+        startY: yPos,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [41, 98, 255], fontSize: 6 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+        },
+        didParseCell: (data) => {
+          // Style the last row (totals)
+          if (data.row.index === tableBody.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [220, 220, 220];
+          }
+          // Style the last column (row totals)
+          if (data.column.index === hours.length + 1) {
+            data.cell.styles.fontStyle = 'bold';
+          }
+        },
+      });
 
       // Footer
-      yPos = doc.internal.pageSize.getHeight() - 15;
+      const footerY = doc.internal.pageSize.getHeight() - 15;
       doc.setDrawColor(200, 200, 200);
-      doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
-      addText('This report was automatically generated by the Sales Performance System.', margin, yPos, { fontSize: 8, color: [150, 150, 150] });
+      doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(150, 150, 150);
+      doc.text('This report was automatically generated by the Sales Performance System.', margin, footerY);
 
-      // Save
-      const dateStr = dateSelectionMode === 'single' 
-        ? format(singleDate, 'yyyy-MM-dd')
-        : `${format(fromDate!, 'yyyy-MM-dd')}_to_${format(toDate!, 'yyyy-MM-dd')}`;
-      const agentStr = selectedAgentId === 'all' ? 'AllAgents' : getSelectedAgentName().replace(/\s+/g, '_');
+      // Page numbers
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, footerY);
+      }
+
+      // Save PDF
+      const dateStr = filters.selectionMode === 'single' && filters.singleDate
+        ? format(filters.singleDate, 'yyyy-MM-dd')
+        : filters.fromDate && filters.toDate
+        ? `${format(filters.fromDate, 'yyyy-MM-dd')}_to_${format(filters.toDate, 'yyyy-MM-dd')}`
+        : 'unknown';
+      const agentStr = filters.selectedAgent === 'all' ? 'AllAgents' : getSelectedAgentName().replace(/\s+/g, '_');
       doc.save(`CallVolumeHeatmap_${agentStr}_${dateStr}.pdf`);
       
       toast.success('PDF exported successfully');
-    } catch (error) {
-      console.error('PDF export error:', error);
-      toast.error('Failed to export PDF');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast.error('Failed to generate PDF. Please try again');
+    } finally {
+      setIsExporting(false);
     }
-  };
+  }, [filters, grandTotal, monthlyData, getDateDisplayText, getSelectedAgentName, getValue, getDayTotal, getHourTotal]);
 
-  // Check if we have no data
-  const hasNoData = !isLoading && heatmapData.length > 0 && grandTotal === 0;
+  // Check for empty data
+  const hasNoData = !isLoading && !isFetching && heatmapData.length > 0 && grandTotal === 0;
 
   if (isLoading) {
     return (
@@ -349,244 +428,62 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
   return (
     <Card>
       <CardHeader className="pb-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <CardTitle className="text-lg font-semibold">Call Volume Heatmap</CardTitle>
-              <CardDescription>
-                {getSelectedAgentName()} calls by day and hour • Total: {grandTotal}
-              </CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleExportPDF}
-              disabled={grandTotal === 0}
-              className="w-fit"
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              Export PDF
-            </Button>
-          </div>
-
-          {/* Date Selection Mode */}
-          <div className="flex flex-col gap-4 p-4 bg-muted/50 rounded-lg">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Selection Mode Toggle */}
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-medium text-muted-foreground">Date Selection</Label>
-                <RadioGroup 
-                  value={dateSelectionMode} 
-                  onValueChange={(v) => setDateSelectionMode(v as DateSelectionMode)}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="single" id="single" />
-                    <Label htmlFor="single" className="text-sm cursor-pointer">Single Day</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="range" id="range" />
-                    <Label htmlFor="range" className="text-sm cursor-pointer">Date Range</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Agent Selector */}
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-medium text-muted-foreground">Agent Filter</Label>
-                  <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
-                  <SelectTrigger className="w-[200px] h-9">
-                    <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="All Agents" />
-                  </SelectTrigger>
-                    <SelectContent className="z-[200]">
-                    <SelectItem value="all">All Agents</SelectItem>
-                    {agentOptions.map(agent => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Date Pickers */}
-            <div className="flex flex-wrap items-end gap-3">
-              {dateSelectionMode === 'single' ? (
-                <div className="flex flex-col gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Select Date</Label>
-                  <Popover open={singleDateOpen} onOpenChange={setSingleDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={cn(
-                          "w-[200px] justify-start text-left font-normal h-9",
-                          !singleDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(singleDate, 'PPP')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={singleDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setSingleDate(date);
-                            setSingleDateOpen(false);
-                          }
-                        }}
-                        disabled={(date) => date > new Date()}
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-medium text-muted-foreground">From Date</Label>
-                    <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "w-[180px] justify-start text-left font-normal h-9",
-                            !fromDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {fromDate ? format(fromDate, 'PPP') : 'Pick a date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={fromDate}
-                          onSelect={(date) => {
-                            if (!date) return;
-                            setFromDate(date);
-                            if (toDate && isBefore(toDate, date)) setToDate(date);
-                            setFromDateOpen(false);
-                          }}
-                          disabled={(date) => date > new Date()}
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs font-medium text-muted-foreground">To Date</Label>
-                    <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "w-[180px] justify-start text-left font-normal h-9",
-                            !toDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {toDate ? format(toDate, 'PPP') : 'Pick a date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={toDate}
-                          onSelect={(date) => {
-                            if (!date) return;
-                            setToDate(date);
-                            if (fromDate && isBefore(date, fromDate)) setFromDate(date);
-                            setToDateOpen(false);
-                          }}
-                          disabled={(date) => date > new Date()}
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Quick Select Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 text-xs"
-                      onClick={() => {
-                        setFromDate(subDays(new Date(), 6));
-                        setToDate(new Date());
-                      }}
-                    >
-                      Last 7 Days
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 text-xs"
-                      onClick={() => {
-                        setFromDate(subDays(new Date(), 29));
-                        setToDate(new Date());
-                      }}
-                    >
-                      Last 30 Days
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 text-xs"
-                      onClick={() => {
-                        setFromDate(startOfMonth(new Date()));
-                        setToDate(endOfMonth(new Date()));
-                      }}
-                    >
-                      This Month
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Validation Error */}
-            {!isDateRangeValid && dateSelectionMode === 'range' && (
-              <div className="flex items-center gap-2 text-destructive text-sm">
-                <AlertCircle className="h-4 w-4" />
-                <span>"To Date" must be after or equal to "From Date"</span>
-              </div>
-            )}
-          </div>
+        <div>
+          <CardTitle className="text-lg font-semibold">Call Volume Heatmap</CardTitle>
+          <CardDescription>
+            {getSelectedAgentName()} calls by day and hour • Total: {grandTotal}
+          </CardDescription>
         </div>
       </CardHeader>
       
-      <CardContent>
-        {/* Loading indicator for fetching */}
-        {isFetching && !isLoading && (
-          <div className="flex items-center justify-center py-4">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="ml-2 text-sm text-muted-foreground">Loading data...</span>
+      <CardContent className="space-y-4">
+        {/* Date Filter Component */}
+        <DateFilterComponent
+          agents={agentOptions}
+          onFilterChange={handleFilterChange}
+          onExportPDF={handleExportPDF}
+          isLoading={isFetching}
+          isExporting={isExporting}
+          canExport={grandTotal > 0}
+        />
+
+        {/* Error State */}
+        {error && (
+          <div className="flex items-center gap-2 text-destructive text-sm p-4 bg-destructive/10 rounded-lg">
+            <AlertCircle className="h-4 w-4" />
+            <span>Error loading data. Please refresh</span>
           </div>
         )}
 
-        {/* No data message */}
-        {hasNoData && !isFetching && (
+        {/* No Data State */}
+        {hasNoData && !error && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <AlertCircle className="h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground font-medium">No data found</p>
+            <p className="text-muted-foreground font-medium">No data found for selected filters</p>
             <p className="text-sm text-muted-foreground mt-1">
               Try selecting a different date range or agent filter
             </p>
           </div>
         )}
 
+        {/* Monthly Summary View */}
+        {filters.showMonthly && monthlyData.length > 0 && !hasNoData && (
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3">Monthly Summary</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {monthlyData.map((m, idx) => (
+                <div key={idx} className="p-3 bg-background rounded-md border">
+                  <p className="text-sm font-medium">{m.month} {m.year}</p>
+                  <p className="text-2xl font-bold text-primary">{m.totalCalls}</p>
+                  <p className="text-xs text-muted-foreground">calls</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Heatmap Grid */}
-        {!hasNoData && (
+        {!hasNoData && !error && (
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               {/* Hour labels */}

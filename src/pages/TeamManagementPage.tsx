@@ -12,12 +12,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search, BarChart3, Bell } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search, BarChart3, Bell, ArrowRightLeft, Eye, UserMinus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TeamPerformanceCharts } from '@/components/teams/TeamPerformanceCharts';
 import { PerformanceTargetsManager } from '@/components/teams/PerformanceTargetsManager';
 import { PerformanceAlertsList } from '@/components/teams/PerformanceAlertsList';
 import { usePerformanceAlerts } from '@/hooks/usePerformanceAlerts';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export const TeamManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -49,6 +51,8 @@ export const TeamManagementPage: React.FC = () => {
   const [selectedTeamForAssign, setSelectedTeamForAssign] = useState<Team | null>(null);
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMembersTeam, setViewMembersTeam] = useState<Team | null>(null);
+  const [movingAgent, setMovingAgent] = useState<TeamMember | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -113,6 +117,22 @@ export const TeamManagementPage: React.FC = () => {
 
   const handleRemoveFromTeam = (agentId: string) => {
     assignAgentToTeam.mutate({ agentId, teamId: null });
+  };
+
+  const handleMoveAgent = (agentId: string, newTeamId: string) => {
+    assignAgentToTeam.mutate({ agentId, teamId: newTeamId });
+    setMovingAgent(null);
+  };
+
+  const getTeamMembers = (teamId: string) => {
+    return agents.filter(a => a.team_id === teamId);
+  };
+
+  const getInitials = (name: string | null, username: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return username.slice(0, 2).toUpperCase();
   };
 
   const filteredAgents = agents.filter(agent => {
@@ -345,25 +365,56 @@ export const TeamManagementPage: React.FC = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="w-4 h-4" />
                       {team.member_count} / 12 members
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => handleOpenAssignDialog(team)}>
-                      <UserPlus className="w-4 h-4 mr-1" />
-                      Assign
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => setViewMembersTeam(team)} disabled={team.member_count === 0}>
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleOpenAssignDialog(team)}>
+                        <UserPlus className="w-4 h-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
                   </div>
                   {team.member_count > 0 && (
-                    <div className="mt-3">
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all" 
-                          style={{ width: `${Math.min((team.member_count / 12) * 100, 100)}%` }}
-                        />
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary rounded-full transition-all" 
+                        style={{ width: `${Math.min((team.member_count / 12) * 100, 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  {/* Quick preview of members */}
+                  {team.member_count > 0 && (
+                    <div className="flex items-center gap-1 pt-1">
+                      <div className="flex -space-x-2">
+                        {getTeamMembers(team.id).slice(0, 4).map(member => (
+                          <Avatar key={member.id} className="w-7 h-7 border-2 border-background">
+                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                              {getInitials(member.full_name, member.username)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {team.member_count > 4 && (
+                          <div className="w-7 h-7 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+                            <span className="text-xs text-muted-foreground">+{team.member_count - 4}</span>
+                          </div>
+                        )}
                       </div>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="ml-auto text-xs h-7 px-2"
+                        onClick={() => setViewMembersTeam(team)}
+                      >
+                        Manage
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -573,6 +624,138 @@ export const TeamManagementPage: React.FC = () => {
             <Button onClick={handleBulkAssign} disabled={selectedAgents.length === 0}>
               Assign {selectedAgents.length} Agent{selectedAgents.length !== 1 ? 's' : ''}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Team Members Dialog */}
+      <Dialog open={!!viewMembersTeam} onOpenChange={(open) => !open && setViewMembersTeam(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              {viewMembersTeam?.name} Members
+            </DialogTitle>
+            <DialogDescription>
+              Manage team members - view, move to other teams, or remove from team.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            <div className="space-y-2 pr-4">
+              {viewMembersTeam && getTeamMembers(viewMembersTeam.id).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No members in this team yet.</p>
+                </div>
+              ) : (
+                viewMembersTeam && getTeamMembers(viewMembersTeam.id).map(member => (
+                  <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                          {getInitials(member.full_name, member.username)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {member.full_name || member.username}
+                          {viewMembersTeam.leader_id === member.id && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Crown className="w-3 h-3 mr-1" />
+                              Leader
+                            </Badge>
+                          )}
+                          <Badge variant={member.is_active ? 'default' : 'outline'} className="text-xs">
+                            {member.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setMovingAgent(member)}
+                        className="gap-1"
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                        Move
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive gap-1"
+                        onClick={() => handleRemoveFromTeam(member.id)}
+                      >
+                        <UserMinus className="w-4 h-4" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewMembersTeam(null)}>Close</Button>
+            <Button onClick={() => {
+              if (viewMembersTeam) {
+                handleOpenAssignDialog(viewMembersTeam);
+                setViewMembersTeam(null);
+              }
+            }}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add Members
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Agent Dialog */}
+      <Dialog open={!!movingAgent} onOpenChange={(open) => !open && setMovingAgent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" />
+              Move {movingAgent?.full_name || movingAgent?.username}
+            </DialogTitle>
+            <DialogDescription>
+              Select a new team for this agent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            {teams.filter(t => t.id !== movingAgent?.team_id).length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No other teams available.</p>
+            ) : (
+              teams.filter(t => t.id !== movingAgent?.team_id).map(team => (
+                <button
+                  key={team.id}
+                  onClick={() => movingAgent && handleMoveAgent(movingAgent.id, team.id)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-primary/5 hover:border-primary/50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      {team.team_type === 'remote' ? (
+                        <Wifi className="w-5 h-5 text-primary" />
+                      ) : (
+                        <Building2 className="w-5 h-5 text-primary" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{team.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {team.member_count} members • {team.leader_name || 'No leader'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="capitalize">{team.team_type}</Badge>
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMovingAgent(null)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

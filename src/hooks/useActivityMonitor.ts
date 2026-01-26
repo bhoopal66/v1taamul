@@ -285,8 +285,13 @@ export function useActivityMonitor() {
   }, [breakStatus, switchActivityMutation, toast]);
 
   // Auto-switch to break when on scheduled break
+  // Guard: only trigger if not already pending or already on break
   useEffect(() => {
-    if (breakStatus.onBreak && currentActivity?.activity_type !== 'break') {
+    if (
+      breakStatus.onBreak && 
+      currentActivity?.activity_type !== 'break' &&
+      !switchActivityMutation.isPending
+    ) {
       switchActivityMutation.mutate({ 
         activityType: 'break', 
         metadata: { 
@@ -295,7 +300,7 @@ export function useActivityMonitor() {
         } as Record<string, string | boolean>
       });
     }
-  }, [breakStatus.onBreak, currentActivity?.activity_type, breakStatus.breakLabel, switchActivityMutation]);
+  }, [breakStatus.onBreak, currentActivity?.activity_type, breakStatus.breakLabel, switchActivityMutation.mutate, switchActivityMutation.isPending]);
 
   // Set up realtime subscription for activity logs
   useEffect(() => {

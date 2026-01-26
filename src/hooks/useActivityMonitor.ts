@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -116,6 +116,8 @@ export function useActivityMonitor() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
+  // Prevent repeated auto-switch loops within the same scheduled break window
+  const lastAutoBreakKeyRef = useRef<string | null>(null);
 
   // Update current time every minute
   useEffect(() => {
@@ -139,6 +141,8 @@ export function useActivityMonitor() {
         .select('*')
         .eq('user_id', user.id)
         .gte('started_at', `${today}T00:00:00`)
+        // Avoid pulling noisy 0-duration ended rows (prevents huge payloads if a bug spams logs)
+        .or('ended_at.is.null,duration_minutes.gt.0')
         .order('started_at', { ascending: true });
       
       if (error) throw error;
@@ -285,22 +289,41 @@ export function useActivityMonitor() {
   }, [breakStatus, switchActivityMutation, toast]);
 
   // Auto-switch to break when on scheduled break
-  // Guard: only trigger if not already pending or already on break
   useEffect(() => {
-    if (
-      breakStatus.onBreak && 
-      currentActivity?.activity_type !== 'break' &&
-      !switchActivityMutation.isPending
-    ) {
-      switchActivityMutation.mutate({ 
-        activityType: 'break', 
-        metadata: { 
-          break_label: breakStatus.breakLabel,
-          is_system_enforced: true 
-        } as Record<string, string | boolean>
-      });
+    // Reset guard when not on a scheduled break
+    if (!breakStatus.onBreak) {
+      lastAutoBreakKeyRef.current = null;
+      return;
     }
-  }, [breakStatus.onBreak, currentActivity?.activity_type, breakStatus.breakLabel, switchActivityMutation.mutate, switchActivityMutation.isPending]);
+
+    const breakKey = `${breakStatus.breakLabel}|${breakStatus.breakEnd ?? ''}`;
+    // Already handled this scheduled break window
+    if (lastAutoBreakKeyRef.current === breakKey) return;
+    // Already on break
+    if (currentActivity?.activity_type === 'break') {
+      lastAutoBreakKeyRef.current = breakKey;
+      return;
+    }
+    // Avoid duplicate calls while mutation is in-flight
+    if (switchActivityMutation.isPending) return;
+
+    // Set guard BEFORE mutating (handles React StrictMode double-invocation)
+    lastAutoBreakKeyRef.current = breakKey;
+    switchActivityMutation.mutate({
+      activityType: 'break',
+      metadata: {
+        break_label: breakStatus.breakLabel,
+        is_system_enforced: true,
+      } as Record<string, string | boolean>,
+    });
+  }, [
+    breakStatus.onBreak,
+    breakStatus.breakLabel,
+    breakStatus.breakEnd,
+    currentActivity?.activity_type,
+    switchActivityMutation.isPending,
+    switchActivityMutation.mutate,
+  ]);
 
   // Set up realtime subscription for activity logs
   useEffect(() => {

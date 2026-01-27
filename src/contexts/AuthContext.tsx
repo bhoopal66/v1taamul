@@ -2,6 +2,18 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+// If a user has multiple roles rows, pick the highest-privilege one.
+// Keep this list in descending privilege order.
+const ROLE_PRIORITY = [
+  'super_admin',
+  'admin',
+  'operations_head',
+  'sales_controller',
+  'supervisor',
+  'coordinator',
+  'agent',
+] as const;
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -40,16 +52,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch user role
-      const { data: roleData } = await supabase
+      // Fetch user roles (can be multiple rows)
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (roleData) {
-        setUserRole(roleData.role);
+        .eq('user_id', userId);
+
+      if (rolesError) {
+        console.warn('Error fetching user roles:', rolesError);
       }
+
+      const roles = (rolesData || [])
+        .map((r: any) => r?.role)
+        .filter(Boolean) as string[];
+
+      const resolvedRole =
+        ROLE_PRIORITY.find((r) => roles.includes(r)) ?? roles[0] ?? 'agent';
+
+      setUserRole(resolvedRole);
 
       // Fetch profile
       const { data: profileData } = await supabase
@@ -76,6 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+      // Fail safe: don't block the app forever; default to least privilege.
+      setUserRole('agent');
+      setLedTeamId(null);
     }
   };
 
@@ -93,11 +116,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Reset derived state so layouts can safely wait for fresh role/profile
+          setUserRole(null);
+          setProfile(null);
+          setLedTeamId(null);
           // Use setTimeout to avoid race conditions with database triggers
           setTimeout(() => fetchUserData(session.user.id), 100);
         } else {
           setUserRole(null);
           setProfile(null);
+          setLedTeamId(null);
         }
         
         setLoading(false);
@@ -117,6 +145,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          setUserRole(null);
+          setProfile(null);
+          setLedTeamId(null);
           fetchUserData(session.user.id);
         }
         

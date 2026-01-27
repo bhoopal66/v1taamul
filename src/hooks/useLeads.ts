@@ -112,7 +112,7 @@ export interface LeadStats {
   totalDealValue: number;
 }
 
-export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRange) => {
+export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRange, agentId?: string) => {
   const { user, userRole, profile, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -126,7 +126,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
   const toDate = dateRange?.to ? endOfDay(dateRange.to).toISOString() : null;
 
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, fromDate, toDate],
+    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, fromDate, toDate, agentId],
     queryFn: async (): Promise<Lead[]> => {
       // First, get all team member IDs if user is a team viewer
       let teamMemberIds: string[] = [user?.id || ''];
@@ -170,6 +170,11 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
             `)
             .order('created_at', { ascending: false });
 
+          // Apply agent filter if specified
+          if (agentId && agentId !== 'all') {
+            query = query.eq('agent_id', agentId);
+          }
+
           // Apply date filter
           if (fromDate) {
             query = query.gte('created_at', fromDate);
@@ -211,6 +216,9 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
         }
       }
 
+      // If a specific agent is selected, filter to just that agent
+      const agentIdsToQuery = (agentId && agentId !== 'all') ? [agentId] : teamMemberIds;
+
       let query = supabase
         .from('leads')
         .select(`
@@ -224,7 +232,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
             industry
           )
         `)
-        .in('agent_id', teamMemberIds)
+        .in('agent_id', agentIdsToQuery)
         .order('created_at', { ascending: false });
 
       // Apply date filter

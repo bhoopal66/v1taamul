@@ -128,7 +128,6 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
   const { data: leads, isLoading, refetch } = useQuery({
     queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, fromDate, toDate],
     queryFn: async (): Promise<Lead[]> => {
-    queryFn: async (): Promise<Lead[]> => {
       // First, get all team member IDs if user is a team viewer
       let teamMemberIds: string[] = [user?.id || ''];
 

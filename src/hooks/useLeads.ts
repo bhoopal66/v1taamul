@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { DateRange } from 'react-day-picker';
+import { startOfDay, endOfDay } from 'date-fns';
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'approved' | 'lost';
 export type ProductType = 'account' | 'loan';
@@ -110,7 +112,7 @@ export interface LeadStats {
   totalDealValue: number;
 }
 
-export const useLeads = (statusFilter?: LeadStatus | 'all') => {
+export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRange) => {
   const { user, userRole, profile, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -119,8 +121,13 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
                        userRole === 'admin' || userRole === 'super_admin' || 
                        userRole === 'sales_controller' || !!ledTeamId;
 
+  // Date range for filtering
+  const fromDate = dateRange?.from ? startOfDay(dateRange.from).toISOString() : null;
+  const toDate = dateRange?.to ? endOfDay(dateRange.to).toISOString() : null;
+
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter],
+    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, fromDate, toDate],
+    queryFn: async (): Promise<Lead[]> => {
     queryFn: async (): Promise<Lead[]> => {
       // First, get all team member IDs if user is a team viewer
       let teamMemberIds: string[] = [user?.id || ''];
@@ -149,7 +156,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         // For admins/super_admins without a specific team, show all leads
         if ((userRole === 'admin' || userRole === 'super_admin') && !teamIdToFetch) {
           // Fetch all leads by not filtering by agent_id
-          const query = supabase
+          let query = supabase
             .from('leads')
             .select(`
               *,
@@ -163,6 +170,14 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
               )
             `)
             .order('created_at', { ascending: false });
+
+          // Apply date filter
+          if (fromDate) {
+            query = query.gte('created_at', fromDate);
+          }
+          if (toDate) {
+            query = query.lte('created_at', toDate);
+          }
 
           const { data, error } = statusFilter && statusFilter !== 'all'
             ? await query.eq('lead_status', statusFilter)
@@ -212,6 +227,14 @@ export const useLeads = (statusFilter?: LeadStatus | 'all') => {
         `)
         .in('agent_id', teamMemberIds)
         .order('created_at', { ascending: false });
+
+      // Apply date filter
+      if (fromDate) {
+        query = query.gte('created_at', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('created_at', toDate);
+      }
 
       if (statusFilter && statusFilter !== 'all') {
         query = query.eq('lead_status', statusFilter);

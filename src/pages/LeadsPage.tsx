@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { LeadKanbanBoard } from '@/components/leads/LeadKanbanBoard';
 import { LeadAnalytics } from '@/components/leads/LeadAnalytics';
 import { LeadFollowUpList } from '@/components/leads/LeadFollowUpList';
@@ -30,6 +32,7 @@ import {
   Factory, 
   DollarSign,
   Calendar,
+  CalendarIcon,
   Star,
   Search,
   Filter,
@@ -49,8 +52,11 @@ import {
   Bell,
   Megaphone,
   History,
+  X,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup' | 'sources' | 'history';
 
@@ -69,6 +75,7 @@ export const LeadsPage = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<LeadTypeFilter>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [editForm, setEditForm] = useState({
     dealValue: '',
     expectedCloseDate: '',
@@ -80,7 +87,7 @@ export const LeadsPage = () => {
     contactPersonName: '',
   });
 
-  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter);
+  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter, dateRange);
   const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
@@ -206,7 +213,54 @@ export const LeadsPage = () => {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Date Range Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={dateRange ? 'default' : 'outline'}
+                className={cn(
+                  'justify-start text-left font-normal h-10',
+                  dateRange && 'bg-primary text-primary-foreground'
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, 'dd MMM')} - {format(dateRange.to, 'dd MMM yyyy')}
+                    </>
+                  ) : (
+                    format(dateRange.from, 'dd MMM yyyy')
+                  )
+                ) : (
+                  'Filter by Date'
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarComponent
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          {dateRange && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDateRange(undefined)}
+              className="h-10 w-10"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          
           {/* View Toggle */}
           <div className="flex items-center border rounded-lg p-1 bg-muted/50">
             <Button
@@ -286,7 +340,7 @@ export const LeadsPage = () => {
           </TooltipProvider>
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-green-500" />
+              <DollarSign className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-xs text-muted-foreground">Total Pipeline</p>
                 <p className="font-bold text-lg">{formatCurrency(stats.totalDealValue)}</p>

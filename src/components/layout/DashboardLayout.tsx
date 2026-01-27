@@ -28,8 +28,9 @@ export const DashboardLayout: React.FC = () => {
     [currentPath]
   );
 
-  // Show loading state while auth, role, or session is loading
-  const isFullyLoaded = !loading && !sessionLoading && userRole !== null;
+  // Show loading state while auth/session is loading.
+  // If authenticated, also wait for role to resolve to avoid permission/redirect flicker.
+  const isFullyLoaded = !loading && !sessionLoading && (!user || userRole !== null);
   
   if (!isFullyLoaded) {
     return (

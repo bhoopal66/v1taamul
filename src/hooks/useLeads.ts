@@ -110,12 +110,7 @@ export interface LeadStats {
   totalDealValue: number;
 }
 
-export interface AgentOption {
-  id: string;
-  name: string;
-}
-
-export const useLeads = (statusFilter?: LeadStatus | 'all', agentFilter?: string | 'all') => {
+export const useLeads = (statusFilter?: LeadStatus | 'all') => {
   const { user, userRole, profile, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -124,40 +119,8 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', agentFilter?: string
                        userRole === 'admin' || userRole === 'super_admin' || 
                        userRole === 'sales_controller' || !!ledTeamId;
 
-  // Fetch list of team agents for the filter dropdown
-  const { data: teamAgents } = useQuery({
-    queryKey: ['leads-team-agents', ledTeamId, profile?.team_id, userRole, user?.id],
-    queryFn: async (): Promise<AgentOption[]> => {
-      const teamIdToFetch = ledTeamId || profile?.team_id;
-      
-      let query = supabase
-        .from('profiles_public')
-        .select('id, full_name, username')
-        .eq('is_active', true)
-        .order('full_name', { ascending: true });
-
-      if ((userRole === 'admin' || userRole === 'super_admin') && !teamIdToFetch) {
-        // Admins see all agents
-      } else if (teamIdToFetch) {
-        query = query.eq('team_id', teamIdToFetch);
-      } else {
-        // Fallback: only current user
-        query = query.eq('id', user?.id);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      return (data || []).map(p => ({
-        id: p.id,
-        name: p.full_name || p.username || 'Unknown',
-      }));
-    },
-    enabled: !!user && isTeamViewer,
-  });
-
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, agentFilter],
+    queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter],
     queryFn: async (): Promise<Lead[]> => {
       // First, get all team member IDs if user is a team viewer
       let teamMemberIds: string[] = [user?.id || ''];
@@ -234,11 +197,6 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', agentFilter?: string
         }
       }
 
-      // Apply agent filter if specified
-      const idsToQuery = (agentFilter && agentFilter !== 'all')
-        ? [agentFilter]
-        : teamMemberIds;
-
       let query = supabase
         .from('leads')
         .select(`
@@ -252,7 +210,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', agentFilter?: string
             industry
           )
         `)
-        .in('agent_id', idsToQuery)
+        .in('agent_id', teamMemberIds)
         .order('created_at', { ascending: false });
 
       if (statusFilter && statusFilter !== 'all') {
@@ -442,7 +400,5 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', agentFilter?: string
     convertToLead,
     isUpdating: updateLead.isPending,
     isConverting: updateTradeLicense.isPending,
-    teamAgents: teamAgents || [],
-    isTeamViewer,
   };
 };

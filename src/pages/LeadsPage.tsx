@@ -65,7 +65,6 @@ const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon:
 export const LeadsPage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
-  const [agentFilter, setAgentFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -81,7 +80,7 @@ export const LeadsPage = () => {
     contactPersonName: '',
   });
 
-  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting, teamAgents, isTeamViewer } = useLeads(statusFilter, agentFilter);
+  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter);
   const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
@@ -265,25 +264,6 @@ export const LeadsPage = () => {
               History
             </Button>
           </div>
-          
-          {/* Agent Filter for Supervisors */}
-          {isTeamViewer && teamAgents.length > 1 && (
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-48">
-                <Users className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {teamAgents.map(agent => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
           <BulkLeadImport onImportComplete={() => refetch()} />
           <TooltipProvider>
             <Tooltip>

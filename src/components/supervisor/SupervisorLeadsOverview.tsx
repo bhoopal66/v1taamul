@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, RefreshCw, TrendingUp, Users } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,12 @@ interface LeadWithDetails {
   deal_value: number | null;
 }
 
+interface TeamMember {
+  id: string;
+  full_name: string | null;
+  username: string;
+}
+
 const statusColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
   contacted: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
@@ -44,9 +51,26 @@ const statusColors: Record<string, string> = {
 
 export const SupervisorLeadsOverview: React.FC<SupervisorLeadsOverviewProps> = ({ teamId }) => {
   const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
+  });
+
+  // Fetch team members for the filter dropdown
+  const { data: teamMembers } = useQuery({
+    queryKey: ['team-members-for-leads-filter', teamId],
+    queryFn: async (): Promise<TeamMember[]> => {
+      if (!teamId) return [];
+      const { data, error } = await supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('team_id', teamId)
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!teamId,
   });
 
   // Calculate date range based on period
@@ -71,9 +95,9 @@ export const SupervisorLeadsOverview: React.FC<SupervisorLeadsOverviewProps> = (
   const effectiveDateRange = getDateRange();
 
   const { data: leads, isLoading, refetch } = useQuery({
-    queryKey: ['supervisor-leads', teamId, effectiveDateRange.from?.toISOString(), effectiveDateRange.to?.toISOString()],
+    queryKey: ['supervisor-leads', teamId, selectedAgentId, effectiveDateRange.from?.toISOString(), effectiveDateRange.to?.toISOString()],
     queryFn: async (): Promise<LeadWithDetails[]> => {
-      // Get leads within date range
+      // Build base query
       let query = supabase
         .from('leads')
         .select(`
@@ -88,6 +112,11 @@ export const SupervisorLeadsOverview: React.FC<SupervisorLeadsOverviewProps> = (
         .gte('created_at', effectiveDateRange.from?.toISOString())
         .lte('created_at', effectiveDateRange.to?.toISOString())
         .order('created_at', { ascending: false });
+
+      // If specific agent is selected, filter directly
+      if (selectedAgentId !== 'all') {
+        query = query.eq('agent_id', selectedAgentId);
+      }
 
       const { data: leadsData, error: leadsError } = await query;
       if (leadsError) throw leadsError;
@@ -184,6 +213,21 @@ export const SupervisorLeadsOverview: React.FC<SupervisorLeadsOverviewProps> = (
           </div>
           
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Agent Filter */}
+            <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {teamMembers?.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.full_name || member.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {/* Period Tabs */}
             <Tabs value={period} onValueChange={(v) => handlePeriodChange(v as PeriodFilter)}>
               <TabsList>

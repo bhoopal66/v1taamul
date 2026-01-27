@@ -57,6 +57,9 @@ import {
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 type ViewMode = 'list' | 'kanban' | 'analytics' | 'followup' | 'sources' | 'history';
 
@@ -69,6 +72,7 @@ const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; icon:
 ];
 
 export const LeadsPage = () => {
+  const { userRole, ledTeamId, profile, user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +80,7 @@ export const LeadsPage = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<LeadTypeFilter>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   const [editForm, setEditForm] = useState({
     dealValue: '',
     expectedCloseDate: '',
@@ -87,7 +92,48 @@ export const LeadsPage = () => {
     contactPersonName: '',
   });
 
-  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter, dateRange);
+  // Check if user can see team/all agents
+  const canFilterByAgent = userRole === 'supervisor' || userRole === 'operations_head' || 
+                           userRole === 'admin' || userRole === 'super_admin' || 
+                           userRole === 'sales_controller' || !!ledTeamId;
+
+  // Fetch team members for agent filter
+  const { data: teamMembers } = useQuery({
+    queryKey: ['leads-team-members', ledTeamId, profile?.team_id, userRole],
+    queryFn: async () => {
+      const teamIdToFetch = ledTeamId || profile?.team_id;
+      
+      // For admins/super_admins, fetch all active agents
+      if ((userRole === 'admin' || userRole === 'super_admin') && !teamIdToFetch) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .eq('is_active', true)
+          .order('full_name');
+        
+        if (error) throw error;
+        return data || [];
+      }
+
+      // For team-specific view
+      if (teamIdToFetch) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .eq('team_id', teamIdToFetch)
+          .eq('is_active', true)
+          .order('full_name');
+        
+        if (error) throw error;
+        return data || [];
+      }
+
+      return [];
+    },
+    enabled: canFilterByAgent,
+  });
+
+  const { leads, stats, isLoading, refetch, updateLeadStatus, updateLeadDetails, convertToLead, isUpdating, isConverting } = useLeads(statusFilter, dateRange, selectedAgentId);
   const { recalculateScores, isRecalculating, getScoreBreakdown } = useLeadScoring();
 
   const filteredLeads = leads.filter(lead => {
@@ -259,6 +305,24 @@ export const LeadsPage = () => {
             >
               <X className="h-4 w-4" />
             </Button>
+          )}
+
+          {/* Agent Filter */}
+          {canFilterByAgent && teamMembers && teamMembers.length > 0 && (
+            <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+              <SelectTrigger className="w-[180px]">
+                <Users className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {teamMembers.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.full_name || member.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           
           {/* View Toggle */}

@@ -12,7 +12,7 @@ import { PerformanceCoachChat } from '@/components/coach/PerformanceCoachChat';
 const EXEMPT_PAGES = ['/activity-monitor', '/settings', '/login'];
 
 export const DashboardLayout: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, userRole } = useAuth();
   const location = useLocation();
   const { hasPageAccess, getUnauthorizedRedirect } = usePermissions();
   const { hasStarted, isLoading: sessionLoading } = useActivitySessionStatus();
@@ -28,8 +28,10 @@ export const DashboardLayout: React.FC = () => {
     [currentPath]
   );
 
-  // Show loading state
-  if (loading || sessionLoading) {
+  // Show loading state while auth, role, or session is loading
+  const isFullyLoaded = !loading && !sessionLoading && userRole !== null;
+  
+  if (!isFullyLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

@@ -44,7 +44,7 @@ export const TeamStatsCards: React.FC<TeamStatsCardsProps> = ({ stats, isLoading
       label: 'Talk Time',
       value: formatDuration(stats.totalTalkTimeToday),
       icon: Clock,
-      color: 'bg-violet-500 text-white',
+      color: 'bg-secondary text-secondary-foreground',
       description: 'Total talk time today',
     },
     {

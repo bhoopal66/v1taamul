@@ -41,12 +41,13 @@ export const useCallList = (selectedDate?: Date) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const today = selectedDate || new Date();
+  // Use consistent date string format for both query key and database query
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   // Fetch today's call list with contact details
   const { data: callList, isLoading, refetch } = useQuery({
-    queryKey: ['call-list', user?.id, today.toDateString()],
+    queryKey: ['call-list', user?.id, dateStr],
     queryFn: async (): Promise<CallListContact[]> => {
-      const dateStr = today.toISOString().split('T')[0];
 
       // Fetch call list for today
       const { data: callListData, error: callListError } = await supabase
@@ -124,6 +125,8 @@ export const useCallList = (selectedDate?: Date) => {
       });
     },
     enabled: !!user?.id,
+    staleTime: 0, // Always refetch to ensure fresh data
+    refetchOnMount: true,
   });
 
   // Calculate stats

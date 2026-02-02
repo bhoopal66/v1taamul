@@ -73,15 +73,6 @@ const cleanPhoneNumber = (phone: string): string => {
   return phone.replace(/[\s\-\(\)\.]/g, '').replace(/^00/, '+');
 };
 
-// IMPORTANT: Use local YYYY-MM-DD (not UTC) to match call list date handling across the app.
-// Using toISOString().split('T')[0] can shift the date for users in non-UTC timezones.
-const formatLocalDate = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export interface DuplicateUploadInfo {
   id: string;
   fileName: string;
@@ -112,7 +103,7 @@ export const useCallSheetUpload = () => {
   const checkDuplicateUpload = useCallback(async (fileName: string): Promise<DuplicateUploadInfo[]> => {
     if (!user?.id) return [];
 
-    const today = formatLocalDate();
+    const today = new Date().toISOString().split('T')[0];
     
     // First, get the duplicate uploads
     const { data: uploads, error } = await supabase
@@ -813,7 +804,7 @@ export const useCallSheetUpload = () => {
         duplicateEntries: validationResult.duplicateEntries,
       });
 
-      const today = formatLocalDate();
+      const today = new Date().toISOString().split('T')[0];
       const validContacts = validationResult.contacts.filter(c => c.isValid);
       const totalSteps = validContacts.length + 3; // upload record + contacts + call list + rejections
 
@@ -867,7 +858,6 @@ export const useCallSheetUpload = () => {
           agent_id: user.id,
           file_name: file.name,
           file_size: file.size,
-          upload_date: today,
           total_entries_submitted: validationResult.totalEntries,
           valid_entries: validationResult.validEntries,
           invalid_entries: validationResult.invalidEntries,

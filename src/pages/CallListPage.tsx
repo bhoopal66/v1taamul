@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,7 +69,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportContactsToCSV, exportContactsToExcel, ContactExportData } from '@/utils/contactsExport';
-import { format, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format, isWithinInterval, startOfDay, endOfDay, subDays, parseISO } from 'date-fns';
 import { useCallList, CallListContact, FeedbackStatus } from '@/hooks/useCallList';
 import { cn } from '@/lib/utils';
 
@@ -116,6 +116,7 @@ const feedbackOptions: { status: FeedbackStatus; label: string; icon: React.Reac
 export const CallListPage: React.FC = () => {
   const { profile, userRole } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [hasAutoSelectedDate, setHasAutoSelectedDate] = useState(false);
   const { callList, stats, isLoading, refetch, logFeedback, isLogging, skipContact, isSkipping } = useCallList(selectedDate);
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
   
@@ -173,6 +174,25 @@ export const CallListPage: React.FC = () => {
     },
     enabled: !!profile?.id,
   });
+
+  // Auto-select the most recent date with data if today has no contacts
+  useEffect(() => {
+    if (hasAutoSelectedDate || isLoading) return;
+    
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const todayHasData = datesWithData.some(d => d.date === todayStr);
+    
+    // If today has no data but there are other dates with data, auto-select the most recent
+    if (!todayHasData && datesWithData.length > 0) {
+      const mostRecentDate = datesWithData[0]; // Already sorted desc
+      if (mostRecentDate) {
+        setSelectedDate(parseISO(mostRecentDate.date));
+        setHasAutoSelectedDate(true);
+      }
+    } else {
+      setHasAutoSelectedDate(true); // Mark as done even if we stick with today
+    }
+  }, [datesWithData, isLoading, hasAutoSelectedDate]);
 
   // Fetch teams for super_admin export filter
   const { data: teams = [] } = useQuery({

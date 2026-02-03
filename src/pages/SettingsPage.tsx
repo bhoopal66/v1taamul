@@ -13,6 +13,7 @@ import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { DatabaseExport } from '@/components/admin/DatabaseExport';
 
 // Storage keys for notification preferences
 const STORAGE_KEYS = {
@@ -385,6 +386,9 @@ export const SettingsPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Database Export - Super Admin Only */}
+        <DatabaseExport />
       </div>
     </div>
   );

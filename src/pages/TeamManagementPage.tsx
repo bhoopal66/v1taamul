@@ -633,75 +633,169 @@ export const TeamManagementPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Team Members Dialog */}
+      {/* View Team Details Dialog */}
       <Dialog open={!!viewMembersTeam} onOpenChange={(open) => !open && setViewMembersTeam(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              {viewMembersTeam?.name} Members
+              {viewMembersTeam?.name} - Team Details
             </DialogTitle>
             <DialogDescription>
-              Manage team members - view, move to other teams, or remove from team.
+              Complete team overview with leader, members, and quick actions.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[400px]">
-            <div className="space-y-2 pr-4">
-              {viewMembersTeam && getTeamMembers(viewMembersTeam.id).length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No members in this team yet.</p>
-                </div>
-              ) : (
-                viewMembersTeam && getTeamMembers(viewMembersTeam.id).map(member => (
-                  <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                          {getInitials(member.full_name, member.username)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {member.full_name || member.username}
-                          {viewMembersTeam.leader_id === member.id && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Crown className="w-3 h-3 mr-1" />
-                              Leader
-                            </Badge>
-                          )}
-                          <Badge variant={member.is_active ? 'default' : 'outline'} className="text-xs">
-                            {member.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
+          
+          {viewMembersTeam && (
+            <>
+              {/* Team Info Header */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
+                {/* Team Leader Card */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                      <Crown className="w-4 h-4 text-primary" />
+                      Team Leader
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3">
+                    {viewMembersTeam.leader_id ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                            {getInitials(viewMembersTeam.leader_name || null, viewMembersTeam.leader_name || 'TL')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-semibold text-sm">{viewMembersTeam.leader_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {agents.find(a => a.id === viewMembersTeam.leader_id)?.email || ''}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Not assigned</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Team Type Card */}
+                <Card>
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Team Type</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3">
+                    <div className="flex items-center gap-2">
+                      {viewMembersTeam.team_type === 'remote' ? (
+                        <Wifi className="w-5 h-5 text-info" />
+                      ) : (
+                        <Building2 className="w-5 h-5 text-info" />
+                      )}
+                      <span className="font-semibold capitalize">{viewMembersTeam.team_type}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Member Stats Card */}
+                <Card>
+                  <CardHeader className="pb-2 pt-3 px-4">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Members</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-lg">{viewMembersTeam.member_count} / 12</span>
+                      <div className="flex gap-2 text-xs">
+                        <Badge variant="default" className="text-xs">
+                          {getTeamMembers(viewMembersTeam.id).filter(m => m.is_active).length} active
+                        </Badge>
+                        {getTeamMembers(viewMembersTeam.id).filter(m => !m.is_active).length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {getTeamMembers(viewMembersTeam.id).filter(m => !m.is_active).length} inactive
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setMovingAgent(member)}
-                        className="gap-1"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                        Move
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive gap-1"
-                        onClick={() => handleRemoveFromTeam(member.id)}
-                      >
-                        <UserMinus className="w-4 h-4" />
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Members Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[250px]">Agent</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="text-right w-[150px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getTeamMembers(viewMembersTeam.id).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                          <p>No members in this team yet.</p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      getTeamMembers(viewMembersTeam.id).map(member => (
+                        <TableRow key={member.id} className={!member.is_active ? 'opacity-60' : ''}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback className={`text-xs font-medium ${viewMembersTeam.leader_id === member.id ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                                  {getInitials(member.full_name, member.username)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium flex items-center gap-2">
+                                  {member.full_name || member.username}
+                                  {viewMembersTeam.leader_id === member.id && (
+                                    <Crown className="w-3.5 h-3.5 text-primary" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">@{member.username}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {member.email}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-xs">
+                              {member.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={() => setMovingAgent(member)}
+                                className="h-7 px-2"
+                              >
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveFromTeam(member.id)}
+                              >
+                                <UserMinus className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewMembersTeam(null)}>Close</Button>
             <Button onClick={() => {

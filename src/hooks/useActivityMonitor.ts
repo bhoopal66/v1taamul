@@ -141,8 +141,9 @@ export function useActivityMonitor() {
         .select('*')
         .eq('user_id', user.id)
         .gte('started_at', `${today}T00:00:00`)
-        // Avoid pulling noisy 0-duration ended rows (prevents huge payloads if a bug spams logs)
-        .or('ended_at.is.null,duration_minutes.gt.0')
+        // Show active logs (ended_at is null) or closed logs with meaningful duration
+        // Also include logs where duration_minutes is null (not yet computed)
+        .or('ended_at.is.null,duration_minutes.is.null,duration_minutes.gt.0')
         .order('started_at', { ascending: true });
       
       if (error) throw error;

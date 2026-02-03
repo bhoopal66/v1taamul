@@ -70,6 +70,11 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     if (!log.ended_at) return true;
     // Keep logs with meaningful duration (> 0 minutes)
     if (log.duration_minutes && log.duration_minutes > 0) return true;
+    // If ended_at exists but duration_minutes is null, calculate it
+    if (log.ended_at && log.duration_minutes === null) {
+      const calculatedDuration = differenceInMinutes(new Date(log.ended_at), new Date(log.started_at));
+      return calculatedDuration > 0;
+    }
     return false;
   });
 
@@ -143,9 +148,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             <div className="space-y-4">
               {filteredLogs.map((log, index) => {
                 const isActive = !log.ended_at;
-                const duration = log.duration_minutes || (isActive 
-                  ? differenceInMinutes(new Date(), new Date(log.started_at))
-                  : 0);
+                // Calculate duration: use stored value, or calculate from ended_at, or calculate from now for active
+                const duration = log.duration_minutes ?? (log.ended_at
+                  ? differenceInMinutes(new Date(log.ended_at), new Date(log.started_at))
+                  : differenceInMinutes(new Date(), new Date(log.started_at)));
                 
                 return (
                   <div key={log.id} className="relative">

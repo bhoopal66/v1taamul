@@ -149,7 +149,7 @@ export const CallListPage: React.FC = () => {
   // View all uploads dialog state
   const [viewAllUploadsOpen, setViewAllUploadsOpen] = useState(false);
   // Fetch dates that have call list data for current user
-  const { data: datesWithData = [] } = useQuery({
+  const { data: datesWithData = [], isLoading: isDatesLoading } = useQuery({
     queryKey: ['call-list-dates', profile?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -177,7 +177,7 @@ export const CallListPage: React.FC = () => {
 
   // Auto-select the most recent date with data if today has no contacts
   useEffect(() => {
-    if (hasAutoSelectedDate || isLoading) return;
+    if (hasAutoSelectedDate || isDatesLoading) return;
     
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const todayHasData = datesWithData.some(d => d.date === todayStr);
@@ -192,7 +192,7 @@ export const CallListPage: React.FC = () => {
     } else {
       setHasAutoSelectedDate(true); // Mark as done even if we stick with today
     }
-  }, [datesWithData, isLoading, hasAutoSelectedDate]);
+  }, [datesWithData, isDatesLoading, hasAutoSelectedDate]);
 
   // Fetch teams for super_admin export filter
   const { data: teams = [] } = useQuery({

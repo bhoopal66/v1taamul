@@ -803,7 +803,7 @@ export const useCallSheetUpload = () => {
 
   // Submit upload mutation - auto-approves and creates call list immediately
   const submitUpload = useMutation({
-    mutationFn: async ({ file, validationResult }: { file: File; validationResult: UploadValidationResult }) => {
+    mutationFn: async ({ file, validationResult, sendToPool = false }: { file: File; validationResult: UploadValidationResult; sendToPool?: boolean }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
       // Start logging session
@@ -936,8 +936,10 @@ export const useCallSheetUpload = () => {
               industry: c.industry || null,
               area: c.area || null,
               first_uploaded_by: user.id,
-              current_owner_agent_id: user.id,
+              current_owner_agent_id: sendToPool ? null : user.id,
               status: 'new' as const,
+              in_company_pool: sendToPool,
+              pool_entry_date: sendToPool ? new Date().toISOString() : null,
             })
             .select('id')
             .single();
@@ -1006,8 +1008,19 @@ export const useCallSheetUpload = () => {
         
         const allContactIds = [...insertedContactIds, ...existingContactIds];
         
-        // Step 3: Create call list entries
-        if (allContactIds.length > 0) {
+        // Step 3: Create call list entries (skip if sending to pool)
+        if (sendToPool) {
+          setUploadProgress({ stage: 'creating_list', percentage: 90, message: 'Contacts added to Company Pool...' });
+          uploadLogger.info('pool_mode', `Sending ${allContactIds.length} contacts to Company Pool - skipping call list creation`);
+          
+          // Update upload record to indicate pool destination
+          await supabase
+            .from('call_sheet_uploads')
+            .update({ 
+              approved_count: allContactIds.length,
+            })
+            .eq('id', upload.id);
+        } else if (allContactIds.length > 0) {
           setUploadProgress({ stage: 'creating_list', percentage: 75, message: 'Creating call list entries...' });
           uploadLogger.info('call_list_start', `Starting to create call list entries for ${allContactIds.length} contacts`, {
             allContactIds: allContactIds.slice(0, 5), // Log first 5 IDs

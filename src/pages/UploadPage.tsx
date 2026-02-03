@@ -34,6 +34,7 @@ import {
   Wand2,
   Phone,
   ArrowRight,
+  Database,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { formatDistanceToNow } from 'date-fns';
@@ -87,6 +88,10 @@ export const UploadPage: React.FC = () => {
 
   // Confirmation dialog state
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  
+  // Pool mode state (for admin/super admin)
+  const [sendToPoolMode, setSendToPoolMode] = useState(false);
+  const [poolUploadSuccess, setPoolUploadSuccess] = useState(false);
 
   // Duplicate warning dialog state
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
@@ -275,8 +280,11 @@ export const UploadPage: React.FC = () => {
       
       // Auto-submit if there are valid entries and no duplicate
       if (result.validEntries > 0) {
-        submitUpload({ file, validationResult: result });
+        submitUpload({ file, validationResult: result, sendToPool: sendToPoolMode });
         setSelectedFile(null);
+        if (sendToPoolMode) {
+          setPoolUploadSuccess(true);
+        }
       }
       isUploadInProgress.current = false;
     } catch (error) {
@@ -289,8 +297,11 @@ export const UploadPage: React.FC = () => {
 
   const handleDuplicateConfirm = () => {
     if (pendingFile && pendingValidation) {
-      submitUpload({ file: pendingFile, validationResult: pendingValidation });
+      submitUpload({ file: pendingFile, validationResult: pendingValidation, sendToPool: sendToPoolMode });
       setSelectedFile(null);
+      if (sendToPoolMode) {
+        setPoolUploadSuccess(true);
+      }
     }
     setDuplicateWarningOpen(false);
     setDuplicateUploads([]);
@@ -319,8 +330,11 @@ export const UploadPage: React.FC = () => {
     }
     
     if (pendingFile && pendingValidation) {
-      submitUpload({ file: pendingFile, validationResult: pendingValidation });
+      submitUpload({ file: pendingFile, validationResult: pendingValidation, sendToPool: sendToPoolMode });
       setSelectedFile(null);
+      if (sendToPoolMode) {
+        setPoolUploadSuccess(true);
+      }
     }
     
     setDuplicateWarningOpen(false);
@@ -345,9 +359,12 @@ export const UploadPage: React.FC = () => {
 
   const handleSubmit = () => {
     if (selectedFile && parsedData) {
-      submitUpload({ file: selectedFile, validationResult: parsedData });
+      submitUpload({ file: selectedFile, validationResult: parsedData, sendToPool: sendToPoolMode });
       setSelectedFile(null);
       setConfirmDialogOpen(false);
+      if (sendToPoolMode) {
+        setPoolUploadSuccess(true);
+      }
     }
   };
 
@@ -455,7 +472,7 @@ export const UploadPage: React.FC = () => {
               )}
 
               {/* Success state - show after successful upload */}
-              {lastUploadSuccess && !parsedData && !isSubmitting && (
+              {lastUploadSuccess && !parsedData && !isSubmitting && !poolUploadSuccess && (
                 <div className="mb-6 p-6 rounded-xl bg-green-500/10 border border-green-500/20">
                   <div className="flex flex-col items-center gap-4 text-center">
                     <div className="p-3 rounded-full bg-green-500/20">
@@ -487,7 +504,82 @@ export const UploadPage: React.FC = () => {
                 </div>
               )}
 
-              {!parsedData && !lastUploadSuccess && !isSubmitting && (
+              {/* Pool Success state - show after successful pool upload */}
+              {poolUploadSuccess && !parsedData && !isSubmitting && (
+                <div className="mb-6 p-6 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex flex-col items-center gap-4 text-center">
+                    <div className="p-3 rounded-full bg-blue-500/20">
+                      <Database className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg text-blue-700">Added to Company Pool!</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Your contacts have been added to the Company Pool for allocation
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => navigate('/user-management')}
+                        className="gap-2"
+                      >
+                        <Database className="w-4 h-4" />
+                        View Company Pool
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setPoolUploadSuccess(false);
+                          resetUploadSuccess();
+                        }}
+                      >
+                        Upload More
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Pool Mode Toggle */}
+              {isAdmin && !parsedData && !lastUploadSuccess && !poolUploadSuccess && !isSubmitting && (
+                <div className="mb-4 p-4 rounded-lg bg-muted/50 border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">Upload Destination</p>
+                        <p className="text-xs text-muted-foreground">
+                          {sendToPoolMode 
+                            ? 'Contacts will be added to Company Pool for later allocation' 
+                            : 'Contacts will be added to your personal Call List'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={!sendToPoolMode ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSendToPoolMode(false)}
+                        className="gap-1"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        Call List
+                      </Button>
+                      <Button
+                        variant={sendToPoolMode ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSendToPoolMode(true)}
+                        className="gap-1"
+                      >
+                        <Database className="w-3.5 h-3.5" />
+                        Company Pool
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!parsedData && !lastUploadSuccess && !poolUploadSuccess && !isSubmitting && (
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}

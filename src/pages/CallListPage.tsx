@@ -194,6 +194,66 @@ export const CallListPage: React.FC = () => {
     }
   }, [datesWithData, isDatesLoading, hasAutoSelectedDate]);
 
+  // Fetch ALL pending contacts across all dates (for "pending" filter)
+  const { data: allPendingContacts = [], isLoading: isLoadingAllPending } = useQuery({
+    queryKey: ['all-pending-contacts', profile?.id],
+    queryFn: async (): Promise<CallListContact[]> => {
+      // Fetch all pending call list items
+      const { data: callListData, error: callListError } = await supabase
+        .from('approved_call_list')
+        .select('*')
+        .eq('agent_id', profile?.id)
+        .eq('call_status', 'pending')
+        .order('list_date', { ascending: false })
+        .order('call_order', { ascending: true });
+
+      if (callListError) throw callListError;
+
+      if (!callListData || callListData.length === 0) {
+        return [];
+      }
+
+      // Get contact IDs
+      const contactIds = callListData.map(c => c.contact_id);
+
+      // Fetch contact details
+      const { data: contacts, error: contactsError } = await supabase
+        .from('master_contacts')
+        .select('*')
+        .in('id', contactIds);
+
+      if (contactsError) throw contactsError;
+
+      // Create a map for quick lookup
+      const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
+
+      return callListData.map(item => {
+        const contact = contactMap.get(item.contact_id);
+
+        return {
+          id: item.id,
+          callListId: item.id,
+          contactId: item.contact_id,
+          companyName: contact?.company_name || 'Unknown',
+          contactPersonName: contact?.contact_person_name || 'Unknown',
+          phoneNumber: contact?.phone_number || '',
+          tradeLicenseNumber: contact?.trade_license_number || '',
+          city: contact?.city || null,
+          industry: contact?.industry || null,
+          area: (contact as { area?: string | null })?.area || null,
+          callOrder: item.call_order,
+          callStatus: item.call_status as 'pending' | 'called' | 'skipped',
+          calledAt: item.called_at,
+          lastFeedback: null,
+          lastNotes: null,
+          listDate: item.list_date, // Include the date for reference
+        };
+      });
+    },
+    enabled: !!profile?.id && filterStatus === 'pending',
+    staleTime: 0,
+  });
+
   // Fetch teams for super_admin export filter
   const { data: teams = [] } = useQuery({
     queryKey: ['teams-for-export'],
@@ -648,7 +708,10 @@ export const CallListPage: React.FC = () => {
     setExportEndDate(end);
   };
 
-  const filteredList = callList.filter(contact => {
+  // Use allPendingContacts when pending filter is selected, otherwise use date-specific callList
+  const sourceList = filterStatus === 'pending' ? allPendingContacts : callList;
+  
+  const filteredList = sourceList.filter(contact => {
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
       contact.companyName.toLowerCase().includes(searchLower) ||
@@ -658,8 +721,10 @@ export const CallListPage: React.FC = () => {
       (contact.area && contact.area.toLowerCase().includes(searchLower)) ||
       (contact.industry && contact.industry.toLowerCase().includes(searchLower));
 
+    // For pending filter, we already filtered by status in the query
     const matchesFilter = 
       filterStatus === 'all' || 
+      filterStatus === 'pending' ||
       contact.callStatus === filterStatus;
 
     const matchesArea = 
@@ -676,6 +741,13 @@ export const CallListPage: React.FC = () => {
   const pendingContacts = filteredList.filter(c => c.callStatus === 'pending');
   const calledContacts = filteredList.filter(c => c.callStatus === 'called');
   const progressPercent = stats.total > 0 ? Math.round((stats.called / stats.total) * 100) : 0;
+  
+  // Calculate stats for pending view (all-time) vs date-specific
+  const displayStats = filterStatus === 'pending' ? {
+    ...stats,
+    total: allPendingContacts.length,
+    pending: allPendingContacts.length,
+  } : stats;
 
   const getStatusBadge = (contact: CallListContact) => {
     if (contact.callStatus === 'skipped') {
@@ -876,13 +948,15 @@ export const CallListPage: React.FC = () => {
           <Card className="col-span-2">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">{isToday ? "Today's" : format(selectedDate, 'MMM d')} Progress</span>
-                <span className="text-2xl font-bold">{progressPercent}%</span>
+                <span className="text-sm text-muted-foreground">
+                  {filterStatus === 'pending' ? 'All Pending' : isToday ? "Today's" : format(selectedDate, 'MMM d')} Progress
+                </span>
+                <span className="text-2xl font-bold">{filterStatus === 'pending' ? allPendingContacts.length : progressPercent}%</span>
               </div>
-              <Progress value={progressPercent} className="h-2" />
+              <Progress value={filterStatus === 'pending' ? 0 : progressPercent} className="h-2" />
               <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{stats.called} called</span>
-                <span>{stats.pending} remaining</span>
+                <span>{filterStatus === 'pending' ? `${allPendingContacts.length} total pending` : `${stats.called} called`}</span>
+                <span>{filterStatus === 'pending' ? 'across all dates' : `${stats.pending} remaining`}</span>
               </div>
             </CardContent>
           </Card>
@@ -1061,7 +1135,7 @@ export const CallListPage: React.FC = () => {
               className="capitalize"
             >
               {status === 'all' ? `All (${stats.total})` : 
-               status === 'pending' ? `Pending (${stats.pending})` :
+               status === 'pending' ? `Pending (${filterStatus === 'pending' ? allPendingContacts.length : stats.pending}${filterStatus === 'pending' ? ' all-time' : ''})` :
                status === 'called' ? `Called (${stats.called})` :
                `Skipped (${stats.skipped})`}
             </Button>
@@ -1087,8 +1161,30 @@ export const CallListPage: React.FC = () => {
         </div>
       </div>
 
+      {/* All Pending Banner */}
+      {filterStatus === 'pending' && allPendingContacts.length > 0 && (
+        <Card className="border-blue-500/30 bg-blue-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-3">
+            <Clock className="w-5 h-5 text-blue-600" />
+            <div className="flex-1">
+              <p className="font-medium text-blue-700">Showing All Pending Contacts</p>
+              <p className="text-sm text-muted-foreground">
+                {allPendingContacts.length} pending contacts across all dates are displayed below.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setFilterStatus('all')}
+            >
+              Show Today Only
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Call List */}
-      {isLoading ? (
+      {(isLoading || (filterStatus === 'pending' && isLoadingAllPending)) ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -1098,9 +1194,11 @@ export const CallListPage: React.FC = () => {
             <Phone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No contacts found</h3>
             <p className="text-muted-foreground">
-              {callList.length === 0 
-                ? "You don't have any approved contacts for today. Upload a call sheet to get started."
-                : "No contacts match your search criteria."}
+              {filterStatus === 'pending' 
+                ? "You don't have any pending contacts across all dates."
+                : callList.length === 0 
+                  ? "You don't have any approved contacts for today. Upload a call sheet to get started."
+                  : "No contacts match your search criteria."}
             </p>
           </CardContent>
         </Card>

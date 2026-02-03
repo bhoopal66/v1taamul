@@ -24,6 +24,7 @@ export interface CallListContact {
   calledAt: string | null;
   lastFeedback: FeedbackStatus | null;
   lastNotes: string | null;
+  listDate?: string; // Optional: date the contact was assigned
 }
 
 export interface CallListStats {

@@ -72,6 +72,9 @@ export const OTHERS_FLAG_THRESHOLD_MINUTES = 30;
 export const FIVE_MIN_AUTO_LOGOUT_ACTIVITIES: SimpleActivityType[] = ['calling', 'meeting_in_office'];
 export const FIVE_MIN_AUTO_LOGOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+// 15-MINUTE IDLE AUTO-LOGOUT (excludes break/lunch)
+export const IDLE_AUTO_LOGOUT_MS = 15 * 60 * 1000; // 15 minutes
+
 // Activity labels for auto-logout reasons
 export const FIVE_MIN_ACTIVITY_LABELS: Record<string, string> = {
   calling: 'Cold Calling',
@@ -162,6 +165,7 @@ export function useActivitySession() {
   const confirmationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fiveMinAutoLogoutTimerRef = useRef<NodeJS.Timeout | null>(null); // 5-min auto-logout timer
+  const idleAutoLogoutTimerRef = useRef<NodeJS.Timeout | null>(null); // 15-min idle auto-logout timer
 
   // Update current time every second for the clock
   useEffect(() => {
@@ -479,6 +483,8 @@ export function useActivitySession() {
         return 'Break Time Overrun';
       case 'five_min_auto_logout':
         return 'Auto Logout – 10 Minute Rule';
+      case 'idle_auto_logout':
+        return 'Auto Logout – Idle 15 Minutes';
       default:
         return 'Agent Activity Alert';
     }
@@ -993,6 +999,100 @@ export function useActivitySession() {
     };
   }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, user?.id, profile?.full_name, queryClient]);
 
+  // 15-MINUTE IDLE AUTO-LOGOUT (no activity selected, excludes break/lunch)
+  useEffect(() => {
+    // Clear existing timer when conditions change
+    if (idleAutoLogoutTimerRef.current) {
+      clearTimeout(idleAutoLogoutTimerRef.current);
+      idleAutoLogoutTimerRef.current = null;
+    }
+
+    // Skip if session not active or user not authenticated
+    if (!isSessionActive || !session?.id || !user?.id) return;
+
+    // Skip if on scheduled break - don't count idle time during breaks
+    if (breakStatus.onBreak) return;
+
+    // Skip if current activity is 'break' (manual or auto break)
+    if (session.current_activity === 'break') return;
+
+    // Only trigger idle auto-logout if NO activity is selected (null means idle/no selection)
+    if (session.current_activity !== null) return;
+
+    // Calculate how long they've been idle (since session started without activity selection)
+    // We use start_time as the reference since that's when they pressed START but didn't select an activity
+    const idleStartTime = session.current_activity_started_at 
+      ? new Date(session.current_activity_started_at).getTime()
+      : session.start_time 
+        ? new Date(session.start_time).getTime()
+        : null;
+
+    if (!idleStartTime) return;
+
+    const now = Date.now();
+    const elapsed = now - idleStartTime;
+    const remaining = IDLE_AUTO_LOGOUT_MS - elapsed;
+
+    if (remaining <= 0) {
+      // Already exceeded 15 minutes idle - perform auto-logout immediately
+      performIdleAutoLogout();
+    } else {
+      // Set timer for remaining time
+      idleAutoLogoutTimerRef.current = setTimeout(() => {
+        performIdleAutoLogout();
+      }, remaining);
+    }
+
+    async function performIdleAutoLogout() {
+      const nowIso = new Date().toISOString();
+      const today = new Date().toISOString().split('T')[0];
+
+      // End the session
+      await supabase
+        .from('activity_sessions')
+        .update({
+          end_time: nowIso,
+          end_reason: 'auto_logout_idle_15min',
+          is_active: false,
+          updated_at: nowIso,
+        })
+        .eq('id', session!.id);
+
+      // Update attendance record
+      await supabase
+        .from('attendance_records')
+        .update({
+          is_working: false,
+          end_reason: 'Auto logout – Idle (15 min)',
+          last_logout: nowIso,
+        })
+        .eq('user_id', user!.id)
+        .eq('date', today);
+
+      // Alert supervisor
+      await alertSupervisor('idle_auto_logout',
+        `Agent ${profile?.full_name || 'Unknown'} was auto-logged out after being idle for 15 minutes without selecting an activity.`,
+        { 
+          auto_logout_reason: 'idle_15_min_no_activity',
+          supervisor_notified: true
+        }
+      );
+
+      toast.error('You have been auto-logged out due to 15 minutes of inactivity. Please log in and select an activity to continue.');
+      
+      queryClient.invalidateQueries({ queryKey: ['activity-session'] });
+      queryClient.invalidateQueries({ queryKey: ['activity-session-status'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    }
+
+    return () => {
+      if (idleAutoLogoutTimerRef.current) {
+        clearTimeout(idleAutoLogoutTimerRef.current);
+        idleAutoLogoutTimerRef.current = null;
+      }
+    };
+  }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, session?.start_time, user?.id, profile?.full_name, breakStatus.onBreak, queryClient]);
+
   // Set up realtime subscription for session updates
   useEffect(() => {
     if (!user?.id) return;
@@ -1041,6 +1141,32 @@ export function useActivitySession() {
     };
   }, [isSessionActive, session?.current_activity, session?.current_activity_started_at, currentTime]);
 
+  // Calculate 15-minute idle countdown
+  const idleCountdown = useMemo(() => {
+    // Only show countdown when idle (no activity selected) and not on break
+    if (!isSessionActive || session?.current_activity !== null || breakStatus.onBreak) {
+      return null;
+    }
+
+    const idleStartTime = session?.current_activity_started_at 
+      ? new Date(session.current_activity_started_at).getTime()
+      : session?.start_time 
+        ? new Date(session.start_time).getTime()
+        : null;
+
+    if (!idleStartTime) return null;
+
+    const elapsed = currentTime.getTime() - idleStartTime;
+    const remaining = Math.max(0, IDLE_AUTO_LOGOUT_MS - elapsed);
+    
+    return {
+      remaining,
+      remainingSeconds: Math.ceil(remaining / 1000),
+      remainingMinutes: Math.ceil(remaining / 60000),
+      isActive: remaining > 0,
+    };
+  }, [isSessionActive, session?.current_activity, session?.current_activity_started_at, session?.start_time, currentTime, breakStatus.onBreak]);
+
   return {
     // State
     session,
@@ -1056,6 +1182,7 @@ export function useActivitySession() {
       ? Math.max(0, GRACE_PERIOD_MS - (currentTime.getTime() - confirmationPendingSince.getTime()))
       : GRACE_PERIOD_MS,
     fiveMinCountdown, // 5-minute auto-logout countdown
+    idleCountdown, // 15-minute idle auto-logout countdown
 
     // Loading states
     isLoading: sessionLoading,

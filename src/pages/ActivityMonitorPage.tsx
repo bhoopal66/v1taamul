@@ -11,6 +11,7 @@ import { AttendanceCard } from '@/components/activity/AttendanceCard';
 import { CallingStatsCard } from '@/components/activity/CallingStatsCard';
 import { ActivityTimeline } from '@/components/activity/ActivityTimeline';
 import { FiveMinCountdownBanner } from '@/components/activity/FiveMinCountdownBanner';
+import { IdleCountdownBanner } from '@/components/activity/IdleCountdownBanner';
 import { useActivityMonitor } from '@/hooks/useActivityMonitor';
 import { Activity, Clock, LogOut, CheckCircle2 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -28,6 +29,7 @@ export const ActivityMonitorPage: React.FC = () => {
     showConfirmationPrompt,
     graceTimeRemaining,
     fiveMinCountdown,
+    idleCountdown,
     isLoading,
     isStarting,
     isSwitching,
@@ -158,7 +160,14 @@ export const ActivityMonitorPage: React.FC = () => {
         </Card>
       )}
 
-      {/* 5-Minute Countdown Banner */}
+      {/* 15-Minute Idle Countdown Banner */}
+      {isSessionActive && idleCountdown && idleCountdown.isActive && !session?.current_activity && (
+        <IdleCountdownBanner
+          remainingSeconds={idleCountdown.remainingSeconds}
+        />
+      )}
+
+      {/* 10-Minute Countdown Banner for Cold Calling / Meeting */}
       {isSessionActive && fiveMinCountdown && fiveMinCountdown.isActive && (
         <FiveMinCountdownBanner
           remainingSeconds={fiveMinCountdown.remainingSeconds}

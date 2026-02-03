@@ -70,7 +70,18 @@ const validatePhoneNumber = (phone: string): boolean => {
 };
 
 const cleanPhoneNumber = (phone: string): string => {
-  return phone.replace(/[\s\-\(\)\.]/g, '').replace(/^00/, '+');
+  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '').replace(/^00/, '+');
+  
+  // Normalize UAE numbers: convert +971 or 971 prefix to 0
+  // e.g., +971501234567 → 0501234567, 971501234567 → 0501234567
+  if (cleaned.startsWith('+971')) {
+    cleaned = '0' + cleaned.substring(4);
+  } else if (cleaned.startsWith('971') && cleaned.length >= 12) {
+    // 971 followed by 9 digits (UAE mobile)
+    cleaned = '0' + cleaned.substring(3);
+  }
+  
+  return cleaned;
 };
 
 export interface DuplicateUploadInfo {

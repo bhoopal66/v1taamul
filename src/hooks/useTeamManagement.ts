@@ -52,10 +52,11 @@ export const useTeamManagement = () => {
         leaderProfiles = data || [];
       }
 
-      // Get member counts (using profiles_public for non-sensitive data)
+      // Get member counts - only count active members
       const { data: memberCounts } = await supabase
         .from('profiles_public')
         .select('team_id')
+        .eq('is_active', true)
         .not('team_id', 'is', null);
 
       const countMap = new Map<string, number>();
@@ -78,14 +79,15 @@ export const useTeamManagement = () => {
     enabled: !!user?.id && isAdmin,
   });
 
-  // Fetch all agents (for assignment) - using profiles for admins who need email access
+  // Fetch only active agents (for assignment)
   const { data: agents, isLoading: agentsLoading } = useQuery({
     queryKey: ['agents-for-team-assignment'],
     queryFn: async (): Promise<TeamMember[]> => {
-      // Admins can access full profiles including email
+      // Admins can access full profiles including email - only show active members
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, username, email, team_id, is_active')
+        .eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;

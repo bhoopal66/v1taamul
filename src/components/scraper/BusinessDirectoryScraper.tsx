@@ -80,6 +80,18 @@ export const BusinessDirectoryScraper = () => {
     }
   };
 
+  // Normalize UAE phone numbers: convert +971 or 971 prefix to 0
+  const normalizePhoneNumber = (phone: string): string => {
+    let cleaned = phone.replace(/[\s\-\(\)\.]/g, '').replace(/^00/, '+');
+    
+    if (cleaned.startsWith('+971')) {
+      cleaned = '0' + cleaned.substring(4);
+    } else if (cleaned.startsWith('971') && cleaned.length >= 12) {
+      cleaned = '0' + cleaned.substring(3);
+    }
+    
+    return cleaned;
+  };
 
   const handleAddToCallList = async () => {
     if (!user?.id || selectedCompanies.size === 0) return;
@@ -94,11 +106,13 @@ export const BusinessDirectoryScraper = () => {
 
     for (const company of selectedList) {
       try {
+        // Normalize the phone number before processing
+        const normalizedPhone = normalizePhoneNumber(company.phone_number);
         // Check if phone number already exists using RPC (bypasses RLS for cross-agent check)
         let contactId: string | null = null;
         
         const { data: existingContactId, error: rpcError } = await supabase
-          .rpc('find_contact_by_phone', { phone: company.phone_number });
+          .rpc('find_contact_by_phone', { phone: normalizedPhone });
 
         if (!rpcError && existingContactId) {
           contactId = existingContactId;
@@ -107,7 +121,7 @@ export const BusinessDirectoryScraper = () => {
           const { data: existing } = await supabase
             .from('master_contacts')
             .select('id')
-            .eq('phone_number', company.phone_number)
+            .eq('phone_number', normalizedPhone)
             .maybeSingle();
 
           if (existing) {
@@ -116,12 +130,12 @@ export const BusinessDirectoryScraper = () => {
         }
 
         if (!contactId) {
-          // Insert new contact
+          // Insert new contact with normalized phone
           const { data: newContact, error: insertError } = await supabase
             .from('master_contacts')
             .insert({
               company_name: company.company_name,
-              phone_number: company.phone_number,
+              phone_number: normalizedPhone,
               contact_person_name: company.contact_person_name || null,
               industry: company.industry || null,
               city: company.city || null,

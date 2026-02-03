@@ -48,6 +48,9 @@ export function usePermissions() {
   const canViewReports = hasFeatureAccess('view_reports');
   const canViewAllAgentsData = hasFeatureAccess('view_all_agents_data');
   const canExportData = hasFeatureAccess('export_data');
+  const canDeleteRecords = hasFeatureAccess('delete_records');
+  const canDeleteTeams = hasFeatureAccess('delete_teams');
+  const canDeleteUsers = hasFeatureAccess('delete_users');
 
   // Get role display label
   const roleLabel = getRoleLabel(role);
@@ -73,5 +76,8 @@ export function usePermissions() {
     canViewReports,
     canViewAllAgentsData,
     canExportData,
+    canDeleteRecords,
+    canDeleteTeams,
+    canDeleteUsers,
   };
 }

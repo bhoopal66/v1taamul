@@ -43,12 +43,14 @@ export const useAllAgentsPerformance = (options: UseAllAgentsPerformanceOptions 
     dateTo = endOfMonth(new Date()) 
   } = options;
 
-  // Only admin, super_admin, operations_head can see ALL agents
-  // Supervisors should only see their team (same as team leaders)
+  // Admin and super_admin can see ALL agents across ALL teams (global view)
+  // operations_head also has global view
+  // Supervisors and team leaders only see their team
   const canSeeAllAgents = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   
-  // Determine the team ID to filter by (for supervisors and team leaders)
-  const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
+  // Determine the team ID to filter by (for supervisors and team leaders only)
+  // Admins don't need team filtering - they see everyone
+  const effectiveTeamId = canSeeAllAgents ? null : (ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null));
 
   // Fetch all agents (filtered by team for supervisors and team leaders)
   const { data: agents, isLoading: agentsLoading } = useQuery({

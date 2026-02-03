@@ -48,7 +48,8 @@ export const useSupervisorData = (teamId?: string) => {
 
   const isSupervisor = userRole === 'supervisor' || userRole === 'operations_head' || userRole === 'admin' || userRole === 'super_admin';
   
-  // Check if user can see all teams (admin, super_admin, operations_head)
+  // Admin and super_admin can see ALL teams globally (no team filtering)
+  // operations_head also has global visibility
   const canSeeAllTeams = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   // Fetch team agents with their performance

@@ -25,7 +25,7 @@ export const PAGE_PERMISSIONS: PagePermission[] = [
   { path: '/activity-monitor', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Activity Monitor' },
   { path: '/settings', allowedRoles: ['agent', 'supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller', 'coordinator'], label: 'Settings' },
   
-  // Management pages (supervisor and above)
+  // Management pages (supervisor and above) - Admin sees ALL agents globally
   { path: '/dashboard', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'], redirectTo: '/profile', label: 'Dashboard' },
   { path: '/supervisor', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin'], redirectTo: '/profile', label: 'Team Overview' },
   { path: '/reports', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin'], redirectTo: '/profile', label: 'Reports' },

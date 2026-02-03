@@ -12,6 +12,7 @@ import { CallingStatsCard } from '@/components/activity/CallingStatsCard';
 import { ActivityTimeline } from '@/components/activity/ActivityTimeline';
 import { FiveMinCountdownBanner } from '@/components/activity/FiveMinCountdownBanner';
 import { IdleCountdownBanner } from '@/components/activity/IdleCountdownBanner';
+import { MyAttendanceHistory } from '@/components/activity/MyAttendanceHistory';
 import { useActivityMonitor } from '@/hooks/useActivityMonitor';
 import { Activity, Clock, LogOut, CheckCircle2 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -239,6 +240,9 @@ export const ActivityMonitorPage: React.FC = () => {
 
       {/* Full Timeline */}
       <ActivityTimeline logs={todayLogs} />
+
+      {/* My Attendance History */}
+      <MyAttendanceHistory />
     </div>
   );
 };

@@ -8,25 +8,19 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAgentAttendanceOverview, AttendancePeriod } from '@/hooks/useAgentAttendanceOverview';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Users, Download, FileSpreadsheet } from 'lucide-react';
+import { useMyAttendanceHistory, AttendancePeriod, MyAttendanceRecord } from '@/hooks/useMyAttendanceHistory';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-
-interface AgentAttendanceOverviewProps {
-  teamId?: string;
-}
 
 // Data starts from Feb 4, 2025
 const DATA_START_DATE = new Date('2025-02-04');
 
-export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = ({ teamId }) => {
-  const [period, setPeriod] = useState<AttendancePeriod>('day');
+export const MyAttendanceHistory: React.FC = () => {
+  const [period, setPeriod] = useState<AttendancePeriod>('week');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const { data: attendanceRecords, isLoading } = useAgentAttendanceOverview({
-    teamId,
+  const { data: attendanceRecords, isLoading } = useMyAttendanceHistory({
     period,
     selectedDate,
   });
@@ -115,91 +109,64 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
     }
   };
 
-  // Group records by agent for week/month view
-  const groupedByAgent = React.useMemo(() => {
-    if (!attendanceRecords || period === 'day') return null;
-
-    const grouped = new Map<string, typeof attendanceRecords>();
-    attendanceRecords.forEach(record => {
-      const existing = grouped.get(record.agentId) || [];
-      existing.push(record);
-      grouped.set(record.agentId, existing);
-    });
-
-    return Array.from(grouped.entries()).map(([agentId, records]) => ({
-      agentId,
-      agentName: records[0]?.agentName || 'Unknown',
-      records,
-      totalDays: records.length,
-      lateDays: records.filter(r => r.isLate).length,
-      totalWorkMinutes: records.reduce((sum, r) => sum + (r.totalWorkMinutes || 0), 0),
-    }));
-  }, [attendanceRecords, period]);
-
   const exportToCSV = () => {
     if (!attendanceRecords || attendanceRecords.length === 0) {
       toast.error('No data to export');
       return;
     }
 
-    if (period === 'day') {
-      // Daily export
-      const headers = ['Agent', 'Date', 'First Login', 'Last Logout', 'Work Time', 'Status'];
-      const rows = attendanceRecords.map(record => [
-        record.agentName,
-        format(new Date(record.date), 'yyyy-MM-dd'),
-        record.firstLogin ? format(new Date(record.firstLogin), 'HH:mm:ss') : '',
-        record.lastLogout ? format(new Date(record.lastLogout), 'HH:mm:ss') : '',
-        record.totalWorkMinutes ? `${Math.floor(record.totalWorkMinutes / 60)}h ${Math.round(record.totalWorkMinutes % 60)}m` : '',
-        record.isLate ? 'Late' : (record.status || 'Present'),
-      ]);
+    const headers = ['Date', 'First Login', 'Last Logout', 'Work Time', 'Status'];
+    const rows = attendanceRecords.map(record => [
+      format(new Date(record.date), 'yyyy-MM-dd'),
+      record.firstLogin ? format(new Date(record.firstLogin), 'HH:mm:ss') : '',
+      record.lastLogout ? format(new Date(record.lastLogout), 'HH:mm:ss') : '',
+      record.totalWorkMinutes ? `${Math.floor(record.totalWorkMinutes / 60)}h ${Math.round(record.totalWorkMinutes % 60)}m` : '',
+      record.isLate ? 'Late' : (record.status || 'Present'),
+    ]);
 
-      const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-      downloadCSV(csvContent, `attendance-daily-${format(selectedDate, 'yyyy-MM-dd')}.csv`);
-    } else {
-      // Week/Month summary export
-      if (!groupedByAgent) return;
-
-      const headers = ['Agent', 'Days Present', 'Late Days', 'Total Work Time', 'Avg Login', 'Avg Logout'];
-      const rows = groupedByAgent.map(agent => {
-        const loginTimes = agent.records.filter(r => r.firstLogin).map(r => new Date(r.firstLogin!).getTime());
-        const logoutTimes = agent.records.filter(r => r.lastLogout).map(r => new Date(r.lastLogout!).getTime());
-        const avgLogin = loginTimes.length > 0 ? new Date(loginTimes.reduce((a, b) => a + b, 0) / loginTimes.length) : null;
-        const avgLogout = logoutTimes.length > 0 ? new Date(logoutTimes.reduce((a, b) => a + b, 0) / logoutTimes.length) : null;
-
-        return [
-          agent.agentName,
-          agent.totalDays.toString(),
-          agent.lateDays.toString(),
-          `${Math.floor(agent.totalWorkMinutes / 60)}h ${Math.round(agent.totalWorkMinutes % 60)}m`,
-          avgLogin ? format(avgLogin, 'HH:mm') : '',
-          avgLogout ? format(avgLogout, 'HH:mm') : '',
-        ];
-      });
-
-      const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-      downloadCSV(csvContent, `attendance-${period}-${getDateRangeLabel().replace(/[^a-zA-Z0-9]/g, '-')}.csv`);
-    }
-    toast.success('Attendance exported to CSV');
-  };
-
-  const downloadCSV = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/csv' });
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = `my-attendance-${getDateRangeLabel().replace(/[^a-zA-Z0-9]/g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('Attendance exported to CSV');
   };
+
+  // Calculate summary for week/month view
+  const summary = React.useMemo(() => {
+    if (!attendanceRecords || period === 'day') return null;
+    
+    const totalDays = attendanceRecords.length;
+    const lateDays = attendanceRecords.filter(r => r.isLate).length;
+    const totalWorkMinutes = attendanceRecords.reduce((sum, r) => sum + (r.totalWorkMinutes || 0), 0);
+    
+    const loginTimes = attendanceRecords
+      .filter(r => r.firstLogin)
+      .map(r => new Date(r.firstLogin!).getTime());
+    const logoutTimes = attendanceRecords
+      .filter(r => r.lastLogout)
+      .map(r => new Date(r.lastLogout!).getTime());
+
+    const avgLoginTime = loginTimes.length > 0 
+      ? new Date(loginTimes.reduce((a, b) => a + b, 0) / loginTimes.length)
+      : null;
+    const avgLogoutTime = logoutTimes.length > 0
+      ? new Date(logoutTimes.reduce((a, b) => a + b, 0) / logoutTimes.length)
+      : null;
+
+    return { totalDays, lateDays, totalWorkMinutes, avgLoginTime, avgLogoutTime };
+  }, [attendanceRecords, period]);
 
   return (
     <Card>
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="w-5 h-5 text-primary" />
-            Agent Attendance Overview
+            <CalendarDays className="w-5 h-5 text-primary" />
+            My Attendance History
           </CardTitle>
           
           <div className="flex items-center gap-3 flex-wrap">
@@ -245,7 +212,7 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
               
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 min-w-[180px]">
+                  <Button variant="outline" size="sm" className="gap-2 min-w-[160px]">
                     <CalendarDays className="w-4 h-4" />
                     {getDateRangeLabel()}
                   </Button>
@@ -278,18 +245,48 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
       <CardContent>
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map(i => (
+            {[1, 2, 3].map(i => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
         ) : attendanceRecords && attendanceRecords.length > 0 ? (
-          period === 'day' ? (
-            // Daily View - Simple table
+          <div className="space-y-4">
+            {/* Summary Cards for Week/Month */}
+            {summary && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold">{summary.totalDays}</p>
+                  <p className="text-xs text-muted-foreground">Days Present</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-destructive">{summary.lateDays}</p>
+                  <p className="text-xs text-muted-foreground">Late Days</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold">{formatWorkDuration(summary.totalWorkMinutes)}</p>
+                  <p className="text-xs text-muted-foreground">Total Work Time</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono">
+                    {summary.avgLoginTime ? format(summary.avgLoginTime, 'hh:mm a') : '—'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Avg. Login</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono">
+                    {summary.avgLogoutTime ? format(summary.avgLogoutTime, 'hh:mm a') : '—'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Avg. Logout</p>
+                </div>
+              </div>
+            )}
+
+            {/* Table */}
             <div className="rounded-md border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead>Agent</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <LogIn className="w-4 h-4" /> First Login
@@ -310,8 +307,10 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
                 </TableHeader>
                 <TableBody>
                   {attendanceRecords.map((record, idx) => (
-                    <TableRow key={`${record.agentId}-${record.date}-${idx}`}>
-                      <TableCell className="font-medium">{record.agentName}</TableCell>
+                    <TableRow key={`${record.date}-${idx}`}>
+                      <TableCell className="font-medium">
+                        {format(new Date(record.date), 'EEE, MMM d')}
+                      </TableCell>
                       <TableCell className="text-center font-mono">
                         {formatTime(record.firstLogin)}
                       </TableCell>
@@ -339,69 +338,10 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
                 </TableBody>
               </Table>
             </div>
-          ) : (
-            // Week/Month View - Grouped by agent with summary
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Agent</TableHead>
-                    <TableHead className="text-center">Days Present</TableHead>
-                    <TableHead className="text-center">Late Days</TableHead>
-                    <TableHead className="text-center">Total Work Time</TableHead>
-                    <TableHead className="text-center">Avg. First Login</TableHead>
-                    <TableHead className="text-center">Avg. Last Logout</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupedByAgent?.map((agent) => {
-                    // Calculate average login/logout times
-                    const loginTimes = agent.records
-                      .filter(r => r.firstLogin)
-                      .map(r => new Date(r.firstLogin!).getTime());
-                    const logoutTimes = agent.records
-                      .filter(r => r.lastLogout)
-                      .map(r => new Date(r.lastLogout!).getTime());
-
-                    const avgLoginTime = loginTimes.length > 0 
-                      ? new Date(loginTimes.reduce((a, b) => a + b, 0) / loginTimes.length)
-                      : null;
-                    const avgLogoutTime = logoutTimes.length > 0
-                      ? new Date(logoutTimes.reduce((a, b) => a + b, 0) / logoutTimes.length)
-                      : null;
-
-                    return (
-                      <TableRow key={agent.agentId}>
-                        <TableCell className="font-medium">{agent.agentName}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{agent.totalDays}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {agent.lateDays > 0 ? (
-                            <Badge variant="destructive">{agent.lateDays}</Badge>
-                          ) : (
-                            <Badge className="bg-emerald-600 text-white">0</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center font-mono">
-                          {formatWorkDuration(agent.totalWorkMinutes)}
-                        </TableCell>
-                        <TableCell className="text-center font-mono">
-                          {avgLoginTime ? format(avgLoginTime, 'hh:mm a') : '—'}
-                        </TableCell>
-                        <TableCell className="text-center font-mono">
-                          {avgLogoutTime ? format(avgLogoutTime, 'hh:mm a') : '—'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )
+          </div>
         ) : (
           <div className="text-center py-12 text-muted-foreground">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p>No attendance records found for this period</p>
             <p className="text-sm mt-1">Data available from Feb 4, 2025</p>
           </div>

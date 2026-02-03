@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Shield, AlertTriangle, PhoneMissed, Activity, UserCheck, Bell, BarChart3, TrendingUp } from 'lucide-react';
+import { RefreshCw, Shield, AlertTriangle, PhoneMissed, Activity, UserCheck, Bell, BarChart3, TrendingUp, CalendarClock } from 'lucide-react';
 import { TeamStatsCards } from '@/components/supervisor/TeamStatsCards';
 import { AgentPerformanceTable } from '@/components/supervisor/AgentPerformanceTable';
 import { UploadApprovalQueue } from '@/components/supervisor/UploadApprovalQueue';
@@ -21,6 +21,7 @@ import { SupervisorAlertsPanel } from '@/components/supervisor/SupervisorAlertsP
 import { SupervisorCallVolumeHeatmap } from '@/components/supervisor/SupervisorCallVolumeHeatmap';
 import { SupervisorLeadsOverview } from '@/components/supervisor/SupervisorLeadsOverview';
 import { FailedUploadsRetryPanel } from '@/components/supervisor/FailedUploadsRetryPanel';
+import { AgentAttendanceOverview } from '@/components/supervisor/AgentAttendanceOverview';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { useTeamActivityMonitor } from '@/hooks/useTeamActivityMonitor';
@@ -227,6 +228,10 @@ export const SupervisorDashboard: React.FC = () => {
               <TrendingUp className="w-4 h-4" />
               New Leads
             </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-1">
+              <CalendarClock className="w-4 h-4" />
+              Attendance
+            </TabsTrigger>
             <TabsTrigger value="submissions">Submissions</TabsTrigger>
             <TabsTrigger value="agents">Agent Drill-Down</TabsTrigger>
             <TabsTrigger value="comparison">Compare Periods</TabsTrigger>
@@ -297,6 +302,10 @@ export const SupervisorDashboard: React.FC = () => {
 
         <TabsContent value="leads" className="space-y-6">
           <SupervisorLeadsOverview teamId={effectiveTeamId} />
+        </TabsContent>
+
+        <TabsContent value="attendance" className="space-y-6">
+          <AgentAttendanceOverview teamId={effectiveTeamId} />
         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">

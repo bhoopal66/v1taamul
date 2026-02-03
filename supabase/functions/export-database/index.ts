@@ -50,7 +50,65 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Database export initiated by super_admin: ${user.id}`);
 
     const exportDate = new Date().toISOString();
-    let sqlContent = `-- Database Export\n-- Generated: ${exportDate}\n-- Exported by: ${user.email}\n\n`;
+    let sqlContent = `-- Complete Database Export (including Auth)\n-- Generated: ${exportDate}\n-- Exported by: ${user.email}\n-- WARNING: This file contains sensitive auth data. Store securely!\n\n`;
+
+    // ========== EXPORT AUTH.USERS ==========
+    sqlContent += `-- ========================================\n`;
+    sqlContent += `-- AUTH.USERS TABLE\n`;
+    sqlContent += `-- ========================================\n\n`;
+
+    try {
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.error("Error fetching auth users:", authError.message);
+        sqlContent += `-- Error fetching auth.users: ${authError.message}\n\n`;
+      } else if (authUsers && authUsers.users && authUsers.users.length > 0) {
+        sqlContent += `-- Total auth users: ${authUsers.users.length}\n`;
+        sqlContent += `-- Note: Passwords are hashed. Users will need to reset passwords after restore.\n\n`;
+
+        for (const authUser of authUsers.users) {
+          const userData: Record<string, unknown> = {
+            id: authUser.id,
+            email: authUser.email,
+            email_confirmed_at: authUser.email_confirmed_at,
+            phone: authUser.phone,
+            phone_confirmed_at: authUser.phone_confirmed_at,
+            confirmed_at: authUser.confirmed_at,
+            last_sign_in_at: authUser.last_sign_in_at,
+            raw_app_meta_data: authUser.app_metadata,
+            raw_user_meta_data: authUser.user_metadata,
+            created_at: authUser.created_at,
+            updated_at: authUser.updated_at,
+            role: authUser.role,
+            aud: authUser.aud,
+          };
+
+          const columns = Object.keys(userData);
+          const values = columns.map(col => {
+            const val = userData[col as keyof typeof userData];
+            if (val === null || val === undefined) return 'NULL';
+            if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+            if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+            return `'${String(val).replace(/'/g, "''")}'`;
+          });
+
+          sqlContent += `-- User: ${authUser.email}\n`;
+          sqlContent += `INSERT INTO auth.users (${columns.join(', ')}) VALUES (${values.join(', ')}) ON CONFLICT (id) DO NOTHING;\n`;
+        }
+        sqlContent += `\n`;
+      } else {
+        sqlContent += `-- No auth users found\n\n`;
+      }
+    } catch (authExportError) {
+      console.error("Error exporting auth users:", authExportError);
+      sqlContent += `-- Error exporting auth users\n\n`;
+    }
+
+    // ========== EXPORT PUBLIC SCHEMA TABLES ==========
+    sqlContent += `-- ========================================\n`;
+    sqlContent += `-- PUBLIC SCHEMA TABLES\n`;
+    sqlContent += `-- ========================================\n\n`;
 
     // List of tables to export (in order of dependencies)
     const tables = [
@@ -91,6 +149,8 @@ const handler = async (req: Request): Promise<Response> => {
       'upload_rejections',
       'followup_logs',
       'meeting_logs',
+      'whatsapp_messages',
+      'whatsapp_templates',
     ];
 
     // Export each table's data
@@ -136,7 +196,9 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    sqlContent += `-- ========================================\n`;
     sqlContent += `-- Export completed: ${new Date().toISOString()}\n`;
+    sqlContent += `-- ========================================\n`;
 
     return new Response(
       JSON.stringify({ 

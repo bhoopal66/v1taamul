@@ -298,6 +298,9 @@ const AgentStatusRow: React.FC<AgentStatusRowProps> = ({ agent }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium truncate">{agent.fullName}</span>
+          <Badge variant="outline" className="text-xs capitalize">
+            {agent.role?.replace('_', ' ') || 'Agent'}
+          </Badge>
           {agent.missedConfirmations > 0 && agent.isWorking && (
             <Badge variant="destructive" className="text-xs">
               {agent.missedConfirmations} missed

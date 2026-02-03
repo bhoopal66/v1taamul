@@ -8,6 +8,7 @@ export interface AgentWorkingStatus {
   fullName: string;
   username: string;
   avatarUrl: string | null;
+  role: string | null;
   isWorking: boolean;
   currentActivity: string | null;
   currentActivityStartedAt: string | null;
@@ -58,6 +59,14 @@ export function useTeamWorkingStatus(teamId?: string) {
 
       const memberIds = members.map(m => m.id);
 
+      // Get roles for all team members
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', memberIds);
+
+      if (rolesError) throw rolesError;
+
       // Get today's sessions for all team members
       const { data: sessions, error: sessionsError } = await supabase
         .from('activity_sessions')
@@ -70,12 +79,14 @@ export function useTeamWorkingStatus(teamId?: string) {
       // Map members to their working status
       return members.map(member => {
         const session = sessions?.find(s => s.user_id === member.id);
+        const userRole = roles?.find(r => r.user_id === member.id)?.role || 'agent';
         
         return {
           userId: member.id,
           fullName: member.full_name || 'Unknown',
           username: member.username || member.id.slice(0, 8),
           avatarUrl: member.avatar_url,
+          role: userRole,
           isWorking: session?.is_active ?? false,
           currentActivity: session?.current_activity || null,
           currentActivityStartedAt: session?.current_activity_started_at || null,

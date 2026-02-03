@@ -67,6 +67,7 @@ import { Database as DBTypes } from '@/integrations/supabase/types';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
 
 type AppRole = DBTypes['public']['Enums']['app_role'];
 
@@ -98,6 +99,7 @@ export const UserManagementPage: React.FC = () => {
   const { poolContacts, moveOldContactsToPool, isMoving } = useCompanyPool();
   
   // Check user permissions
+  const { canDeleteUsers } = usePermissions();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
   const isSupervisor = userRole === 'supervisor';
@@ -500,18 +502,22 @@ export const UserManagementPage: React.FC = () => {
                                       <Database className="w-4 h-4 mr-2" />
                                       Move Data to Pool
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      className="text-destructive"
-                                      onClick={() => setConfirmDialog({ 
-                                        open: true, 
-                                        action: 'deactivate', 
-                                        user 
-                                      })}
-                                    >
-                                      <UserX className="w-4 h-4 mr-2" />
-                                      Deactivate & Move Data
-                                    </DropdownMenuItem>
+                                    {canDeleteUsers && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          className="text-destructive"
+                                          onClick={() => setConfirmDialog({ 
+                                            open: true, 
+                                            action: 'deactivate', 
+                                            user 
+                                          })}
+                                        >
+                                          <UserX className="w-4 h-4 mr-2" />
+                                          Deactivate & Move Data
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
                                   </>
                                 )}
                               </DropdownMenuContent>

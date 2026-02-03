@@ -50,6 +50,10 @@ export const FEATURE_PERMISSIONS: FeaturePermission[] = [
   { feature: 'acknowledge_alerts', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin'] },
   { feature: 'export_data', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'] },
   { feature: 'view_stage_duration_widget', allowedRoles: ['supervisor', 'operations_head', 'admin', 'super_admin', 'sales_controller'] },
+  // Delete operations - super_admin only (admin cannot delete)
+  { feature: 'delete_records', allowedRoles: ['super_admin'] },
+  { feature: 'delete_teams', allowedRoles: ['super_admin'] },
+  { feature: 'delete_users', allowedRoles: ['super_admin'] },
 ];
 
 // Helper function to check if a role has access to a page

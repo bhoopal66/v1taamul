@@ -20,6 +20,7 @@ import { PerformanceAlertsList } from '@/components/teams/PerformanceAlertsList'
 import { usePerformanceAlerts } from '@/hooks/usePerformanceAlerts';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const TeamManagementPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -44,6 +45,8 @@ export const TeamManagementPage: React.FC = () => {
     assignAgentToTeam,
     bulkAssignAgents 
   } = useTeamManagement();
+
+  const { canDeleteTeams } = usePermissions();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
@@ -341,27 +344,29 @@ export const TeamManagementPage: React.FC = () => {
                       <Button variant="ghost" size="icon" onClick={() => handleEditTeam(team)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Team?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will remove the team and unassign all {team.member_count} members. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeam(team.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {canDeleteTeams && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Team?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will remove the team and unassign all {team.member_count} members. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteTeam(team.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

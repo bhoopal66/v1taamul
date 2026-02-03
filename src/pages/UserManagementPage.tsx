@@ -96,8 +96,12 @@ export const UserManagementPage: React.FC = () => {
     deactivateUser,
     isUpdating 
   } = useUserManagement();
-  const { poolContacts, moveOldContactsToPool, isMoving } = useCompanyPool();
+  const { poolContacts, activeAgents, moveOldContactsToPool, isMoving, allocateToAgent, isAllocating } = useCompanyPool();
   
+  // Pool allocation state
+  const [selectedPoolContacts, setSelectedPoolContacts] = useState<string[]>([]);
+  const [allocateDialogOpen, setAllocateDialogOpen] = useState(false);
+  const [selectedAgentForAllocation, setSelectedAgentForAllocation] = useState<string>('');
   // Check user permissions
   const { canDeleteUsers } = usePermissions();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -536,19 +540,96 @@ export const UserManagementPage: React.FC = () => {
         <TabsContent value="pool" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                Company Data Pool
-              </CardTitle>
-              <CardDescription>
-                Contacts older than 1 month or from deactivated users. All agents can use these for calls.
-              </CardDescription>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    Company Data Pool
+                  </CardTitle>
+                  <CardDescription>
+                    Contacts older than 1 month or from deactivated users. Select up to 100 to allocate to an agent.
+                  </CardDescription>
+                </div>
+                {selectedPoolContacts.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="text-sm px-3 py-1">
+                      {selectedPoolContacts.length} selected
+                    </Badge>
+                    <Button 
+                      onClick={() => setAllocateDialogOpen(true)}
+                      disabled={selectedPoolContacts.length === 0 || selectedPoolContacts.length > 100}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Allocate to Agent
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedPoolContacts([])}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {/* Quick select buttons */}
+              <div className="flex items-center gap-2 pt-3 flex-wrap">
+                <span className="text-sm text-muted-foreground">Quick select:</span>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const first100 = poolContacts.slice(0, 100).map(c => c.id);
+                    setSelectedPoolContacts(first100);
+                  }}
+                  disabled={poolContacts.length === 0}
+                >
+                  First 100
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const first50 = poolContacts.slice(0, 50).map(c => c.id);
+                    setSelectedPoolContacts(first50);
+                  }}
+                  disabled={poolContacts.length === 0}
+                >
+                  First 50
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const all = selectedPoolContacts.length === poolContacts.length 
+                      ? [] 
+                      : poolContacts.slice(0, 100).map(c => c.id);
+                    setSelectedPoolContacts(all);
+                  }}
+                  disabled={poolContacts.length === 0}
+                >
+                  {selectedPoolContacts.length === poolContacts.length ? 'Deselect All' : 'Select All (max 100)'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[500px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <input
+                          type="checkbox"
+                          checked={selectedPoolContacts.length > 0 && selectedPoolContacts.length === Math.min(poolContacts.length, 100)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPoolContacts(poolContacts.slice(0, 100).map(c => c.id));
+                            } else {
+                              setSelectedPoolContacts([]);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                      </TableHead>
                       <TableHead>Company</TableHead>
                       <TableHead>Contact</TableHead>
                       <TableHead>Phone</TableHead>
@@ -558,7 +639,37 @@ export const UserManagementPage: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {poolContacts.map((contact) => (
-                      <TableRow key={contact.id}>
+                      <TableRow 
+                        key={contact.id}
+                        className={cn(
+                          "cursor-pointer",
+                          selectedPoolContacts.includes(contact.id) && "bg-primary/5"
+                        )}
+                        onClick={() => {
+                          setSelectedPoolContacts(prev => {
+                            if (prev.includes(contact.id)) {
+                              return prev.filter(id => id !== contact.id);
+                            } else if (prev.length < 100) {
+                              return [...prev, contact.id];
+                            }
+                            return prev;
+                          });
+                        }}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedPoolContacts.includes(contact.id)}
+                            onChange={(e) => {
+                              if (e.target.checked && selectedPoolContacts.length < 100) {
+                                setSelectedPoolContacts([...selectedPoolContacts, contact.id]);
+                              } else if (!e.target.checked) {
+                                setSelectedPoolContacts(selectedPoolContacts.filter(id => id !== contact.id));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-input"
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{contact.company_name}</TableCell>
                         <TableCell>{contact.contact_person_name}</TableCell>
                         <TableCell className="font-mono text-sm">{contact.phone_number}</TableCell>
@@ -576,7 +687,7 @@ export const UserManagementPage: React.FC = () => {
                     ))}
                     {poolContacts.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                           No contacts in the company pool yet
                         </TableCell>
                       </TableRow>
@@ -886,6 +997,80 @@ export const UserManagementPage: React.FC = () => {
         onOpenChange={setResetPasswordDialogOpen}
         user={resetPasswordUser}
       />
+
+      {/* Allocate Pool Contacts Dialog */}
+      <Dialog open={allocateDialogOpen} onOpenChange={setAllocateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Allocate {selectedPoolContacts.length} Contacts
+            </DialogTitle>
+            <DialogDescription>
+              Select an agent to allocate the selected contacts to their call list for today.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="agent-select">Select Agent</Label>
+              <Select 
+                value={selectedAgentForAllocation} 
+                onValueChange={setSelectedAgentForAllocation}
+              >
+                <SelectTrigger id="agent-select">
+                  <SelectValue placeholder="Choose an agent..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeAgents.map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex flex-col">
+                        <span>{agent.full_name || agent.username}</span>
+                        <span className="text-xs text-muted-foreground">{agent.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-sm">
+                <strong>{selectedPoolContacts.length}</strong> contacts will be added to the agent's call list for today.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setAllocateDialogOpen(false);
+              setSelectedAgentForAllocation('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedAgentForAllocation && selectedPoolContacts.length > 0) {
+                  allocateToAgent({ 
+                    contactIds: selectedPoolContacts, 
+                    agentId: selectedAgentForAllocation 
+                  });
+                  setAllocateDialogOpen(false);
+                  setSelectedPoolContacts([]);
+                  setSelectedAgentForAllocation('');
+                }
+              }}
+              disabled={!selectedAgentForAllocation || isAllocating}
+            >
+              {isAllocating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Allocating...
+                </>
+              ) : (
+                'Allocate Contacts'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -233,6 +233,20 @@ export const useCompanyPool = () => {
     },
   });
 
+  // Fetch active agents for allocation
+  const { data: activeAgents } = useQuery({
+    queryKey: ['active-agents-for-pool'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, email')
+        .eq('is_active', true)
+        .order('full_name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Trigger moving old contacts to pool
   const moveOldContactsToPool = useMutation({
     mutationFn: async () => {
@@ -249,10 +263,68 @@ export const useCompanyPool = () => {
     },
   });
 
+  // Allocate pool contacts to an agent's call list
+  const allocateToAgent = useMutation({
+    mutationFn: async ({ contactIds, agentId }: { contactIds: string[]; agentId: string }) => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get max call_order for today for this agent
+      const { data: maxOrderData } = await supabase
+        .from('approved_call_list')
+        .select('call_order')
+        .eq('agent_id', agentId)
+        .eq('list_date', today)
+        .order('call_order', { ascending: false })
+        .limit(1);
+      
+      let startOrder = (maxOrderData?.[0]?.call_order || 0) + 1;
+      
+      // Create call list entries
+      const callListEntries = contactIds.map((contactId, index) => ({
+        agent_id: agentId,
+        contact_id: contactId,
+        list_date: today,
+        call_order: startOrder + index,
+        call_status: 'pending' as const,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('approved_call_list')
+        .insert(callListEntries);
+
+      if (insertError) throw insertError;
+
+      // Update master_contacts - remove from pool and assign to agent
+      const { error: updateError } = await supabase
+        .from('master_contacts')
+        .update({ 
+          in_company_pool: false, 
+          current_owner_agent_id: agentId,
+          pool_entry_date: null 
+        })
+        .in('id', contactIds);
+
+      if (updateError) throw updateError;
+
+      return contactIds.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`Allocated ${count} contacts to agent's call list`);
+      queryClient.invalidateQueries({ queryKey: ['company-pool'] });
+      queryClient.invalidateQueries({ queryKey: ['call-list'] });
+    },
+    onError: (error) => {
+      toast.error(`Failed to allocate contacts: ${error.message}`);
+    },
+  });
+
   return {
     poolContacts: poolContacts || [],
+    activeAgents: activeAgents || [],
     isLoading,
     moveOldContactsToPool: moveOldContactsToPool.mutate,
     isMoving: moveOldContactsToPool.isPending,
+    allocateToAgent: allocateToAgent.mutate,
+    isAllocating: allocateToAgent.isPending,
   };
 };

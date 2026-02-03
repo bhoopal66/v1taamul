@@ -11,6 +11,7 @@ import { firecrawlApi, ExtractedCompany } from '@/lib/api/firecrawl';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
+import { DirectoryPresets } from './DirectoryPresets';
 
 export const BusinessDirectoryScraper = () => {
   const { toast } = useToast();
@@ -341,12 +342,18 @@ export const BusinessDirectoryScraper = () => {
         )}
 
         {!isLoading && companies.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Enter a business directory URL to extract company data</p>
-            <p className="text-sm mt-1">
-              Works with Yellow Pages, business directories, and company listing pages
-            </p>
+          <div className="space-y-6">
+            <DirectoryPresets 
+              onSelectDirectory={(directoryUrl) => setUrl(directoryUrl)} 
+              disabled={isLoading}
+            />
+            <div className="text-center py-6 text-muted-foreground border-t">
+              <Globe className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>Select a directory above or enter a custom URL</p>
+              <p className="text-sm mt-1">
+                Navigate to a category/listing page for best results
+              </p>
+            </div>
           </div>
         )}
       </CardContent>

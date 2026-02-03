@@ -71,6 +71,19 @@ import { usePermissions } from '@/hooks/usePermissions';
 
 type AppRole = DBTypes['public']['Enums']['app_role'];
 
+// Normalize UAE phone numbers from +971/971 format to 0 format
+const normalizePhoneDisplay = (phone: string | null): string => {
+  if (!phone) return '-';
+  let normalized = phone.trim();
+  // Remove +971 or 971 prefix and replace with 0
+  if (normalized.startsWith('+971')) {
+    normalized = '0' + normalized.slice(4);
+  } else if (normalized.startsWith('971')) {
+    normalized = '0' + normalized.slice(3);
+  }
+  return normalized;
+};
+
 const roleLabels: Record<AppRole, { label: string; color: string }> = {
   agent: { label: 'Agent', color: 'bg-gray-500/10 text-gray-600' },
   coordinator: { label: 'Coordinator', color: 'bg-cyan-500/10 text-cyan-600' },
@@ -672,7 +685,7 @@ export const UserManagementPage: React.FC = () => {
                         </TableCell>
                         <TableCell className="font-medium">{contact.company_name}</TableCell>
                         <TableCell>{contact.contact_person_name}</TableCell>
-                        <TableCell className="font-mono text-sm">{contact.phone_number}</TableCell>
+                        <TableCell className="font-mono text-sm">{normalizePhoneDisplay(contact.phone_number)}</TableCell>
                         <TableCell>
                           {contact.city && <span>{contact.city}</span>}
                           {contact.city && contact.area && <span> / </span>}

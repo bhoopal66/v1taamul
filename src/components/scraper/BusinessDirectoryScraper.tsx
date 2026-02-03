@@ -13,16 +13,65 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { DirectoryPresets } from './DirectoryPresets';
 
+interface ExtractedCompanyWithStatus extends ExtractedCompany {
+  isExisting?: boolean;
+  existingContactId?: string;
+}
+
 export const BusinessDirectoryScraper = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   
   const [isAddingToCallList, setIsAddingToCallList] = useState(false);
-  const [companies, setCompanies] = useState<ExtractedCompany[]>([]);
+  const [companies, setCompanies] = useState<ExtractedCompanyWithStatus[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<number>>(new Set());
   const [sourceUrl, setSourceUrl] = useState<string>('');
+
+  const checkDuplicates = async (extractedCompanies: ExtractedCompany[]): Promise<ExtractedCompanyWithStatus[]> => {
+    const companiesWithStatus: ExtractedCompanyWithStatus[] = [];
+    
+    for (const company of extractedCompanies) {
+      const normalizedPhone = normalizePhoneNumber(company.phone_number);
+      let isExisting = false;
+      let existingContactId: string | undefined;
+      
+      try {
+        // Check using RPC for cross-agent lookup
+        const { data: existingId } = await supabase
+          .rpc('find_contact_by_phone', { phone: normalizedPhone });
+        
+        if (existingId) {
+          isExisting = true;
+          existingContactId = existingId;
+        } else {
+          // Fallback: direct query
+          const { data: existing } = await supabase
+            .from('master_contacts')
+            .select('id')
+            .eq('phone_number', normalizedPhone)
+            .maybeSingle();
+          
+          if (existing) {
+            isExisting = true;
+            existingContactId = existing.id;
+          }
+        }
+      } catch (err) {
+        console.error('Duplicate check error:', err);
+      }
+      
+      companiesWithStatus.push({
+        ...company,
+        isExisting,
+        existingContactId,
+      });
+    }
+    
+    return companiesWithStatus;
+  };
 
   const handleScrape = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,14 +84,33 @@ export const BusinessDirectoryScraper = () => {
     try {
       const response = await firecrawlApi.extractCompanies(url);
 
-      if (response.success && response.companies) {
-        setCompanies(response.companies);
+      if (response.success && response.companies && response.companies.length > 0) {
         setSourceUrl(response.sourceUrl || url);
-        setSelectedCompanies(new Set(response.companies.map((_, i) => i)));
+        
+        // Check for duplicates in database
+        setIsCheckingDuplicates(true);
+        const companiesWithStatus = await checkDuplicates(response.companies);
+        setCompanies(companiesWithStatus);
+        setIsCheckingDuplicates(false);
+        
+        // Auto-select only new entries
+        const newEntryIndices = companiesWithStatus
+          .map((c, i) => (!c.isExisting ? i : -1))
+          .filter(i => i !== -1);
+        setSelectedCompanies(new Set(newEntryIndices));
+        
+        const existingCount = companiesWithStatus.filter(c => c.isExisting).length;
+        const newCount = companiesWithStatus.length - existingCount;
         
         toast({
           title: 'Extraction Complete',
-          description: `Found ${response.companies.length} companies`,
+          description: `Found ${response.companies.length} companies (${newCount} new, ${existingCount} existing)`,
+        });
+      } else if (response.success && (!response.companies || response.companies.length === 0)) {
+        toast({
+          title: 'No Companies Found',
+          description: 'The page was scraped but no company data was extracted. Try a different category page.',
+          variant: 'default',
         });
       } else {
         toast({
@@ -60,6 +128,7 @@ export const BusinessDirectoryScraper = () => {
       });
     } finally {
       setIsLoading(false);
+      setIsCheckingDuplicates(false);
     }
   };
 
@@ -248,11 +317,16 @@ export const BusinessDirectoryScraper = () => {
             className="flex-1"
             disabled={isLoading}
           />
-          <Button type="submit" disabled={isLoading || !url.trim()}>
+          <Button type="submit" disabled={isLoading || isCheckingDuplicates || !url.trim()}>
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Extracting...
+              </>
+            ) : isCheckingDuplicates ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Checking duplicates...
               </>
             ) : (
               <>
@@ -265,13 +339,19 @@ export const BusinessDirectoryScraper = () => {
 
         {companies.length > 0 && (
           <>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary">
                   {selectedCompanies.size} of {companies.length} selected
                 </Badge>
+                <Badge variant="outline" className="text-green-600 border-green-300">
+                  {companies.filter(c => !c.isExisting).length} new
+                </Badge>
+                <Badge variant="outline" className="text-orange-600 border-orange-300">
+                  {companies.filter(c => c.isExisting).length} existing
+                </Badge>
                 {sourceUrl && (
-                  <span className="text-xs text-muted-foreground truncate max-w-[300px]">
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                     from: {sourceUrl}
                   </span>
                 )}
@@ -312,6 +392,7 @@ export const BusinessDirectoryScraper = () => {
                     </TableHead>
                     <TableHead>Company Name</TableHead>
                     <TableHead>Phone</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Contact Person</TableHead>
                     <TableHead>Industry</TableHead>
                     <TableHead>Location</TableHead>
@@ -319,7 +400,7 @@ export const BusinessDirectoryScraper = () => {
                 </TableHeader>
                 <TableBody>
                   {companies.map((company, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={index} className={company.isExisting ? 'bg-orange-50 dark:bg-orange-950/20' : ''}>
                       <TableCell>
                         <Checkbox
                           checked={selectedCompanies.has(index)}
@@ -328,6 +409,17 @@ export const BusinessDirectoryScraper = () => {
                       </TableCell>
                       <TableCell className="font-medium">{company.company_name}</TableCell>
                       <TableCell>{company.phone_number}</TableCell>
+                      <TableCell>
+                        {company.isExisting ? (
+                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-xs">
+                            Existing
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-green-600 border-green-300 text-xs">
+                            New
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{company.contact_person_name || '-'}</TableCell>
                       <TableCell>{company.industry || '-'}</TableCell>
                       <TableCell>

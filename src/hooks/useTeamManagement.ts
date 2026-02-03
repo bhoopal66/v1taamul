@@ -21,6 +21,7 @@ export interface TeamMember {
   email: string;
   team_id: string | null;
   is_active: boolean;
+  role?: string;
 }
 
 export const useTeamManagement = () => {
@@ -79,7 +80,7 @@ export const useTeamManagement = () => {
     enabled: !!user?.id && isAdmin,
   });
 
-  // Fetch only active agents (for assignment)
+  // Fetch only active agents (for assignment) with their roles
   const { data: agents, isLoading: agentsLoading } = useQuery({
     queryKey: ['agents-for-team-assignment'],
     queryFn: async (): Promise<TeamMember[]> => {
@@ -91,7 +92,26 @@ export const useTeamManagement = () => {
         .order('full_name');
 
       if (error) throw error;
-      return data || [];
+
+      // Fetch roles for all agents
+      const agentIds = data?.map(a => a.id) || [];
+      let rolesMap = new Map<string, string>();
+      
+      if (agentIds.length > 0) {
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .in('user_id', agentIds);
+        
+        rolesData?.forEach(r => {
+          rolesMap.set(r.user_id, r.role);
+        });
+      }
+
+      return (data || []).map(agent => ({
+        ...agent,
+        role: rolesMap.get(agent.id) || 'agent',
+      }));
     },
     enabled: !!user?.id && isAdmin,
   });

@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search, BarChart3, Bell, ArrowRightLeft, Eye, UserMinus } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Building2, Wifi, UserPlus, Crown, Search, BarChart3, Bell, ArrowRightLeft, Eye, UserMinus, Shield } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TeamPerformanceCharts } from '@/components/teams/TeamPerformanceCharts';
 import { PerformanceTargetsManager } from '@/components/teams/PerformanceTargetsManager';
@@ -726,6 +726,7 @@ export const TeamManagementPage: React.FC = () => {
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-[250px]">Agent</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead className="w-[120px]">Role</TableHead>
                       <TableHead className="w-[100px]">Status</TableHead>
                       <TableHead className="text-right w-[150px]">Actions</TableHead>
                     </TableRow>
@@ -733,18 +734,23 @@ export const TeamManagementPage: React.FC = () => {
                   <TableBody>
                     {getTeamMembers(viewMembersTeam.id).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
                           <p>No members in this team yet.</p>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      getTeamMembers(viewMembersTeam.id).map(member => (
-                        <TableRow key={member.id} className={!member.is_active ? 'opacity-60' : ''}>
+                      getTeamMembers(viewMembersTeam.id).map(member => {
+                        const isSupervisor = member.role === 'supervisor' || member.role === 'admin' || member.role === 'super_admin' || member.role === 'operations_head';
+                        return (
+                        <TableRow 
+                          key={member.id} 
+                          className={`${!member.is_active ? 'opacity-60' : ''} ${isSupervisor ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
-                                <AvatarFallback className={`text-xs font-medium ${viewMembersTeam.leader_id === member.id ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                                <AvatarFallback className={`text-xs font-medium ${viewMembersTeam.leader_id === member.id ? 'bg-primary text-primary-foreground' : isSupervisor ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
                                   {getInitials(member.full_name, member.username)}
                                 </AvatarFallback>
                               </Avatar>
@@ -754,6 +760,9 @@ export const TeamManagementPage: React.FC = () => {
                                   {viewMembersTeam.leader_id === member.id && (
                                     <Crown className="w-3.5 h-3.5 text-primary" />
                                   )}
+                                  {isSupervisor && (
+                                    <Shield className="w-3.5 h-3.5 text-primary" />
+                                  )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">@{member.username}</p>
                               </div>
@@ -761,6 +770,14 @@ export const TeamManagementPage: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {member.email}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={isSupervisor ? 'default' : 'outline'} 
+                              className={`text-xs capitalize ${isSupervisor ? 'bg-primary/90' : ''}`}
+                            >
+                              {member.role || 'agent'}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-xs">
@@ -788,7 +805,8 @@ export const TeamManagementPage: React.FC = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

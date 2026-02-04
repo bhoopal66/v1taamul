@@ -106,7 +106,7 @@ export const LeadsPage = () => {
       // For admins/super_admins, fetch all active agents
       if ((userRole === 'admin' || userRole === 'super_admin') && !teamIdToFetch) {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id, full_name, username')
           .eq('is_active', true)
           .order('full_name');
@@ -118,7 +118,7 @@ export const LeadsPage = () => {
       // For team-specific view
       if (teamIdToFetch) {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id, full_name, username')
           .eq('team_id', teamIdToFetch)
           .eq('is_active', true)

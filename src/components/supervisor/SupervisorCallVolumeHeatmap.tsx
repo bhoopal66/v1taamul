@@ -147,13 +147,19 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
   });
 
   // Fetch heatmap data - uses APPLIED filters for agent selection
+  // Use formatted date strings as query keys for consistency
+  const startDateStr = effectiveDateRange?.from ? formatDateStr(effectiveDateRange.from) : null;
+  const endDateStr = effectiveDateRange?.to ? formatDateStr(effectiveDateRange.to) : null;
+  
   const { data: heatmapData = [], isLoading, isFetching, error } = useQuery({
-    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, effectiveDateRange?.from?.toISOString(), effectiveDateRange?.to?.toISOString(), appliedFilters.selectedAgent],
+    queryKey: ['supervisor-call-heatmap', user?.id, effectiveTeamId, canSeeAllData, startDateStr, endDateStr, appliedFilters.selectedAgent],
     queryFn: async (): Promise<HeatmapData[]> => {
-      if (!effectiveDateRange?.from || !effectiveDateRange?.to) return [];
+      if (!startDateStr || !endDateStr) return [];
       
-      const startDate = startOfDay(effectiveDateRange.from);
-      const endDate = endOfDay(effectiveDateRange.to);
+      // Use date-only strings to avoid timezone issues
+      // Query from start of day to end of day using date strings
+      const startTimestamp = `${startDateStr}T00:00:00`;
+      const endTimestamp = `${endDateStr}T23:59:59`;
       
       // Get agent IDs for filtering
       let agentIds: string[] | null = null;
@@ -162,25 +168,23 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
         agentIds = [appliedFilters.selectedAgent];
       } else if (!canSeeAllData && effectiveTeamId) {
         const { data: teamMembers } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id')
-          .eq('team_id', effectiveTeamId)
-          .eq('is_active', true);
+          .eq('team_id', effectiveTeamId);
         agentIds = teamMembers?.map(p => p.id) || [];
       } else if (!canSeeAllData && user?.id) {
         const { data: supervised } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id')
-          .eq('supervisor_id', user.id)
-          .eq('is_active', true);
+          .eq('supervisor_id', user.id);
         agentIds = supervised?.map(p => p.id) || [];
       }
 
       let query = supabase
         .from('call_feedback')
         .select('call_timestamp')
-        .gte('call_timestamp', startDate.toISOString())
-        .lte('call_timestamp', endDate.toISOString());
+        .gte('call_timestamp', startTimestamp)
+        .lte('call_timestamp', endTimestamp);
 
       if (agentIds !== null && agentIds.length > 0) {
         query = query.in('agent_id', agentIds);

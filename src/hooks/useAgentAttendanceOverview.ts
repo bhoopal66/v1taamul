@@ -325,11 +325,16 @@ export const useAgentAttendanceOverview = ({
         // They should match directly.
         const workKey = `${record.user_id}|${record.date}`;
 
-        // Only treat ongoing logs as relevant if this is TODAY and the agent is currently working,
-        // and the time is still within the shift window.
+        // Only treat ongoing logs as relevant if:
+        // 1. This is TODAY
+        // 2. The agent is currently working (is_working = true)
+        // 3. The time is still within the shift window
+        // 4. The latest ongoing log is recent (started within the last 30 minutes) to avoid stale sessions
         const todayWindow = getWorkWindow(todayDubaiKey);
         const isWithinTodayWindow = !!todayWindow && Date.now() >= todayWindow.start && Date.now() <= todayWindow.end;
-        const includeOngoingForToday = record.date === todayDubaiKey && isWithinTodayWindow && !!record.is_working;
+        const latestOngoingStart = latestOngoingStartByUserDate.get(workKey);
+        const isOngoingRecent = latestOngoingStart && (Date.now() - latestOngoingStart < 30 * 60 * 1000);
+        const includeOngoingForToday = record.date === todayDubaiKey && isWithinTodayWindow && !!record.is_working && isOngoingRecent;
 
         const closedMinutes = workMinutesByUserDateClosed.get(workKey);
         const withOngoingTodayMinutes = workMinutesByUserDateWithOngoingToday.get(workKey);

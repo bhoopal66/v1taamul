@@ -110,12 +110,13 @@ export const useAgentAttendanceOverview = ({
         .in('user_id', memberIds)
         .gte('started_at', `${startDateStr}T00:00:00+04:00`)
         .lte('started_at', `${endDateStr}T23:59:59+04:00`)
-        .in('activity_type', WORK_ACTIVITY_TYPES);
+        .in('activity_type', WORK_ACTIVITY_TYPES)
+        .order('started_at', { ascending: true });
 
       if (activityError) throw activityError;
 
-      // Group activity logs by user and date (in Dubai timezone), sum up work minutes
-      const workMinutesByUserDate = new Map<string, number>();
+      // Group activity logs by user and date, then calculate non-overlapping work time
+      const logsByUserDate = new Map<string, Array<{ start: number; end: number }>>();
       
       (activityLogs || []).forEach(log => {
         // Convert to Dubai timezone for date grouping
@@ -128,27 +129,57 @@ export const useAgentAttendanceOverview = ({
         
         const key = `${log.user_id}|${dubaiDate}`;
         
-        // Calculate duration: use stored duration_minutes if available,
-        // otherwise calculate from started_at and ended_at
-        let durationMinutes = log.duration_minutes;
+        const start = new Date(log.started_at).getTime();
+        let end: number;
         
-        if (durationMinutes === null && log.ended_at) {
-          const start = new Date(log.started_at).getTime();
-          const end = new Date(log.ended_at).getTime();
-          durationMinutes = Math.round((end - start) / 60000);
-        }
-        
-        // For ongoing activities (no end time), calculate from start to now
-        if (durationMinutes === null && !log.ended_at) {
-          const start = new Date(log.started_at).getTime();
+        if (log.ended_at) {
+          end = new Date(log.ended_at).getTime();
+        } else {
+          // For ongoing activities, use current time but cap at end of work day (7 PM Dubai = 15:00 UTC)
           const now = Date.now();
-          durationMinutes = Math.round((now - start) / 60000);
+          const endOfWorkDay = new Date(log.started_at);
+          endOfWorkDay.setUTCHours(15, 0, 0, 0); // 7 PM Dubai time
+          end = Math.min(now, endOfWorkDay.getTime());
         }
         
-        if (durationMinutes && durationMinutes > 0) {
-          const existing = workMinutesByUserDate.get(key) || 0;
-          workMinutesByUserDate.set(key, existing + durationMinutes);
+        // Only add valid time spans
+        if (end > start) {
+          const existing = logsByUserDate.get(key) || [];
+          existing.push({ start, end });
+          logsByUserDate.set(key, existing);
         }
+      });
+
+      // Calculate non-overlapping work minutes for each user/date
+      const workMinutesByUserDate = new Map<string, number>();
+      
+      logsByUserDate.forEach((spans, key) => {
+        // Sort spans by start time
+        spans.sort((a, b) => a.start - b.start);
+        
+        // Merge overlapping spans
+        const mergedSpans: Array<{ start: number; end: number }> = [];
+        for (const span of spans) {
+          if (mergedSpans.length === 0) {
+            mergedSpans.push({ ...span });
+          } else {
+            const last = mergedSpans[mergedSpans.length - 1];
+            if (span.start <= last.end) {
+              // Overlapping - extend the end time if needed
+              last.end = Math.max(last.end, span.end);
+            } else {
+              // Non-overlapping - add new span
+              mergedSpans.push({ ...span });
+            }
+          }
+        }
+        
+        // Sum up non-overlapping durations
+        const totalMinutes = mergedSpans.reduce((sum, span) => {
+          return sum + Math.round((span.end - span.start) / 60000);
+        }, 0);
+        
+        workMinutesByUserDate.set(key, totalMinutes);
       });
 
       // Create a map for easy lookup

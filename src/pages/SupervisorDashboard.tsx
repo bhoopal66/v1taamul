@@ -199,28 +199,30 @@ export const SupervisorDashboard: React.FC = () => {
         <div className="flex flex-col gap-4">
           {/* Primary Navigation Row */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap gap-1 h-auto p-1">
-              <TabsTrigger value="working-status" className="gap-1.5 text-xs sm:text-sm">
-                <UserCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Working</span> Status
-              </TabsTrigger>
-              <TabsTrigger value="alerts" className="gap-1.5 text-xs sm:text-sm">
-                <Bell className="w-3.5 h-3.5" />
-                Alerts
-                {unreadCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-destructive text-destructive-foreground rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="gap-1.5 text-xs sm:text-sm">
-                <Activity className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Live</span> Activity
-              </TabsTrigger>
-              <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm">
-                <CalendarClock className="w-3.5 h-3.5" />
-                Attendance
-              </TabsTrigger>
+            <TabsList className="h-auto p-1.5 bg-background border rounded-lg shadow-sm">
+              <div className="flex flex-wrap gap-1">
+                <TabsTrigger value="working-status" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Working</span> Status
+                </TabsTrigger>
+                <TabsTrigger value="alerts" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                  <Bell className="w-3.5 h-3.5" />
+                  Alerts
+                  {unreadCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-destructive text-destructive-foreground rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Live</span> Activity
+                </TabsTrigger>
+                <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  Attendance
+                </TabsTrigger>
+              </div>
             </TabsList>
             
             <Select value={trendDays.toString()} onValueChange={(v) => setTrendDays(Number(v))}>
@@ -236,35 +238,37 @@ export const SupervisorDashboard: React.FC = () => {
           </div>
 
           {/* Secondary Navigation Row */}
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap gap-1 h-auto p-1 bg-muted/50">
-            <TabsTrigger value="trends" className="gap-1.5 text-xs sm:text-sm">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Trends
-            </TabsTrigger>
-            <TabsTrigger value="heatmap" className="gap-1.5 text-xs sm:text-sm">
-              <BarChart3 className="w-3.5 h-3.5" />
-              Heatmap
-            </TabsTrigger>
-            <TabsTrigger value="leads" className="gap-1.5 text-xs sm:text-sm">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Leads
-            </TabsTrigger>
-            <TabsTrigger value="unanswered" className="gap-1.5 text-xs sm:text-sm">
-              <PhoneMissed className="w-3.5 h-3.5" />
-              Unanswered
-            </TabsTrigger>
-            <TabsTrigger value="submissions" className="gap-1.5 text-xs sm:text-sm">
-              Submissions
-            </TabsTrigger>
-            <TabsTrigger value="agents" className="gap-1.5 text-xs sm:text-sm">
-              Drill-Down
-            </TabsTrigger>
-            <TabsTrigger value="comparison" className="gap-1.5 text-xs sm:text-sm">
-              Compare
-            </TabsTrigger>
-            <TabsTrigger value="today" className="gap-1.5 text-xs sm:text-sm">
-              Today
-            </TabsTrigger>
+          <TabsList className="h-auto p-1.5 bg-muted/30 border border-muted rounded-lg">
+            <div className="flex flex-wrap gap-1">
+              <TabsTrigger value="trends" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Trends
+              </TabsTrigger>
+              <TabsTrigger value="heatmap" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                <BarChart3 className="w-3.5 h-3.5" />
+                Heatmap
+              </TabsTrigger>
+              <TabsTrigger value="leads" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Leads
+              </TabsTrigger>
+              <TabsTrigger value="unanswered" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                <PhoneMissed className="w-3.5 h-3.5" />
+                Unanswered
+              </TabsTrigger>
+              <TabsTrigger value="submissions" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                Submissions
+              </TabsTrigger>
+              <TabsTrigger value="agents" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                Drill-Down
+              </TabsTrigger>
+              <TabsTrigger value="comparison" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                Compare
+              </TabsTrigger>
+              <TabsTrigger value="today" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                Today
+              </TabsTrigger>
+            </div>
           </TabsList>
         </div>
 

@@ -211,19 +211,6 @@ export const useAgentAttendanceOverview = ({
         return window;
       };
 
-      // First, find the latest started_at per user/date for capping ongoing activities
-      const latestStartedByUserDate = new Map<string, number>();
-      (activityLogs || []).forEach(log => {
-        const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
-        const key = `${log.user_id}|${dubaiDateKey}`;
-        const startTime = new Date(log.started_at).getTime();
-        
-        const existing = latestStartedByUserDate.get(key);
-        if (!existing || startTime > existing) {
-          latestStartedByUserDate.set(key, startTime);
-        }
-      });
-
       (activityLogs || []).forEach(log => {
         const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
         const window = getWorkWindow(dubaiDateKey);
@@ -232,15 +219,14 @@ export const useAgentAttendanceOverview = ({
         const rawStart = new Date(log.started_at).getTime();
         const key = `${log.user_id}|${dubaiDateKey}`;
         
-        // For ongoing activities, use the latest started_at + buffer as the effective end
-        // This prevents counting work time until end of day just because activities weren't closed
+        // For ongoing activities, use the activity's own start time + 15 min buffer
+        // This prevents counting work time beyond reasonable activity duration
         let rawEnd: number;
         if (log.ended_at) {
           rawEnd = new Date(log.ended_at).getTime();
         } else {
-          // Use latest started time + 15 min buffer, capped to current time
-          const latestStarted = latestStartedByUserDate.get(key) || rawStart;
-          rawEnd = Math.min(latestStarted + 15 * 60 * 1000, Date.now());
+          // Use THIS activity's start + 15 min buffer, capped to current time
+          rawEnd = Math.min(rawStart + 15 * 60 * 1000, Date.now());
         }
 
         // Clamp spans to the day's Dubai work-hours window to prevent multi-day inflation

@@ -40,7 +40,14 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
   const formatTime = (isoString: string | null) => {
     if (!isoString) return '—';
     try {
-      return format(new Date(isoString), 'hh:mm a');
+      // Format time in Dubai timezone (UTC+4)
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Dubai',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
     } catch {
       return '—';
     }

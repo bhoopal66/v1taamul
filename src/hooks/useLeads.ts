@@ -116,10 +116,11 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
   const { user, userRole, profile, ledTeamId } = useAuth();
   const queryClient = useQueryClient();
 
-  // Check if user is a supervisor, team leader, or higher role that should see team leads
-  const isTeamViewer = userRole === 'supervisor' || userRole === 'operations_head' || 
-                       userRole === 'admin' || userRole === 'super_admin' || 
-                       userRole === 'sales_controller' || !!ledTeamId;
+  // Check if user has global access (admin, super_admin, operations_head)
+  const hasGlobalAccess = userRole === 'admin' || userRole === 'super_admin' || userRole === 'operations_head';
+  
+  // Check if user is a team viewer (supervisor, team leader, etc.)
+  const isTeamViewer = userRole === 'supervisor' || userRole === 'sales_controller' || !!ledTeamId;
 
   // Date range for filtering
   const fromDate = dateRange?.from ? startOfDay(dateRange.from).toISOString() : null;
@@ -128,15 +129,77 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
   const { data: leads, isLoading, refetch } = useQuery({
     queryKey: ['leads', user?.id, userRole, profile?.team_id, ledTeamId, statusFilter, fromDate, toDate, agentId],
     queryFn: async (): Promise<Lead[]> => {
-      // First, get all team member IDs if user is a team viewer
+      // For admins/super_admins/operations_head, show all leads (global access)
+      if (hasGlobalAccess) {
+        let query = supabase
+          .from('leads')
+          .select(`
+            *,
+            master_contacts (
+              company_name,
+              contact_person_name,
+              phone_number,
+              trade_license_number,
+              city,
+              industry
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        // Apply agent filter if specified
+        if (agentId && agentId !== 'all') {
+          query = query.eq('agent_id', agentId);
+        }
+
+        // Apply date filter
+        if (fromDate) {
+          query = query.gte('created_at', fromDate);
+        }
+        if (toDate) {
+          query = query.lte('created_at', toDate);
+        }
+
+        if (statusFilter && statusFilter !== 'all') {
+          query = query.eq('lead_status', statusFilter);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        return (data || []).map(item => {
+          const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
+          return {
+            id: item.id,
+            contactId: item.contact_id,
+            agentId: item.agent_id,
+            companyName: item.master_contacts?.company_name || 'Unknown',
+            contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
+            phoneNumber: item.master_contacts?.phone_number || '',
+            tradeLicenseNumber,
+            city: item.master_contacts?.city || null,
+            industry: item.master_contacts?.industry || null,
+            leadStatus: (item.lead_status || 'new') as LeadStatus,
+            leadScore: item.lead_score || 0,
+            leadSource: ((item as any).lead_source || 'account_RAK') as LeadSource,
+            dealValue: item.deal_value,
+            expectedCloseDate: item.expected_close_date,
+            qualifiedDate: item.qualified_date,
+            notes: item.notes,
+            createdAt: item.created_at || '',
+            updatedAt: item.updated_at || '',
+            isLead: !!tradeLicenseNumber,
+          };
+        });
+      }
+
+      // For team viewers (supervisors, team leaders), get team member leads
       let teamMemberIds: string[] = [user?.id || ''];
 
       if (isTeamViewer) {
-        // Get the team ID to fetch members for
         const teamIdToFetch = ledTeamId || profile?.team_id;
 
         if (teamIdToFetch) {
-          // Fetch all agents in the team
           const { data: teamMembers } = await supabase
             .from('profiles')
             .select('id')
@@ -145,74 +208,10 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
 
           if (teamMembers && teamMembers.length > 0) {
             teamMemberIds = teamMembers.map(m => m.id);
-            // Also include the current user (team leader/supervisor) in case they have leads
             if (!teamMemberIds.includes(user?.id || '')) {
               teamMemberIds.push(user?.id || '');
             }
           }
-        }
-        
-        // For admins/super_admins without a specific team, show all leads
-        if ((userRole === 'admin' || userRole === 'super_admin') && !teamIdToFetch) {
-          // Fetch all leads by not filtering by agent_id
-          let query = supabase
-            .from('leads')
-            .select(`
-              *,
-              master_contacts (
-                company_name,
-                contact_person_name,
-                phone_number,
-                trade_license_number,
-                city,
-                industry
-              )
-            `)
-            .order('created_at', { ascending: false });
-
-          // Apply agent filter if specified
-          if (agentId && agentId !== 'all') {
-            query = query.eq('agent_id', agentId);
-          }
-
-          // Apply date filter
-          if (fromDate) {
-            query = query.gte('created_at', fromDate);
-          }
-          if (toDate) {
-            query = query.lte('created_at', toDate);
-          }
-
-          const { data, error } = statusFilter && statusFilter !== 'all'
-            ? await query.eq('lead_status', statusFilter)
-            : await query;
-
-          if (error) throw error;
-
-          return (data || []).map(item => {
-            const tradeLicenseNumber = item.master_contacts?.trade_license_number || null;
-            return {
-              id: item.id,
-              contactId: item.contact_id,
-              agentId: item.agent_id,
-              companyName: item.master_contacts?.company_name || 'Unknown',
-              contactPersonName: item.master_contacts?.contact_person_name || 'Unknown',
-              phoneNumber: item.master_contacts?.phone_number || '',
-              tradeLicenseNumber,
-              city: item.master_contacts?.city || null,
-              industry: item.master_contacts?.industry || null,
-              leadStatus: (item.lead_status || 'new') as LeadStatus,
-              leadScore: item.lead_score || 0,
-              leadSource: ((item as any).lead_source || 'account_RAK') as LeadSource,
-              dealValue: item.deal_value,
-              expectedCloseDate: item.expected_close_date,
-              qualifiedDate: item.qualified_date,
-              notes: item.notes,
-              createdAt: item.created_at || '',
-              updatedAt: item.updated_at || '',
-              isLead: !!tradeLicenseNumber,
-            };
-          });
         }
       }
 

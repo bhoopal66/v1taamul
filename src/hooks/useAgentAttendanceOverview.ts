@@ -1,8 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
 
 export type AttendancePeriod = 'day' | 'week' | 'month';
+
+// Activity types that count as "work" (exclude break and idle)
+const WORK_ACTIVITY_TYPES = [
+  'data_collection',
+  'customer_followup',
+  'calling_telecalling',
+  'calling_coldcalling',
+  'calling_calllist_movement',
+  'client_meeting',
+  'admin_documentation',
+  'training',
+  'system_bank_portal',
+] as const;
 
 interface AgentAttendanceRecord {
   agentId: string;
@@ -89,12 +102,62 @@ export const useAgentAttendanceOverview = ({
 
       if (attendanceError) throw attendanceError;
 
+      // Fetch activity logs to calculate actual work time
+      const { data: activityLogs, error: activityError } = await supabase
+        .from('activity_logs')
+        .select('user_id, activity_type, started_at, ended_at, duration_minutes')
+        .in('user_id', memberIds)
+        .gte('started_at', `${startDateStr}T00:00:00`)
+        .lte('started_at', `${endDateStr}T23:59:59`)
+        .in('activity_type', WORK_ACTIVITY_TYPES);
+
+      if (activityError) throw activityError;
+
+      // Group activity logs by user and date, sum up work minutes
+      const workMinutesByUserDate = new Map<string, number>();
+      
+      (activityLogs || []).forEach(log => {
+        const logDate = format(new Date(log.started_at), 'yyyy-MM-dd');
+        const key = `${log.user_id}|${logDate}`;
+        
+        // Calculate duration: use stored duration_minutes if available,
+        // otherwise calculate from started_at and ended_at
+        let durationMinutes = log.duration_minutes;
+        
+        if (durationMinutes === null && log.ended_at) {
+          const start = new Date(log.started_at).getTime();
+          const end = new Date(log.ended_at).getTime();
+          durationMinutes = Math.round((end - start) / 60000);
+        }
+        
+        // For ongoing activities (no end time), calculate from start to now
+        if (durationMinutes === null && !log.ended_at) {
+          const start = new Date(log.started_at).getTime();
+          const now = Date.now();
+          durationMinutes = Math.round((now - start) / 60000);
+        }
+        
+        if (durationMinutes && durationMinutes > 0) {
+          const existing = workMinutesByUserDate.get(key) || 0;
+          workMinutesByUserDate.set(key, existing + durationMinutes);
+        }
+      });
+
       // Create a map for easy lookup
       const profileMap = new Map(profiles.map(p => [p.id, p]));
 
       // Transform data - group by agent and date
       const records: AgentAttendanceRecord[] = (attendanceData || []).map(record => {
         const agent = profileMap.get(record.user_id);
+        const workKey = `${record.user_id}|${record.date}`;
+        
+        // Use calculated work minutes from activity logs if available,
+        // otherwise fall back to stored total_work_minutes
+        const calculatedWorkMinutes = workMinutesByUserDate.get(workKey);
+        const totalWorkMinutes = calculatedWorkMinutes !== undefined 
+          ? calculatedWorkMinutes 
+          : record.total_work_minutes;
+        
         return {
           agentId: record.user_id,
           agentName: agent?.full_name || agent?.username || 'Unknown',
@@ -103,7 +166,7 @@ export const useAgentAttendanceOverview = ({
           lastLogout: record.last_logout,
           status: record.status,
           isLate: record.is_late || false,
-          totalWorkMinutes: record.total_work_minutes,
+          totalWorkMinutes: totalWorkMinutes,
         };
       });
 

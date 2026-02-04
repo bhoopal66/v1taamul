@@ -72,9 +72,9 @@ export const useAgentAttendanceOverview = ({
       const startDateStr = format(startDate, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
 
-      // First get team members
+      // First get team members - using profiles_public view to avoid RLS issues
       let profilesQuery = supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, full_name, username')
         .eq('is_active', true);
 

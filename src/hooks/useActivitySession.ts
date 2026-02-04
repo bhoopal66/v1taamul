@@ -264,17 +264,42 @@ export function useActivitySession() {
         if (error) throw error;
       }
 
-      // Also update attendance record
-      await supabase
+      // Check if attendance record already exists for today
+      const { data: existingAttendance } = await supabase
         .from('attendance_records')
-        .upsert({
-          user_id: user.id,
-          date: today,
-          first_login: now,
-          start_button_pressed_at: now,
-          is_working: true,
-          status: 'present',
-        }, { onConflict: 'user_id,date' });
+        .select('id, first_login')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .maybeSingle();
+
+      if (existingAttendance) {
+        // Update existing record - preserve first_login if already set, clear last_logout
+        await supabase
+          .from('attendance_records')
+          .update({
+            // Only set first_login if it was null (first login of the day)
+            ...(existingAttendance.first_login ? {} : { first_login: now }),
+            start_button_pressed_at: now,
+            is_working: true,
+            status: 'present',
+            // Clear last_logout when user starts working again
+            last_logout: null,
+            end_reason: null,
+          })
+          .eq('id', existingAttendance.id);
+      } else {
+        // Insert new record for first login of the day
+        await supabase
+          .from('attendance_records')
+          .insert({
+            user_id: user.id,
+            date: today,
+            first_login: now,
+            start_button_pressed_at: now,
+            is_working: true,
+            status: 'present',
+          });
+      }
 
       return true;
     },

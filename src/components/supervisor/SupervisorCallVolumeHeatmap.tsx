@@ -161,6 +161,17 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
       const startTimestamp = `${startDateStr}T00:00:00`;
       const endTimestamp = `${endDateStr}T23:59:59`;
       
+      console.log('[Heatmap] Query params:', {
+        startDateStr,
+        endDateStr,
+        startTimestamp,
+        endTimestamp,
+        canSeeAllData,
+        effectiveTeamId,
+        selectedAgent: appliedFilters.selectedAgent,
+        userRole,
+      });
+      
       // Get agent IDs for filtering
       let agentIds: string[] | null = null;
       
@@ -179,6 +190,8 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
           .eq('supervisor_id', user.id);
         agentIds = supervised?.map(p => p.id) || [];
       }
+      
+      console.log('[Heatmap] Agent filter:', { agentIds, isNull: agentIds === null });
 
       let query = supabase
         .from('call_feedback')
@@ -189,10 +202,13 @@ export const SupervisorCallVolumeHeatmap = ({ teamId }: SupervisorCallVolumeHeat
       if (agentIds !== null && agentIds.length > 0) {
         query = query.in('agent_id', agentIds);
       } else if (agentIds !== null && agentIds.length === 0) {
+        console.log('[Heatmap] No agents found, returning empty');
         return [];
       }
 
       const { data, error } = await query;
+      
+      console.log('[Heatmap] Query result:', { count: data?.length, error });
 
       if (error) throw error;
 

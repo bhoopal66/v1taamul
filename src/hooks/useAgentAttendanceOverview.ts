@@ -123,19 +123,40 @@ export const useAgentAttendanceOverview = ({
       });
 
       // Build a map of first activity start and last activity end per user per date
-      const activityTimesMap = new Map<string, { firstStart: string; lastEnd: string | null }>();
+      // Also track the latest started_at for ongoing activities to show as "last activity time"
+      const activityTimesMap = new Map<string, { 
+        firstStart: string; 
+        lastEnd: string | null;
+        lastStarted: string; // Track latest started_at for ongoing sessions
+        hasOngoing: boolean;
+      }>();
       
       (allActivityLogs || []).forEach(log => {
         const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
         const key = `${log.user_id}|${dubaiDateKey}`;
         
         const existing = activityTimesMap.get(key);
+        const logStartTime = new Date(log.started_at).getTime();
+        const isOngoing = !log.ended_at;
+        
         if (!existing) {
           activityTimesMap.set(key, {
             firstStart: log.started_at,
             lastEnd: log.ended_at,
+            lastStarted: log.started_at,
+            hasOngoing: isOngoing,
           });
         } else {
+          // Track the latest started_at
+          if (logStartTime > new Date(existing.lastStarted).getTime()) {
+            existing.lastStarted = log.started_at;
+          }
+          
+          // Track if any activity is ongoing
+          if (isOngoing) {
+            existing.hasOngoing = true;
+          }
+          
           // Update lastEnd if this log has a later end time
           if (log.ended_at) {
             if (!existing.lastEnd || new Date(log.ended_at) > new Date(existing.lastEnd)) {
@@ -166,8 +187,6 @@ export const useAgentAttendanceOverview = ({
       type Span = { start: number; end: number };
       const logsByUserDate = new Map<string, Span[]>();
 
-      // dubaiDateFormatter already declared above
-
       const workWindowCache = new Map<string, { start: number; end: number } | null>();
       const getWorkWindow = (dubaiDateKey: string) => {
         const cached = workWindowCache.get(dubaiDateKey);
@@ -192,21 +211,44 @@ export const useAgentAttendanceOverview = ({
         return window;
       };
 
+      // First, find the latest started_at per user/date for capping ongoing activities
+      const latestStartedByUserDate = new Map<string, number>();
+      (activityLogs || []).forEach(log => {
+        const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
+        const key = `${log.user_id}|${dubaiDateKey}`;
+        const startTime = new Date(log.started_at).getTime();
+        
+        const existing = latestStartedByUserDate.get(key);
+        if (!existing || startTime > existing) {
+          latestStartedByUserDate.set(key, startTime);
+        }
+      });
+
       (activityLogs || []).forEach(log => {
         const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
         const window = getWorkWindow(dubaiDateKey);
         if (!window) return;
 
         const rawStart = new Date(log.started_at).getTime();
-        const rawEnd = log.ended_at ? new Date(log.ended_at).getTime() : Date.now();
+        const key = `${log.user_id}|${dubaiDateKey}`;
+        
+        // For ongoing activities, use the latest started_at + buffer as the effective end
+        // This prevents counting work time until end of day just because activities weren't closed
+        let rawEnd: number;
+        if (log.ended_at) {
+          rawEnd = new Date(log.ended_at).getTime();
+        } else {
+          // Use latest started time + 15 min buffer, capped to current time
+          const latestStarted = latestStartedByUserDate.get(key) || rawStart;
+          rawEnd = Math.min(latestStarted + 15 * 60 * 1000, Date.now());
+        }
 
-        // Clamp spans to the day’s Dubai work-hours window to prevent multi-day inflation
+        // Clamp spans to the day's Dubai work-hours window to prevent multi-day inflation
         const start = Math.max(rawStart, window.start);
         const end = Math.min(rawEnd, window.end);
 
         if (end <= start) return;
 
-        const key = `${log.user_id}|${dubaiDateKey}`;
         const existing = logsByUserDate.get(key) || [];
         existing.push({ start, end });
         logsByUserDate.set(key, existing);
@@ -250,12 +292,15 @@ export const useAgentAttendanceOverview = ({
       // Transform data - group by agent and date
       const records: AgentAttendanceRecord[] = (attendanceData || []).map(record => {
         const agent = profileMap.get(record.user_id);
+        // The attendance record date is stored in YYYY-MM-DD (Dubai calendar day).
+        // The activityTimesMap and workMinutesByUserDate use dubaiDateFormatter output which is also YYYY-MM-DD.
+        // They should match directly.
         const workKey = `${record.user_id}|${record.date}`;
         
         // Use calculated work minutes from activity logs if available,
         // otherwise fall back to stored total_work_minutes
         const calculatedWorkMinutes = workMinutesByUserDate.get(workKey);
-
+        
         // Prefer calculated minutes from activity logs.
         // If we fall back to stored minutes, clamp to a sane single-day maximum to avoid inflated values.
         const fallbackStored = typeof record.total_work_minutes === 'number' ? record.total_work_minutes : null;
@@ -265,7 +310,17 @@ export const useAgentAttendanceOverview = ({
         // Get accurate first/last times from activity logs (more reliable than stored attendance times)
         const activityTimes = activityTimesMap.get(workKey);
         const accurateFirstLogin = activityTimes?.firstStart || record.first_login;
-        const accurateLastLogout = activityTimes?.lastEnd || record.last_logout;
+        
+        // For last logout: if there are ongoing activities, show the latest started_at time
+        // (representing when they were last actively doing something)
+        // Otherwise show the actual last ended_at time
+        let accurateLastLogout: string | null;
+        if (activityTimes?.hasOngoing) {
+          // Use the latest started_at as the "last active" time for ongoing sessions
+          accurateLastLogout = activityTimes.lastStarted;
+        } else {
+          accurateLastLogout = activityTimes?.lastEnd || record.last_logout;
+        }
         
         return {
           agentId: record.user_id,

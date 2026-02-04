@@ -57,6 +57,7 @@ import {
   UserPlus,
   Edit2,
   Key,
+  Upload,
 } from 'lucide-react';
 import { AdminResetPasswordDialog } from '@/components/auth/AdminResetPasswordDialog';
 import { useUserManagement, useCompanyPool, UserWithRole } from '@/hooks/useUserManagement';
@@ -64,7 +65,7 @@ import { exportUserDataToExcel } from '@/utils/userDataExport';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Database as DBTypes } from '@/integrations/supabase/types';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -98,6 +99,7 @@ const availableRoles: AppRole[] = ['agent', 'coordinator', 'supervisor', 'operat
 
 export const UserManagementPage: React.FC = () => {
   const { profile, userRole, ledTeamId } = useAuth();
+  const navigate = useNavigate();
   const { 
     users, 
     isLoading, 
@@ -563,12 +565,19 @@ export const UserManagementPage: React.FC = () => {
                     Contacts older than 1 month or from deactivated users. Select up to 100 to allocate to an agent.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   {selectedPoolContacts.length > 0 && (
                     <Badge variant="secondary" className="text-sm px-3 py-1">
                       {selectedPoolContacts.length} selected
                     </Badge>
                   )}
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/upload?pool=true')}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload to Pool
+                  </Button>
                   <Button 
                     onClick={() => setAllocateDialogOpen(true)}
                     disabled={selectedPoolContacts.length === 0 || selectedPoolContacts.length > 100}

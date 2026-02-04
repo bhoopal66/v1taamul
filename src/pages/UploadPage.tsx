@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ export const UploadPage: React.FC = () => {
   const { profile } = useAuth();
   const { isAdmin } = usePermissions();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     parsedData,
     isProcessing,
@@ -89,9 +90,18 @@ export const UploadPage: React.FC = () => {
   // Confirmation dialog state
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   
-  // Pool mode state (for admin/super admin)
-  const [sendToPoolMode, setSendToPoolMode] = useState(false);
+  // Pool mode state (for admin/super admin) - initialized from URL param
+  const [sendToPoolMode, setSendToPoolMode] = useState(() => {
+    return isAdmin && searchParams.get('pool') === 'true';
+  });
   const [poolUploadSuccess, setPoolUploadSuccess] = useState(false);
+
+  // Update pool mode when URL param changes (for admins only)
+  useEffect(() => {
+    if (isAdmin && searchParams.get('pool') === 'true') {
+      setSendToPoolMode(true);
+    }
+  }, [searchParams, isAdmin]);
 
   // Duplicate warning dialog state
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);

@@ -563,26 +563,28 @@ export const UserManagementPage: React.FC = () => {
                     Contacts older than 1 month or from deactivated users. Select up to 100 to allocate to an agent.
                   </CardDescription>
                 </div>
-                {selectedPoolContacts.length > 0 && (
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
+                  {selectedPoolContacts.length > 0 && (
                     <Badge variant="secondary" className="text-sm px-3 py-1">
                       {selectedPoolContacts.length} selected
                     </Badge>
-                    <Button 
-                      onClick={() => setAllocateDialogOpen(true)}
-                      disabled={selectedPoolContacts.length === 0 || selectedPoolContacts.length > 100}
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Allocate to Agent
-                    </Button>
+                  )}
+                  <Button 
+                    onClick={() => setAllocateDialogOpen(true)}
+                    disabled={selectedPoolContacts.length === 0 || selectedPoolContacts.length > 100}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Allocate to Agent
+                  </Button>
+                  {selectedPoolContacts.length > 0 && (
                     <Button 
                       variant="outline" 
                       onClick={() => setSelectedPoolContacts([])}
                     >
-                      Clear
+                      Clear Selection
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               {/* Quick select buttons */}
               <div className="flex items-center gap-2 pt-3 flex-wrap">

@@ -7,11 +7,13 @@ import { cn } from '@/lib/utils';
 interface IdleCountdownBannerProps {
   remainingSeconds: number;
   totalSeconds?: number;
+  hasActivity?: boolean; // Whether user has an activity selected
 }
 
 export const IdleCountdownBanner: React.FC<IdleCountdownBannerProps> = ({
   remainingSeconds,
   totalSeconds = 900, // 15 minutes
+  hasActivity = false,
 }) => {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -20,6 +22,36 @@ export const IdleCountdownBanner: React.FC<IdleCountdownBannerProps> = ({
   // Determine urgency level
   const isUrgent = remainingSeconds <= 120; // Last 2 minutes
   const isCritical = remainingSeconds <= 60; // Last minute
+
+  // Different messaging based on whether activity is selected or not
+  const getTitle = () => {
+    if (isCritical) return '⚠️ Auto-Logout Imminent!';
+    if (isUrgent) return hasActivity ? '⚠️ Confirm Activity Soon' : '⚠️ Select an Activity Soon';
+    return hasActivity ? '🕐 Inactivity Warning' : '🕐 Idle - Please Select an Activity';
+  };
+
+  const getDescription = () => {
+    if (hasActivity) {
+      return 'You will be automatically logged out if you don\'t confirm your activity';
+    }
+    return 'You will be automatically logged out if no activity is selected';
+  };
+
+  const getBottomText = () => {
+    if (isCritical) {
+      return hasActivity 
+        ? "⚠️ LOGGING OUT IN LESS THAN 1 MINUTE - Confirm your activity NOW!"
+        : "⚠️ LOGGING OUT IN LESS THAN 1 MINUTE - Select an activity NOW!";
+    }
+    if (isUrgent) {
+      return hasActivity
+        ? "Less than 2 minutes remaining - confirm activity to continue"
+        : "Less than 2 minutes remaining - select an activity to continue";
+    }
+    return hasActivity
+      ? "Confirm your activity when prompted to stay logged in"
+      : "Select an activity from the panel to start working";
+  };
 
   return (
     <Card className={cn(
@@ -58,10 +90,10 @@ export const IdleCountdownBanner: React.FC<IdleCountdownBannerProps> = ({
                   "font-semibold",
                   isCritical ? "text-destructive" : isUrgent ? "text-orange-600" : "text-blue-700"
                 )}>
-                  {isCritical ? '⚠️ Auto-Logout Imminent!' : isUrgent ? '⚠️ Select an Activity Soon' : '🕐 Idle - Please Select an Activity'}
+                  {getTitle()}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  You will be automatically logged out if no activity is selected
+                  {getDescription()}
                 </p>
               </div>
 
@@ -92,12 +124,7 @@ export const IdleCountdownBanner: React.FC<IdleCountdownBannerProps> = ({
             />
 
             <p className="text-xs text-muted-foreground text-center">
-              {isCritical 
-                ? "⚠️ LOGGING OUT IN LESS THAN 1 MINUTE - Select an activity NOW!"
-                : isUrgent 
-                  ? "Less than 2 minutes remaining - select an activity to continue"
-                  : "Select an activity from the panel to start working"
-              }
+              {getBottomText()}
             </p>
           </div>
         </div>

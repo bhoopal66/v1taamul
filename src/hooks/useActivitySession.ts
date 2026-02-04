@@ -999,7 +999,7 @@ export function useActivitySession() {
     };
   }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, user?.id, profile?.full_name, queryClient]);
 
-  // 15-MINUTE IDLE AUTO-LOGOUT (no activity selected, excludes break/lunch)
+  // 15-MINUTE IDLE AUTO-LOGOUT (no activity selected OR no work being done, excludes break/lunch)
   useEffect(() => {
     // Clear existing timer when conditions change
     if (idleAutoLogoutTimerRef.current) {
@@ -1016,16 +1016,27 @@ export function useActivitySession() {
     // Skip if current activity is 'break' (manual or auto break)
     if (session.current_activity === 'break') return;
 
-    // Only trigger idle auto-logout if NO activity is selected (null means idle/no selection)
-    if (session.current_activity !== null) return;
-
-    // Calculate how long they've been idle (since session started without activity selection)
-    // We use start_time as the reference since that's when they pressed START but didn't select an activity
-    const idleStartTime = session.current_activity_started_at 
-      ? new Date(session.current_activity_started_at).getTime()
-      : session.start_time 
-        ? new Date(session.start_time).getTime()
-        : null;
+    // Determine the reference time for idle calculation:
+    // 1. If NO activity is selected (null) - use when they pressed START or when activity was cleared
+    // 2. If activity IS selected - use last_confirmation_at as proxy for "last active moment"
+    let idleStartTime: number | null = null;
+    
+    if (session.current_activity === null) {
+      // No activity selected - use activity started time or session start time
+      idleStartTime = session.current_activity_started_at 
+        ? new Date(session.current_activity_started_at).getTime()
+        : session.start_time 
+          ? new Date(session.start_time).getTime()
+          : null;
+    } else {
+      // Activity is selected - use last_confirmation_at as reference
+      // This tracks when the agent last confirmed they were actively working
+      idleStartTime = session.last_confirmation_at
+        ? new Date(session.last_confirmation_at).getTime()
+        : session.current_activity_started_at
+          ? new Date(session.current_activity_started_at).getTime()
+          : null;
+    }
 
     if (!idleStartTime) return;
 
@@ -1046,6 +1057,8 @@ export function useActivitySession() {
     async function performIdleAutoLogout() {
       const nowIso = new Date().toISOString();
       const today = new Date().toISOString().split('T')[0];
+      const wasOnActivity = session!.current_activity !== null;
+      const activityInfo = wasOnActivity ? ` while on "${session!.current_activity}"` : ' without selecting an activity';
 
       // End the session
       await supabase
@@ -1071,9 +1084,10 @@ export function useActivitySession() {
 
       // Alert supervisor
       await alertSupervisor('idle_auto_logout',
-        `Agent ${profile?.full_name || 'Unknown'} was auto-logged out after being idle for 15 minutes without selecting an activity.`,
+        `Agent ${profile?.full_name || 'Unknown'} was auto-logged out after being inactive for 15 minutes${activityInfo}.`,
         { 
           auto_logout_reason: 'idle_15_min_no_activity',
+          last_activity: session!.current_activity || 'none',
           supervisor_notified: true
         }
       );
@@ -1091,7 +1105,7 @@ export function useActivitySession() {
         idleAutoLogoutTimerRef.current = null;
       }
     };
-  }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, session?.start_time, user?.id, profile?.full_name, breakStatus.onBreak, queryClient]);
+  }, [isSessionActive, session?.id, session?.current_activity, session?.current_activity_started_at, session?.start_time, session?.last_confirmation_at, user?.id, profile?.full_name, breakStatus.onBreak, queryClient]);
 
   // Set up realtime subscription for session updates
   useEffect(() => {
@@ -1143,16 +1157,29 @@ export function useActivitySession() {
 
   // Calculate 15-minute idle countdown
   const idleCountdown = useMemo(() => {
-    // Only show countdown when idle (no activity selected) and not on break
-    if (!isSessionActive || session?.current_activity !== null || breakStatus.onBreak) {
+    // Skip if not in active session or on break
+    if (!isSessionActive || breakStatus.onBreak || session?.current_activity === 'break') {
       return null;
     }
 
-    const idleStartTime = session?.current_activity_started_at 
-      ? new Date(session.current_activity_started_at).getTime()
-      : session?.start_time 
-        ? new Date(session.start_time).getTime()
-        : null;
+    // Determine idle start time based on whether activity is selected or not
+    let idleStartTime: number | null = null;
+    
+    if (session?.current_activity === null) {
+      // No activity selected - use activity started time or session start time
+      idleStartTime = session?.current_activity_started_at 
+        ? new Date(session.current_activity_started_at).getTime()
+        : session?.start_time 
+          ? new Date(session.start_time).getTime()
+          : null;
+    } else {
+      // Activity is selected - use last_confirmation_at as reference
+      idleStartTime = session?.last_confirmation_at
+        ? new Date(session.last_confirmation_at).getTime()
+        : session?.current_activity_started_at
+          ? new Date(session.current_activity_started_at).getTime()
+          : null;
+    }
 
     if (!idleStartTime) return null;
 
@@ -1164,8 +1191,9 @@ export function useActivitySession() {
       remainingSeconds: Math.ceil(remaining / 1000),
       remainingMinutes: Math.ceil(remaining / 60000),
       isActive: remaining > 0,
+      hasActivity: session?.current_activity !== null,
     };
-  }, [isSessionActive, session?.current_activity, session?.current_activity_started_at, session?.start_time, currentTime, breakStatus.onBreak]);
+  }, [isSessionActive, session?.current_activity, session?.current_activity_started_at, session?.start_time, session?.last_confirmation_at, currentTime, breakStatus.onBreak]);
 
   return {
     // State

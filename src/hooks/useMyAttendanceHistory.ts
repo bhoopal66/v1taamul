@@ -60,6 +60,7 @@ export const useMyAttendanceHistory = ({
       const startDateStr = format(startDate, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
 
+      // Fetch attendance records
       const { data, error } = await supabase
         .from('attendance_records')
         .select('*')
@@ -70,14 +71,61 @@ export const useMyAttendanceHistory = ({
 
       if (error) throw error;
 
-      return (data || []).map(record => ({
-        date: record.date,
-        firstLogin: record.first_login,
-        lastLogout: record.last_logout,
-        status: record.status,
-        isLate: record.is_late || false,
-        totalWorkMinutes: record.total_work_minutes,
-      })) as MyAttendanceRecord[];
+      // Fetch activity logs to get accurate first/last times
+      const { data: activityLogs, error: activityError } = await supabase
+        .from('activity_logs')
+        .select('started_at, ended_at')
+        .eq('user_id', user.id)
+        .gte('started_at', `${startDateStr}T00:00:00+04:00`)
+        .lte('started_at', `${endDateStr}T23:59:59+04:00`)
+        .order('started_at', { ascending: true });
+
+      if (activityError) throw activityError;
+
+      // Build a map of first activity start and last activity end per date
+      const dubaiDateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dubai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
+      const activityTimesMap = new Map<string, { firstStart: string; lastEnd: string | null }>();
+      
+      (activityLogs || []).forEach(log => {
+        const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
+        
+        const existing = activityTimesMap.get(dubaiDateKey);
+        if (!existing) {
+          activityTimesMap.set(dubaiDateKey, {
+            firstStart: log.started_at,
+            lastEnd: log.ended_at,
+          });
+        } else {
+          // Update lastEnd if this log has a later end time
+          if (log.ended_at) {
+            if (!existing.lastEnd || new Date(log.ended_at) > new Date(existing.lastEnd)) {
+              existing.lastEnd = log.ended_at;
+            }
+          }
+        }
+      });
+
+      return (data || []).map(record => {
+        // Get accurate first/last times from activity logs
+        const activityTimes = activityTimesMap.get(record.date);
+        const accurateFirstLogin = activityTimes?.firstStart || record.first_login;
+        const accurateLastLogout = activityTimes?.lastEnd || record.last_logout;
+
+        return {
+          date: record.date,
+          firstLogin: accurateFirstLogin,
+          lastLogout: accurateLastLogout,
+          status: record.status,
+          isLate: record.is_late || false,
+          totalWorkMinutes: record.total_work_minutes,
+        };
+      }) as MyAttendanceRecord[];
     },
     enabled: !!user?.id,
     staleTime: 30000,

@@ -161,10 +161,11 @@ export const ActivityMonitorPage: React.FC = () => {
         </Card>
       )}
 
-      {/* 15-Minute Idle Countdown Banner */}
-      {isSessionActive && idleCountdown && idleCountdown.isActive && !session?.current_activity && (
+      {/* 15-Minute Idle/Inactivity Countdown Banner */}
+      {isSessionActive && idleCountdown && idleCountdown.isActive && (
         <IdleCountdownBanner
           remainingSeconds={idleCountdown.remainingSeconds}
+          hasActivity={idleCountdown.hasActivity}
         />
       )}
 

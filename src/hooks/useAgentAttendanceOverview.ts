@@ -122,6 +122,8 @@ export const useAgentAttendanceOverview = ({
         day: '2-digit',
       });
 
+      const todayDubaiKey = dubaiDateFormatter.format(new Date());
+
       // Build a map of first activity start and last activity end per user per date
       // Also track the latest started_at for ongoing activities to show as "last activity time"
       const activityTimesMap = new Map<string, { 
@@ -211,6 +213,11 @@ export const useAgentAttendanceOverview = ({
         return window;
       };
 
+      // Build spans only from CLOSED work-activity logs.
+      // Unclosed logs (ended_at is null) can be duplicated / stale; we only consider the most recent
+      // unclosed log for TODAY, and only if the agent is actively working (handled later per-record).
+      const latestOngoingStartByUserDate = new Map<string, number>();
+
       (activityLogs || []).forEach(log => {
         const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
         const window = getWorkWindow(dubaiDateKey);
@@ -218,16 +225,17 @@ export const useAgentAttendanceOverview = ({
 
         const rawStart = new Date(log.started_at).getTime();
         const key = `${log.user_id}|${dubaiDateKey}`;
-        
-        // For ongoing activities, use the activity's own start time + 15 min buffer
-        // This prevents counting work time beyond reasonable activity duration
-        let rawEnd: number;
-        if (log.ended_at) {
-          rawEnd = new Date(log.ended_at).getTime();
-        } else {
-          // Use THIS activity's start + 15 min buffer, capped to current time
-          rawEnd = Math.min(rawStart + 15 * 60 * 1000, Date.now());
+
+        if (!log.ended_at) {
+          // Track only the latest unclosed work log per user/date (we'll optionally include it for today)
+          const existing = latestOngoingStartByUserDate.get(key);
+          if (!existing || rawStart > existing) {
+            latestOngoingStartByUserDate.set(key, rawStart);
+          }
+          return;
         }
+
+        const rawEnd = new Date(log.ended_at).getTime();
 
         // Clamp spans to the day's Dubai work-hours window to prevent multi-day inflation
         const start = Math.max(rawStart, window.start);
@@ -240,36 +248,70 @@ export const useAgentAttendanceOverview = ({
         logsByUserDate.set(key, existing);
       });
 
-      // Calculate non-overlapping work minutes for each user/date
-      const workMinutesByUserDate = new Map<string, number>();
-      
-      logsByUserDate.forEach((spans, key) => {
-        // Sort spans by start time
-        spans.sort((a, b) => a.start - b.start);
-        
-        // Merge overlapping spans
-        const mergedSpans: Array<{ start: number; end: number }> = [];
-        for (const span of spans) {
-          if (mergedSpans.length === 0) {
-            mergedSpans.push({ ...span });
+      const mergeAndSumMinutes = (spans: Span[]) => {
+        if (spans.length === 0) return 0;
+
+        const sorted = [...spans].sort((a, b) => a.start - b.start);
+        const merged: Span[] = [];
+        for (const span of sorted) {
+          if (merged.length === 0) {
+            merged.push({ ...span });
+            continue;
+          }
+          const last = merged[merged.length - 1];
+          if (span.start <= last.end) {
+            last.end = Math.max(last.end, span.end);
           } else {
-            const last = mergedSpans[mergedSpans.length - 1];
-            if (span.start <= last.end) {
-              // Overlapping - extend the end time if needed
-              last.end = Math.max(last.end, span.end);
-            } else {
-              // Non-overlapping - add new span
-              mergedSpans.push({ ...span });
+            merged.push({ ...span });
+          }
+        }
+
+        return merged.reduce((sum, span) => sum + Math.round((span.end - span.start) / 60000), 0);
+      };
+
+      // Calculate non-overlapping work minutes for each user/date (closed logs only)
+      const workMinutesByUserDateClosed = new Map<string, number>();
+      // For today's date key only, we also compute an optional total including the latest ongoing log
+      const workMinutesByUserDateWithOngoingToday = new Map<string, number>();
+
+      logsByUserDate.forEach((spans, key) => {
+        const closedMinutes = mergeAndSumMinutes(spans);
+        workMinutesByUserDateClosed.set(key, closedMinutes);
+
+        // If there's an ongoing log today for this key, compute a total including a capped ongoing span.
+        const dateKey = key.split('|')[1];
+        if (dateKey === todayDubaiKey) {
+          const ongoingStart = latestOngoingStartByUserDate.get(key);
+          if (ongoingStart) {
+            const window = getWorkWindow(dateKey);
+            if (window) {
+              const rawEnd = Math.min(ongoingStart + 15 * 60 * 1000, Date.now());
+              const start = Math.max(ongoingStart, window.start);
+              const end = Math.min(rawEnd, window.end);
+              const totalWithOngoing = end > start
+                ? mergeAndSumMinutes([...spans, { start, end }])
+                : closedMinutes;
+              workMinutesByUserDateWithOngoingToday.set(key, totalWithOngoing);
             }
           }
         }
-        
-        // Sum up non-overlapping durations
-        const totalMinutes = mergedSpans.reduce((sum, span) => {
-          return sum + Math.round((span.end - span.start) / 60000);
-        }, 0);
-        
-        workMinutesByUserDate.set(key, totalMinutes);
+      });
+
+      // If we have an ongoing log today but no closed spans at all, still prepare the with-ongoing total.
+      latestOngoingStartByUserDate.forEach((ongoingStart, key) => {
+        const dateKey = key.split('|')[1];
+        if (dateKey !== todayDubaiKey) return;
+        if (workMinutesByUserDateWithOngoingToday.has(key)) return;
+
+        const window = getWorkWindow(dateKey);
+        if (!window) return;
+
+        const rawEnd = Math.min(ongoingStart + 15 * 60 * 1000, Date.now());
+        const start = Math.max(ongoingStart, window.start);
+        const end = Math.min(rawEnd, window.end);
+        if (end <= start) return;
+
+        workMinutesByUserDateWithOngoingToday.set(key, mergeAndSumMinutes([{ start, end }]));
       });
 
       // Create a map for easy lookup
@@ -282,30 +324,38 @@ export const useAgentAttendanceOverview = ({
         // The activityTimesMap and workMinutesByUserDate use dubaiDateFormatter output which is also YYYY-MM-DD.
         // They should match directly.
         const workKey = `${record.user_id}|${record.date}`;
-        
-        // Use calculated work minutes from activity logs if available,
-        // otherwise fall back to stored total_work_minutes
-        const calculatedWorkMinutes = workMinutesByUserDate.get(workKey);
-        
-        // Prefer calculated minutes from activity logs.
-        // If we fall back to stored minutes, clamp to a sane single-day maximum to avoid inflated values.
+
+        // Only treat ongoing logs as relevant if this is TODAY and the agent is currently working,
+        // and the time is still within the shift window.
+        const todayWindow = getWorkWindow(todayDubaiKey);
+        const isWithinTodayWindow = !!todayWindow && Date.now() >= todayWindow.start && Date.now() <= todayWindow.end;
+        const includeOngoingForToday = record.date === todayDubaiKey && isWithinTodayWindow && !!record.is_working;
+
+        const closedMinutes = workMinutesByUserDateClosed.get(workKey);
+        const withOngoingTodayMinutes = workMinutesByUserDateWithOngoingToday.get(workKey);
+        const calculatedWorkMinutes = includeOngoingForToday
+          ? (withOngoingTodayMinutes ?? closedMinutes)
+          : closedMinutes;
+
+        // If we have no calculated minutes (no activity logs matched), fall back to stored total_work_minutes.
+        // Clamp stored minutes to a sane single-day maximum to avoid inflated values.
         const fallbackStored = typeof record.total_work_minutes === 'number' ? record.total_work_minutes : null;
-        const safeFallback = fallbackStored !== null && fallbackStored > 0 && fallbackStored <= 24 * 60 ? fallbackStored : null;
+        const safeFallback = fallbackStored !== null && fallbackStored >= 0 && fallbackStored <= 24 * 60 ? fallbackStored : null;
         const totalWorkMinutes = calculatedWorkMinutes ?? safeFallback;
         
         // Get accurate first/last times from activity logs (more reliable than stored attendance times)
         const activityTimes = activityTimesMap.get(workKey);
         const accurateFirstLogin = activityTimes?.firstStart || record.first_login;
         
-        // For last logout: if there are ongoing activities, show the latest started_at time
-        // (representing when they were last actively doing something)
-        // Otherwise show the actual last ended_at time
         let accurateLastLogout: string | null;
-        if (activityTimes?.hasOngoing) {
-          // Use the latest started_at as the "last active" time for ongoing sessions
+        // Prefer the latest ended_at as the true "logout" time.
+        // Only show latest started_at when the agent is currently working today (to indicate "last active").
+        if (activityTimes?.lastEnd) {
+          accurateLastLogout = activityTimes.lastEnd;
+        } else if (includeOngoingForToday && activityTimes?.hasOngoing) {
           accurateLastLogout = activityTimes.lastStarted;
         } else {
-          accurateLastLogout = activityTimes?.lastEnd || record.last_logout;
+          accurateLastLogout = record.last_logout;
         }
         
         return {

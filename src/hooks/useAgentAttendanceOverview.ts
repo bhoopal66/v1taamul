@@ -114,6 +114,14 @@ export const useAgentAttendanceOverview = ({
 
       if (allActivityError) throw allActivityError;
 
+      // Dubai date formatter for consistent date keys
+      const dubaiDateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dubai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
       // Build a map of first activity start and last activity end per user per date
       const activityTimesMap = new Map<string, { firstStart: string; lastEnd: string | null }>();
       
@@ -158,12 +166,7 @@ export const useAgentAttendanceOverview = ({
       type Span = { start: number; end: number };
       const logsByUserDate = new Map<string, Span[]>();
 
-      const dubaiDateFormatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Dubai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
+      // dubaiDateFormatter already declared above
 
       const workWindowCache = new Map<string, { start: number; end: number } | null>();
       const getWorkWindow = (dubaiDateKey: string) => {

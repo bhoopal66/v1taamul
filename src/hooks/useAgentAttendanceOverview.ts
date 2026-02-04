@@ -237,6 +237,11 @@ export const useAgentAttendanceOverview = ({
 
         const rawEnd = new Date(log.ended_at).getTime();
 
+        // Skip if the activity ended before the work window started (entirely outside work hours)
+        if (rawEnd <= window.start) return;
+        // Skip if the activity started after the work window ended
+        if (rawStart >= window.end) return;
+
         // Clamp spans to the day's Dubai work-hours window to prevent multi-day inflation
         const start = Math.max(rawStart, window.start);
         const end = Math.min(rawEnd, window.end);

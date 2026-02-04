@@ -53,6 +53,24 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
     }
   };
 
+  // Validate and format logout time - show warning if logout is before login (data integrity issue)
+  const formatLogoutTime = (firstLogin: string | null, lastLogout: string | null) => {
+    if (!lastLogout) return '—';
+    
+    // If we have both times, check if logout is before login (data integrity issue)
+    if (firstLogin && lastLogout) {
+      const loginTime = new Date(firstLogin).getTime();
+      const logoutTime = new Date(lastLogout).getTime();
+      
+      if (logoutTime < loginTime) {
+        // Data integrity issue - logout is before login, show as invalid
+        return '⚠️ Invalid';
+      }
+    }
+    
+    return formatTime(lastLogout);
+  };
+
   const formatWorkDuration = (minutes: number | null) => {
     if (!minutes) return '—';
     const hours = Math.floor(minutes / 60);
@@ -457,7 +475,7 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
                         {formatTime(record.firstLogin)}
                       </TableCell>
                       <TableCell className="text-center font-mono">
-                        {formatTime(record.lastLogout)}
+                        {formatLogoutTime(record.firstLogin, record.lastLogout)}
                       </TableCell>
                       <TableCell className="text-center">
                         {formatWorkDuration(record.totalWorkMinutes)}

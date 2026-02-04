@@ -194,60 +194,78 @@ export const SupervisorDashboard: React.FC = () => {
       {/* Failed Uploads Recovery Panel */}
       <FailedUploadsRetryPanel />
 
-      {/* Performance Tabs */}
+      {/* Performance Tabs - Streamlined Layout */}
       <Tabs defaultValue="working-status" className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="working-status" className="gap-1">
-              <UserCheck className="w-4 h-4" />
-              Working Status
+        <div className="flex flex-col gap-4">
+          {/* Primary Navigation Row */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap gap-1 h-auto p-1">
+              <TabsTrigger value="working-status" className="gap-1.5 text-xs sm:text-sm">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Working</span> Status
+              </TabsTrigger>
+              <TabsTrigger value="alerts" className="gap-1.5 text-xs sm:text-sm">
+                <Bell className="w-3.5 h-3.5" />
+                Alerts
+                {unreadCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-destructive text-destructive-foreground rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="gap-1.5 text-xs sm:text-sm">
+                <Activity className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Live</span> Activity
+              </TabsTrigger>
+              <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm">
+                <CalendarClock className="w-3.5 h-3.5" />
+                Attendance
+              </TabsTrigger>
+            </TabsList>
+            
+            <Select value={trendDays.toString()} onValueChange={(v) => setTrendDays(Number(v))}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="14">Last 14 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Secondary Navigation Row */}
+          <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap gap-1 h-auto p-1 bg-muted/50">
+            <TabsTrigger value="trends" className="gap-1.5 text-xs sm:text-sm">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Trends
             </TabsTrigger>
-            <TabsTrigger value="alerts" className="gap-1">
-              <Bell className="w-4 h-4" />
-              Alerts
-              {unreadCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-destructive text-destructive-foreground rounded-full">
-                  {unreadCount}
-                </span>
-              )}
+            <TabsTrigger value="heatmap" className="gap-1.5 text-xs sm:text-sm">
+              <BarChart3 className="w-3.5 h-3.5" />
+              Heatmap
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-1">
-              <Activity className="w-4 h-4" />
-              Live Activity
+            <TabsTrigger value="leads" className="gap-1.5 text-xs sm:text-sm">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Leads
             </TabsTrigger>
-            <TabsTrigger value="trends">Team Trends</TabsTrigger>
-            <TabsTrigger value="heatmap" className="gap-1">
-              <BarChart3 className="w-4 h-4" />
-              Call Heatmap
-            </TabsTrigger>
-            <TabsTrigger value="unanswered" className="gap-1">
-              <PhoneMissed className="w-4 h-4" />
+            <TabsTrigger value="unanswered" className="gap-1.5 text-xs sm:text-sm">
+              <PhoneMissed className="w-3.5 h-3.5" />
               Unanswered
             </TabsTrigger>
-            <TabsTrigger value="leads" className="gap-1">
-              <TrendingUp className="w-4 h-4" />
-              New Leads
+            <TabsTrigger value="submissions" className="gap-1.5 text-xs sm:text-sm">
+              Submissions
             </TabsTrigger>
-            <TabsTrigger value="attendance" className="gap-1">
-              <CalendarClock className="w-4 h-4" />
-              Attendance
+            <TabsTrigger value="agents" className="gap-1.5 text-xs sm:text-sm">
+              Drill-Down
             </TabsTrigger>
-            <TabsTrigger value="submissions">Submissions</TabsTrigger>
-            <TabsTrigger value="agents">Agent Drill-Down</TabsTrigger>
-            <TabsTrigger value="comparison">Compare Periods</TabsTrigger>
-            <TabsTrigger value="today">Today's Activity</TabsTrigger>
+            <TabsTrigger value="comparison" className="gap-1.5 text-xs sm:text-sm">
+              Compare
+            </TabsTrigger>
+            <TabsTrigger value="today" className="gap-1.5 text-xs sm:text-sm">
+              Today
+            </TabsTrigger>
           </TabsList>
-          
-          <Select value={trendDays.toString()} onValueChange={(v) => setTrendDays(Number(v))}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="14">Last 14 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <TabsContent value="working-status" className="space-y-6">

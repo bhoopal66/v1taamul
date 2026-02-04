@@ -7,10 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useAgentAttendanceOverview, AttendancePeriod } from '@/hooks/useAgentAttendanceOverview';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Users, Download, FileSpreadsheet } from 'lucide-react';
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Users, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, getDay, isSaturday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -20,6 +20,12 @@ interface AgentAttendanceOverviewProps {
 
 // Data starts from Feb 4, 2025
 const DATA_START_DATE = new Date('2025-02-04');
+
+// Work hours configuration
+const WORK_HOURS = {
+  weekday: { start: '10:00 AM', end: '07:00 PM', startHour: 10, endHour: 19 },
+  saturday: { start: '10:00 AM', end: '02:00 PM', startHour: 10, endHour: 14 },
+};
 
 export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = ({ teamId }) => {
   const [period, setPeriod] = useState<AttendancePeriod>('day');
@@ -136,6 +142,34 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
     }));
   }, [attendanceRecords, period]);
 
+  const getExpectedWorkHours = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const dayOfWeek = getDay(date);
+    
+    // Sunday = 0, skip Sundays (no work)
+    if (dayOfWeek === 0) {
+      return { start: 'Off', end: 'Off', expectedMinutes: 0, isWorkDay: false };
+    }
+    
+    // Saturday = 6: 10 AM to 2 PM (4 hours)
+    if (dayOfWeek === 6) {
+      return { 
+        start: WORK_HOURS.saturday.start, 
+        end: WORK_HOURS.saturday.end, 
+        expectedMinutes: 4 * 60,
+        isWorkDay: true 
+      };
+    }
+    
+    // Weekdays (Mon-Fri): 10 AM to 7 PM (9 hours)
+    return { 
+      start: WORK_HOURS.weekday.start, 
+      end: WORK_HOURS.weekday.end, 
+      expectedMinutes: 9 * 60,
+      isWorkDay: true 
+    };
+  };
+
   const exportToCSV = () => {
     if (!attendanceRecords || attendanceRecords.length === 0) {
       toast.error('No data to export');
@@ -183,6 +217,101 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
     toast.success('Attendance exported to CSV');
   };
 
+  const exportDetailedCSV = () => {
+    if (!attendanceRecords || attendanceRecords.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+
+    // Detailed export with expected work hours
+    const headers = [
+      'Agent Name',
+      'Date',
+      'Day',
+      'Expected Start',
+      'Expected End',
+      'Expected Hours',
+      'Actual First Login',
+      'Actual Last Logout',
+      'Actual Work Time',
+      'Difference (mins)',
+      'Status',
+      'Is Late',
+      'Late By (mins)',
+      'Remarks'
+    ];
+
+    const rows = attendanceRecords.map(record => {
+      const recordDate = new Date(record.date);
+      const dayName = format(recordDate, 'EEEE');
+      const workHours = getExpectedWorkHours(record.date);
+      
+      const actualMinutes = record.totalWorkMinutes || 0;
+      const differenceMinutes = actualMinutes - workHours.expectedMinutes;
+      
+      let remarks = '';
+      if (!workHours.isWorkDay) {
+        remarks = 'Non-working day (Sunday)';
+      } else if (!record.firstLogin) {
+        remarks = 'Absent / No login recorded';
+      } else if (differenceMinutes < -30) {
+        remarks = 'Undertime';
+      } else if (differenceMinutes > 30) {
+        remarks = 'Overtime';
+      } else {
+        remarks = 'On time';
+      }
+
+      return [
+        `"${record.agentName}"`,
+        format(recordDate, 'yyyy-MM-dd'),
+        dayName,
+        workHours.start,
+        workHours.end,
+        workHours.isWorkDay ? `${workHours.expectedMinutes / 60}h` : 'Off',
+        record.firstLogin ? format(new Date(record.firstLogin), 'hh:mm:ss a') : 'No Login',
+        record.lastLogout ? format(new Date(record.lastLogout), 'hh:mm:ss a') : 'No Logout',
+        actualMinutes > 0 ? `${Math.floor(actualMinutes / 60)}h ${Math.round(actualMinutes % 60)}m` : '0h 0m',
+        workHours.isWorkDay ? differenceMinutes.toString() : 'N/A',
+        record.status || 'Unknown',
+        record.isLate ? 'Yes' : 'No',
+        record.isLate && record.firstLogin ? 
+          Math.round((new Date(record.firstLogin).getHours() * 60 + new Date(record.firstLogin).getMinutes()) - (10 * 60)).toString() : 
+          '0',
+        `"${remarks}"`
+      ];
+    });
+
+    // Add summary section
+    const summaryRows: string[][] = [];
+    summaryRows.push([]);
+    summaryRows.push(['--- SUMMARY ---']);
+    summaryRows.push(['Total Records', attendanceRecords.length.toString()]);
+    summaryRows.push(['Total Late Days', attendanceRecords.filter(r => r.isLate).length.toString()]);
+    
+    const totalWorkedMinutes = attendanceRecords.reduce((sum, r) => sum + (r.totalWorkMinutes || 0), 0);
+    summaryRows.push(['Total Work Time', `${Math.floor(totalWorkedMinutes / 60)}h ${Math.round(totalWorkedMinutes % 60)}m`]);
+    
+    summaryRows.push([]);
+    summaryRows.push(['Work Hours Schedule:']);
+    summaryRows.push(['Sunday', 'Off']);
+    summaryRows.push(['Monday - Friday', '10:00 AM - 7:00 PM (9 hours)']);
+    summaryRows.push(['Saturday', '10:00 AM - 2:00 PM (4 hours)']);
+
+    const csvContent = [
+      headers.join(','), 
+      ...rows.map(row => row.join(',')),
+      ...summaryRows.map(row => row.join(','))
+    ].join('\n');
+    
+    const filename = period === 'day' 
+      ? `attendance-detailed-${format(selectedDate, 'yyyy-MM-dd')}.csv`
+      : `attendance-detailed-${period}-${getDateRangeLabel().replace(/[^a-zA-Z0-9]/g, '-')}.csv`;
+    
+    downloadCSV(csvContent, filename);
+    toast.success('Detailed attendance exported to CSV');
+  };
+
   const downloadCSV = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -214,7 +343,12 @@ export const AgentAttendanceOverview: React.FC<AgentAttendanceOverviewProps> = (
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={exportToCSV} className="gap-2">
                   <FileSpreadsheet className="w-4 h-4" />
-                  Download CSV
+                  Quick Export (CSV)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={exportDetailedCSV} className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  Detailed Export (CSV)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

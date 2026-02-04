@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addDays } from 'date-fns';
 
 export type AttendancePeriod = 'day' | 'week' | 'month';
 
@@ -103,51 +103,75 @@ export const useAgentAttendanceOverview = ({
       if (attendanceError) throw attendanceError;
 
       // Fetch activity logs to calculate actual work time
-      // Use a wider time range to account for timezone differences (Dubai is UTC+4)
+      // Query a slightly wider range to safely catch spans that start near boundaries,
+      // then clamp spans to Dubai work-hours windows per day.
+      const activityQueryStartStr = format(addDays(startDate, -1), 'yyyy-MM-dd');
+      const activityQueryEndStr = format(addDays(endDate, 1), 'yyyy-MM-dd');
+
       const { data: activityLogs, error: activityError } = await supabase
         .from('activity_logs')
         .select('user_id, activity_type, started_at, ended_at, duration_minutes')
         .in('user_id', memberIds)
-        .gte('started_at', `${startDateStr}T00:00:00+04:00`)
-        .lte('started_at', `${endDateStr}T23:59:59+04:00`)
+        .gte('started_at', `${activityQueryStartStr}T00:00:00+04:00`)
+        .lte('started_at', `${activityQueryEndStr}T23:59:59+04:00`)
         .in('activity_type', WORK_ACTIVITY_TYPES)
         .order('started_at', { ascending: true });
 
       if (activityError) throw activityError;
 
-      // Group activity logs by user and date, then calculate non-overlapping work time
-      const logsByUserDate = new Map<string, Array<{ start: number; end: number }>>();
-      
+      // Group activity logs by user and Dubai-date, then calculate non-overlapping work time
+      type Span = { start: number; end: number };
+      const logsByUserDate = new Map<string, Span[]>();
+
+      const dubaiDateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dubai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
+      const workWindowCache = new Map<string, { start: number; end: number } | null>();
+      const getWorkWindow = (dubaiDateKey: string) => {
+        const cached = workWindowCache.get(dubaiDateKey);
+        if (cached !== undefined) return cached;
+
+        // Determine weekday in Dubai (Dubai is fixed UTC+4; using a Dubai timestamp keeps this stable)
+        const noonDubai = new Date(`${dubaiDateKey}T12:00:00+04:00`);
+        const day = noonDubai.getUTCDay();
+
+        // Sunday (0) is off
+        if (day === 0) {
+          workWindowCache.set(dubaiDateKey, null);
+          return null;
+        }
+
+        const startMs = new Date(`${dubaiDateKey}T10:00:00+04:00`).getTime();
+        const endTime = day === 6 ? '14:00:00' : '19:00:00';
+        const endMs = new Date(`${dubaiDateKey}T${endTime}+04:00`).getTime();
+
+        const window = { start: startMs, end: endMs };
+        workWindowCache.set(dubaiDateKey, window);
+        return window;
+      };
+
       (activityLogs || []).forEach(log => {
-        // Convert to Dubai timezone for date grouping
-        const dubaiDate = new Date(log.started_at).toLocaleString('en-CA', { 
-          timeZone: 'Asia/Dubai',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).split(',')[0]; // Gets YYYY-MM-DD format
-        
-        const key = `${log.user_id}|${dubaiDate}`;
-        
-        const start = new Date(log.started_at).getTime();
-        let end: number;
-        
-        if (log.ended_at) {
-          end = new Date(log.ended_at).getTime();
-        } else {
-          // For ongoing activities, use current time but cap at end of work day (7 PM Dubai = 15:00 UTC)
-          const now = Date.now();
-          const endOfWorkDay = new Date(log.started_at);
-          endOfWorkDay.setUTCHours(15, 0, 0, 0); // 7 PM Dubai time
-          end = Math.min(now, endOfWorkDay.getTime());
-        }
-        
-        // Only add valid time spans
-        if (end > start) {
-          const existing = logsByUserDate.get(key) || [];
-          existing.push({ start, end });
-          logsByUserDate.set(key, existing);
-        }
+        const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
+        const window = getWorkWindow(dubaiDateKey);
+        if (!window) return;
+
+        const rawStart = new Date(log.started_at).getTime();
+        const rawEnd = log.ended_at ? new Date(log.ended_at).getTime() : Date.now();
+
+        // Clamp spans to the day’s Dubai work-hours window to prevent multi-day inflation
+        const start = Math.max(rawStart, window.start);
+        const end = Math.min(rawEnd, window.end);
+
+        if (end <= start) return;
+
+        const key = `${log.user_id}|${dubaiDateKey}`;
+        const existing = logsByUserDate.get(key) || [];
+        existing.push({ start, end });
+        logsByUserDate.set(key, existing);
       });
 
       // Calculate non-overlapping work minutes for each user/date
@@ -193,9 +217,12 @@ export const useAgentAttendanceOverview = ({
         // Use calculated work minutes from activity logs if available,
         // otherwise fall back to stored total_work_minutes
         const calculatedWorkMinutes = workMinutesByUserDate.get(workKey);
-        const totalWorkMinutes = calculatedWorkMinutes !== undefined 
-          ? calculatedWorkMinutes 
-          : record.total_work_minutes;
+
+        // Prefer calculated minutes from activity logs.
+        // If we fall back to stored minutes, clamp to a sane single-day maximum to avoid inflated values.
+        const fallbackStored = typeof record.total_work_minutes === 'number' ? record.total_work_minutes : null;
+        const safeFallback = fallbackStored !== null && fallbackStored > 0 && fallbackStored <= 24 * 60 ? fallbackStored : null;
+        const totalWorkMinutes = calculatedWorkMinutes ?? safeFallback;
         
         return {
           agentId: record.user_id,

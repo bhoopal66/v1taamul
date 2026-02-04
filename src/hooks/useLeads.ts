@@ -201,7 +201,7 @@ export const useLeads = (statusFilter?: LeadStatus | 'all', dateRange?: DateRang
 
         if (teamIdToFetch) {
           const { data: teamMembers } = await supabase
-            .from('profiles')
+            .from('profiles_public')
             .select('id')
             .eq('team_id', teamIdToFetch)
             .eq('is_active', true);

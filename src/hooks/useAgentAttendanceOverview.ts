@@ -103,22 +103,30 @@ export const useAgentAttendanceOverview = ({
       if (attendanceError) throw attendanceError;
 
       // Fetch activity logs to calculate actual work time
+      // Use a wider time range to account for timezone differences (Dubai is UTC+4)
       const { data: activityLogs, error: activityError } = await supabase
         .from('activity_logs')
         .select('user_id, activity_type, started_at, ended_at, duration_minutes')
         .in('user_id', memberIds)
-        .gte('started_at', `${startDateStr}T00:00:00`)
-        .lte('started_at', `${endDateStr}T23:59:59`)
+        .gte('started_at', `${startDateStr}T00:00:00+04:00`)
+        .lte('started_at', `${endDateStr}T23:59:59+04:00`)
         .in('activity_type', WORK_ACTIVITY_TYPES);
 
       if (activityError) throw activityError;
 
-      // Group activity logs by user and date, sum up work minutes
+      // Group activity logs by user and date (in Dubai timezone), sum up work minutes
       const workMinutesByUserDate = new Map<string, number>();
       
       (activityLogs || []).forEach(log => {
-        const logDate = format(new Date(log.started_at), 'yyyy-MM-dd');
-        const key = `${log.user_id}|${logDate}`;
+        // Convert to Dubai timezone for date grouping
+        const dubaiDate = new Date(log.started_at).toLocaleString('en-CA', { 
+          timeZone: 'Asia/Dubai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).split(',')[0]; // Gets YYYY-MM-DD format
+        
+        const key = `${log.user_id}|${dubaiDate}`;
         
         // Calculate duration: use stored duration_minutes if available,
         // otherwise calculate from started_at and ended_at

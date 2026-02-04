@@ -102,6 +102,41 @@ export const useAgentAttendanceOverview = ({
 
       if (attendanceError) throw attendanceError;
 
+      // Fetch ALL activity logs for the date range to calculate accurate first/last times
+      // This is more reliable than stored attendance times which can be overwritten by multiple sessions
+      const { data: allActivityLogs, error: allActivityError } = await supabase
+        .from('activity_logs')
+        .select('user_id, started_at, ended_at')
+        .in('user_id', memberIds)
+        .gte('started_at', `${startDateStr}T00:00:00+04:00`)
+        .lte('started_at', `${endDateStr}T23:59:59+04:00`)
+        .order('started_at', { ascending: true });
+
+      if (allActivityError) throw allActivityError;
+
+      // Build a map of first activity start and last activity end per user per date
+      const activityTimesMap = new Map<string, { firstStart: string; lastEnd: string | null }>();
+      
+      (allActivityLogs || []).forEach(log => {
+        const dubaiDateKey = dubaiDateFormatter.format(new Date(log.started_at));
+        const key = `${log.user_id}|${dubaiDateKey}`;
+        
+        const existing = activityTimesMap.get(key);
+        if (!existing) {
+          activityTimesMap.set(key, {
+            firstStart: log.started_at,
+            lastEnd: log.ended_at,
+          });
+        } else {
+          // Update lastEnd if this log has a later end time
+          if (log.ended_at) {
+            if (!existing.lastEnd || new Date(log.ended_at) > new Date(existing.lastEnd)) {
+              existing.lastEnd = log.ended_at;
+            }
+          }
+        }
+      });
+
       // Fetch activity logs to calculate actual work time
       // Query a slightly wider range to safely catch spans that start near boundaries,
       // then clamp spans to Dubai work-hours windows per day.
@@ -224,12 +259,17 @@ export const useAgentAttendanceOverview = ({
         const safeFallback = fallbackStored !== null && fallbackStored > 0 && fallbackStored <= 24 * 60 ? fallbackStored : null;
         const totalWorkMinutes = calculatedWorkMinutes ?? safeFallback;
         
+        // Get accurate first/last times from activity logs (more reliable than stored attendance times)
+        const activityTimes = activityTimesMap.get(workKey);
+        const accurateFirstLogin = activityTimes?.firstStart || record.first_login;
+        const accurateLastLogout = activityTimes?.lastEnd || record.last_logout;
+        
         return {
           agentId: record.user_id,
           agentName: agent?.full_name || agent?.username || 'Unknown',
           date: record.date,
-          firstLogin: record.first_login,
-          lastLogout: record.last_logout,
+          firstLogin: accurateFirstLogin,
+          lastLogout: accurateLastLogout,
           status: record.status,
           isLate: record.is_late || false,
           totalWorkMinutes: totalWorkMinutes,

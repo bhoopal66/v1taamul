@@ -6,22 +6,34 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Users, Download, FileSpreadsheet, FileText, CalendarDays, CalendarRange, ArrowLeft, Calendar, RotateCcw, Filter } from 'lucide-react';
+import { Users, Download, FileSpreadsheet, FileText, CalendarDays, CalendarRange, ArrowLeft, Calendar, RotateCcw, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { CalendarIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay, format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { startOfDay, endOfDay, format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AgentDailyStats {
   agentId: string;
   agentName: string;
+  totalCalls: number;
+  interested: number;
+  notInterested: number;
+  notAnswered: number;
+  leadsGenerated: number;
+  conversionRate: number;
+}
+
+interface DailyBreakdown {
+  date: string;
+  displayDate: string;
   totalCalls: number;
   interested: number;
   notInterested: number;
@@ -60,6 +72,9 @@ export const AgentPerformanceList: React.FC = () => {
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
   const [appliedAgentId, setAppliedAgentId] = useState<string>('all');
+  
+  // Collapsible state for daily breakdown
+  const [isDailyBreakdownOpen, setIsDailyBreakdownOpen] = useState(true);
 
   // Calculate week dates based on offset
   const getWeekDates = (offset: number) => {
@@ -88,6 +103,13 @@ export const AgentPerformanceList: React.FC = () => {
 
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || profile?.team_id;
+  
+  // Check if we should show daily breakdown (for multi-day filters)
+  const showDailyBreakdown = useMemo(() => {
+    return appliedMode === 'week' || appliedMode === 'month' || 
+      (appliedMode === 'range' && appliedStartDate && appliedEndDate && 
+       startOfDay(appliedStartDate).getTime() !== startOfDay(appliedEndDate).getTime());
+  }, [appliedMode, appliedStartDate, appliedEndDate]);
 
   // Fetch agents for dropdown
   const { data: agentOptions = [] } = useQuery({
@@ -116,8 +138,8 @@ export const AgentPerformanceList: React.FC = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['agent-performance-list', user?.id, effectiveTeamId, canSeeAllData, appliedMode, appliedSingleDate?.toISOString(), appliedStartDate?.toISOString(), appliedEndDate?.toISOString(), appliedAgentId],
-    queryFn: async () => {
-      if (!hasAppliedFilter) return { agentStats: [], summary: null };
+    queryFn: async (): Promise<{ agentStats: AgentDailyStats[]; summary: AllAgentsSummary | null; dailyBreakdown: DailyBreakdown[] }> => {
+      if (!hasAppliedFilter) return { agentStats: [], summary: null, dailyBreakdown: [] };
 
       let queryStart: Date;
       let queryEnd: Date;
@@ -132,7 +154,7 @@ export const AgentPerformanceList: React.FC = () => {
         queryStart = startOfDay(appliedStartDate);
         queryEnd = endOfDay(appliedEndDate);
       } else {
-        return { agentStats: [], summary: null };
+        return { agentStats: [], summary: null, dailyBreakdown: [] };
       }
 
       const start = queryStart.toISOString();
@@ -169,14 +191,14 @@ export const AgentPerformanceList: React.FC = () => {
       // Build the query for call feedback
       let feedbackQuery = supabase
         .from('call_feedback')
-        .select('agent_id, feedback_status')
+        .select('agent_id, feedback_status, call_timestamp')
         .gte('call_timestamp', start)
         .lte('call_timestamp', end);
 
       if (agentIds && agentIds.length > 0) {
         feedbackQuery = feedbackQuery.in('agent_id', agentIds);
       } else if (agentIds && agentIds.length === 0) {
-        return { agentStats: [], summary: null };
+        return { agentStats: [], summary: null, dailyBreakdown: [] };
       }
 
       const { data: feedback, error: feedbackError } = await feedbackQuery;
@@ -185,7 +207,7 @@ export const AgentPerformanceList: React.FC = () => {
       // Build the query for leads
       let leadsQuery = supabase
         .from('leads')
-        .select('agent_id')
+        .select('agent_id, created_at')
         .gte('created_at', start)
         .lte('created_at', end);
 
@@ -249,6 +271,46 @@ export const AgentPerformanceList: React.FC = () => {
           : 0,
       }));
 
+      // Calculate daily breakdown for multi-day filters
+      const dailyBreakdown: DailyBreakdown[] = [];
+      const isMultiDay = appliedMode === 'week' || appliedMode === 'month' || 
+        (appliedMode === 'range' && queryStart.getTime() !== queryEnd.getTime() - 86400000 + 1);
+      
+      if (isMultiDay) {
+        const allDays = eachDayOfInterval({ start: queryStart, end: queryEnd });
+        
+        allDays.forEach(day => {
+          const dayStart = startOfDay(day);
+          const dayEnd = endOfDay(day);
+          
+          const dayFeedback = feedback?.filter(f => {
+            const ts = new Date(f.call_timestamp!);
+            return ts >= dayStart && ts <= dayEnd;
+          }) || [];
+          
+          const dayLeads = leads?.filter(l => {
+            const ts = new Date(l.created_at!);
+            return ts >= dayStart && ts <= dayEnd;
+          }) || [];
+          
+          const totalCalls = dayFeedback.length;
+          const interested = dayFeedback.filter(f => f.feedback_status === 'interested').length;
+          const notInterested = dayFeedback.filter(f => f.feedback_status === 'not_interested').length;
+          const notAnswered = dayFeedback.filter(f => f.feedback_status === 'not_answered').length;
+          
+          dailyBreakdown.push({
+            date: format(day, 'yyyy-MM-dd'),
+            displayDate: format(day, 'EEE, MMM d'),
+            totalCalls,
+            interested,
+            notInterested,
+            notAnswered,
+            leadsGenerated: dayLeads.length,
+            conversionRate: totalCalls > 0 ? Math.round((interested / totalCalls) * 100) : 0,
+          });
+        });
+      }
+
       // Calculate summary
       const summary: AllAgentsSummary = {
         totalAgents: agentStats.length,
@@ -265,6 +327,7 @@ export const AgentPerformanceList: React.FC = () => {
       return {
         agentStats: agentStats.sort((a, b) => b.totalCalls - a.totalCalls),
         summary,
+        dailyBreakdown,
       };
     },
     enabled: !!user?.id && hasAppliedFilter,
@@ -273,6 +336,7 @@ export const AgentPerformanceList: React.FC = () => {
 
   const agents = data?.agentStats || [];
   const summary = data?.summary;
+  const dailyBreakdown = data?.dailyBreakdown || [];
 
   // Validation for apply button
   const canApplyFilter = useCallback(() => {
@@ -950,6 +1014,131 @@ export const AgentPerformanceList: React.FC = () => {
         {/* Results Table */}
         {hasAppliedFilter && !isLoading && agents.length > 0 && (
           <div className="mt-6">
+            {/* Daily Breakdown Section - for week/month/range */}
+            {showDailyBreakdown && dailyBreakdown.length > 0 && (
+              <Collapsible open={isDailyBreakdownOpen} onOpenChange={setIsDailyBreakdownOpen} className="mb-6">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted">
+                    <span className="font-medium flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4" />
+                      Daily Breakdown ({dailyBreakdown.length} days)
+                    </span>
+                    {isDailyBreakdownOpen ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="border rounded-lg mt-2 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Calls</TableHead>
+                          <TableHead className="text-right">Interested</TableHead>
+                          <TableHead className="text-right">Not Interested</TableHead>
+                          <TableHead className="text-right">Not Answered</TableHead>
+                          <TableHead className="text-right">Leads</TableHead>
+                          <TableHead className="w-32">Conversion</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dailyBreakdown.map((day) => (
+                          <TableRow key={day.date} className={day.totalCalls === 0 ? 'opacity-50' : ''}>
+                            <TableCell className="font-medium">{day.displayDate}</TableCell>
+                            <TableCell className="text-right font-medium">{day.totalCalls}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary" className="bg-success/10 text-success">
+                                {day.interested}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary" className="bg-destructive/10 text-destructive">
+                                {day.notInterested}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary" className="bg-warning/10 text-warning">
+                                {day.notAnswered}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="default">{day.leadsGenerated}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Progress value={day.conversionRate} className="h-2 flex-1" />
+                                <span className="text-xs font-medium w-8">{day.conversionRate}%</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Total Row */}
+                        <TableRow className="bg-primary/5 font-semibold border-t-2">
+                          <TableCell className="font-bold">TOTAL</TableCell>
+                          <TableCell className="text-right font-bold">
+                            {dailyBreakdown.reduce((sum, d) => sum + d.totalCalls, 0)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="bg-success/10 text-success font-bold">
+                              {dailyBreakdown.reduce((sum, d) => sum + d.interested, 0)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="bg-destructive/10 text-destructive font-bold">
+                              {dailyBreakdown.reduce((sum, d) => sum + d.notInterested, 0)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="bg-warning/10 text-warning font-bold">
+                              {dailyBreakdown.reduce((sum, d) => sum + d.notAnswered, 0)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="default" className="font-bold">
+                              {dailyBreakdown.reduce((sum, d) => sum + d.leadsGenerated, 0)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress 
+                                value={
+                                  dailyBreakdown.reduce((sum, d) => sum + d.totalCalls, 0) > 0
+                                    ? Math.round(
+                                        (dailyBreakdown.reduce((sum, d) => sum + d.interested, 0) / 
+                                        dailyBreakdown.reduce((sum, d) => sum + d.totalCalls, 0)) * 100
+                                      )
+                                    : 0
+                                } 
+                                className="h-2 flex-1" 
+                              />
+                              <span className="text-xs font-bold w-8">
+                                {dailyBreakdown.reduce((sum, d) => sum + d.totalCalls, 0) > 0
+                                  ? Math.round(
+                                      (dailyBreakdown.reduce((sum, d) => sum + d.interested, 0) / 
+                                      dailyBreakdown.reduce((sum, d) => sum + d.totalCalls, 0)) * 100
+                                    )
+                                  : 0}%
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Agent Summary Table */}
+            <div className="mb-2">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Agent Summary
+              </h4>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>

@@ -77,9 +77,17 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
   const today = new Date();
   const { start: periodStart, end: periodEnd } = getDateRange(timePeriod);
 
-  // Only admin, super_admin, operations_head can see ALL data in leaderboard
+  // Global access roles can see ALL data across all teams
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
+
+  console.log('[PerformanceData] Config:', {
+    userRole,
+    canSeeAllData,
+    effectiveTeamId,
+    timePeriod,
+    dateRange: `${periodStart.toISOString()} to ${periodEnd.toISOString()}`
+  });
 
   // Fetch stats for selected time period
   const { data: myStats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
@@ -87,7 +95,9 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
     queryFn: async (): Promise<PerformanceStats> => {
       if (!user?.id) throw new Error('No user');
 
-      // Get call feedback for period
+      console.log('[MyStats] Fetching for user:', user.id, 'period:', timePeriod);
+
+      // Get call feedback for period - this is personal stats, so always filter by current user
       const { data: feedback, error } = await supabase
         .from('call_feedback')
         .select('feedback_status, whatsapp_sent')
@@ -256,19 +266,24 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
 
   // Fetch team leaderboard (filtered by team for supervisors)
   const { data: leaderboard, isLoading: leaderboardLoading, refetch: refetchLeaderboard } = useQuery({
-    queryKey: ['team-leaderboard', userRole, timePeriod, leadStatusFilter, effectiveTeamId, canSeeAllData],
+    queryKey: ['team-leaderboard', userRole, timePeriod, leadStatusFilter, effectiveTeamId, canSeeAllData, user?.id],
     queryFn: async (): Promise<LeaderboardEntry[]> => {
       // Get agent IDs for team filtering
       let agentIds: string[] | null = null;
       
-      if (!canSeeAllData && effectiveTeamId) {
+      if (canSeeAllData) {
+        // Global access - no agent filtering, get ALL agents' data
+        console.log('[Leaderboard] Global access - fetching ALL agents data');
+        agentIds = null;
+      } else if (effectiveTeamId) {
         const { data: teamProfiles } = await supabase
           .from('profiles_public')
           .select('id')
           .eq('team_id', effectiveTeamId)
           .eq('is_active', true);
         agentIds = teamProfiles?.map(p => p.id) || [];
-      } else if (!canSeeAllData && !effectiveTeamId && user?.id) {
+        console.log('[Leaderboard] Team filtering:', agentIds.length, 'agents');
+      } else if (user?.id) {
         // Supervisor without team - get directly supervised agents
         const { data: supervisedProfiles } = await supabase
           .from('profiles_public')
@@ -276,6 +291,7 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
           .eq('supervisor_id', user.id)
           .eq('is_active', true);
         agentIds = supervisedProfiles?.map(p => p.id) || [];
+        console.log('[Leaderboard] Supervisor filtering:', agentIds.length, 'agents');
       }
 
       // Get all feedback for period grouped by agent
@@ -285,21 +301,29 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
         .gte('call_timestamp', periodStart.toISOString())
         .lte('call_timestamp', periodEnd.toISOString());
 
-      if (agentIds !== null && agentIds.length > 0) {
+      // Only apply agent filter if we have a specific list
+      if (agentIds !== null) {
+        if (agentIds.length > 0) {
         feedbackQuery = feedbackQuery.in('agent_id', agentIds);
-      } else if (agentIds !== null && agentIds.length === 0) {
+        } else {
+          console.log('[Leaderboard] No agents found - returning empty');
         return []; // No agents to show
+        }
       }
+      // If agentIds is null (canSeeAllData), query runs without agent filter
 
       const { data: feedback, error } = await feedbackQuery;
 
       if (error) throw error;
+
+      console.log('[Leaderboard] Got feedback records:', feedback?.length || 0);
 
       // Get all profiles (filtered if needed)
       let profilesQuery = supabase
         .from('profiles_public')
         .select('id, full_name, username');
       
+      // Only filter profiles if we have a specific list
       if (agentIds !== null && agentIds.length > 0) {
         profilesQuery = profilesQuery.in('id', agentIds);
       }
@@ -313,11 +337,14 @@ export const usePerformanceData = (options: UsePerformanceDataOptions = {}) => {
         .gte('created_at', periodStart.toISOString())
         .lte('created_at', periodEnd.toISOString());
 
+      // Only filter leads if we have a specific list
       if (agentIds !== null && agentIds.length > 0) {
         leadsQuery = leadsQuery.in('agent_id', agentIds);
       }
 
       const { data: leads } = await leadsQuery;
+      
+      console.log('[Leaderboard] Got leads:', leads?.length || 0);
 
       // Create a set of agent IDs that have leads
       const agentsWithLeads = new Set(leads?.map(l => l.agent_id) || []);

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, format, getDay, getHours } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, format, getDay, getHours, startOfMonth, endOfMonth } from 'date-fns';
 
 export interface HeatmapData {
   day: number; // 0-6 (Sun-Sat)
@@ -33,13 +33,18 @@ export interface TimelineActivity {
 export const useDashboardWidgets = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
 
-  // Only admin, super_admin, operations_head can see ALL data
+  // Global access roles can see ALL data across all teams
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
 
   // Helper to get agent IDs for team filtering
   const getTeamAgentIds = async (): Promise<string[] | null> => {
-    if (canSeeAllData) return null; // No filtering needed
+    // For global access roles, return null to skip agent filtering entirely
+    // This ensures ALL data is fetched without any team/agent restrictions
+    if (canSeeAllData) {
+      console.log('[DashboardWidgets] Global access - no agent filtering');
+      return null;
+    }
     
     if (effectiveTeamId) {
       const { data } = await supabase
@@ -65,10 +70,16 @@ export const useDashboardWidgets = () => {
 
   // Call Volume Heatmap Data
   const { data: heatmapData, isLoading: heatmapLoading } = useQuery({
-    queryKey: ['call-heatmap', user?.id, effectiveTeamId, canSeeAllData],
+    queryKey: ['call-heatmap', user?.id, effectiveTeamId, canSeeAllData, userRole],
     queryFn: async (): Promise<HeatmapData[]> => {
       const startDate = subDays(new Date(), 30);
       const agentIds = await getTeamAgentIds();
+      
+      console.log('[Heatmap] Fetching data:', {
+        canSeeAllData,
+        userRole,
+        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length
+      });
       
       let query = supabase
         .from('call_feedback')
@@ -78,9 +89,10 @@ export const useDashboardWidgets = () => {
       if (agentIds !== null && agentIds.length > 0) {
         query = query.in('agent_id', agentIds);
       } else if (agentIds !== null && agentIds.length === 0) {
-        // No agents to show
+        console.log('[Heatmap] No agents found for team filtering');
         return [];
       }
+      // If agentIds is null (canSeeAllData), query runs without agent filter
 
       const { data, error } = await query;
 
@@ -117,11 +129,19 @@ export const useDashboardWidgets = () => {
 
   // Lead Pipeline Funnel Data
   const { data: funnelData, isLoading: funnelLoading } = useQuery({
-    queryKey: ['lead-funnel', user?.id, effectiveTeamId, canSeeAllData],
+    queryKey: ['lead-funnel', user?.id, effectiveTeamId, canSeeAllData, userRole],
     queryFn: async (): Promise<FunnelStage[]> => {
-      const startDate = startOfWeek(new Date());
-      const endDate = endOfWeek(new Date());
+      // Use the month to ensure we get data even if current week has no activity
+      const startDate = startOfMonth(new Date());
+      const endDate = endOfMonth(new Date());
       const agentIds = await getTeamAgentIds();
+
+      console.log('[Funnel] Fetching data:', {
+        canSeeAllData,
+        userRole,
+        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length,
+        dateRange: `${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`
+      });
 
       // Get call feedback counts
       let callsQuery = supabase
@@ -133,6 +153,7 @@ export const useDashboardWidgets = () => {
       if (agentIds !== null && agentIds.length > 0) {
         callsQuery = callsQuery.in('agent_id', agentIds);
       } else if (agentIds !== null && agentIds.length === 0) {
+        console.log('[Funnel] No agents found for team filtering');
         return [
           { stage: 'Calls Made', value: 0, fill: 'hsl(var(--primary))' },
           { stage: 'Interested', value: 0, fill: 'hsl(var(--chart-2))' },
@@ -176,13 +197,19 @@ export const useDashboardWidgets = () => {
 
   // Performance Streak Data
   const { data: streakData, isLoading: streakLoading } = useQuery({
-    queryKey: ['performance-streak', user?.id, effectiveTeamId, canSeeAllData],
+    queryKey: ['performance-streak', user?.id, effectiveTeamId, canSeeAllData, userRole],
     queryFn: async (): Promise<StreakData> => {
       const days = 14;
       const dailyCounts: { [key: string]: number } = {};
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayTotals: { [key: number]: number } = {};
       const agentIds = await getTeamAgentIds();
+
+      console.log('[Streak] Fetching data:', {
+        canSeeAllData,
+        userRole,
+        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length
+      });
 
       for (let i = 0; i < days; i++) {
         const date = subDays(new Date(), i);
@@ -245,9 +272,15 @@ export const useDashboardWidgets = () => {
 
   // Team Activity Timeline
   const { data: timelineData, isLoading: timelineLoading } = useQuery({
-    queryKey: ['team-timeline', user?.id, effectiveTeamId, canSeeAllData],
+    queryKey: ['team-timeline', user?.id, effectiveTeamId, canSeeAllData, userRole],
     queryFn: async (): Promise<TimelineActivity[]> => {
       const agentIds = await getTeamAgentIds();
+
+      console.log('[Timeline] Fetching data:', {
+        canSeeAllData,
+        userRole,
+        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length
+      });
 
       let query = supabase
         .from('call_feedback')

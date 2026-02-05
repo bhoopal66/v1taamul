@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -6,15 +7,17 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Users, Download, FileSpreadsheet, FileText, CalendarDays, CalendarRange, ArrowLeft, Calendar, RotateCcw, Filter } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfDay, endOfDay, format } from 'date-fns';
+import { startOfDay, endOfDay, format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AgentDailyStats {
   agentId: string;
@@ -37,7 +40,7 @@ interface AllAgentsSummary {
   avgConversionRate: number;
 }
 
-type FilterMode = 'single' | 'range' | null;
+type FilterMode = 'single' | 'range' | 'week' | 'month' | null;
 
 export const AgentPerformanceList: React.FC = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
@@ -47,25 +50,72 @@ export const AgentPerformanceList: React.FC = () => {
   const [singleDate, setSingleDate] = useState<Date | null>(null);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0);
+  const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
   
   // Applied filter state (triggers query)
   const [appliedMode, setAppliedMode] = useState<FilterMode>(null);
   const [appliedSingleDate, setAppliedSingleDate] = useState<Date | null>(null);
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
+  const [appliedAgentId, setAppliedAgentId] = useState<string>('all');
+
+  // Calculate week dates based on offset
+  const getWeekDates = (offset: number) => {
+    const now = new Date();
+    const weekStart = startOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
+    return { weekStart, weekEnd };
+  };
+
+  // Calculate month dates based on offset
+  const getMonthDates = (offset: number) => {
+    const now = new Date();
+    const monthStart = startOfMonth(subMonths(now, offset));
+    const monthEnd = endOfMonth(subMonths(now, offset));
+    return { monthStart, monthEnd };
+  };
 
   // Check if filter has been applied
-  const hasAppliedFilter = appliedMode === 'single' 
-    ? appliedSingleDate !== null 
-    : appliedMode === 'range' 
-      ? appliedStartDate !== null && appliedEndDate !== null 
-      : false;
+  const hasAppliedFilter = useMemo(() => {
+    if (appliedMode === 'single') return appliedSingleDate !== null;
+    if (appliedMode === 'range') return appliedStartDate !== null && appliedEndDate !== null;
+    if (appliedMode === 'week') return appliedStartDate !== null && appliedEndDate !== null;
+    if (appliedMode === 'month') return appliedStartDate !== null && appliedEndDate !== null;
+    return false;
+  }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
 
-  // All users now scoped to their team only
+  const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || profile?.team_id;
 
+  // Fetch agents for dropdown
+  const { data: agentOptions = [] } = useQuery({
+    queryKey: ['agent-perf-agents', effectiveTeamId, canSeeAllData, user?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (!canSeeAllData) {
+        if (effectiveTeamId) {
+          query = query.eq('team_id', effectiveTeamId);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-performance-list', user?.id, effectiveTeamId, appliedMode, appliedSingleDate?.toISOString(), appliedStartDate?.toISOString(), appliedEndDate?.toISOString()],
+    queryKey: ['agent-performance-list', user?.id, effectiveTeamId, canSeeAllData, appliedMode, appliedSingleDate?.toISOString(), appliedStartDate?.toISOString(), appliedEndDate?.toISOString(), appliedAgentId],
     queryFn: async () => {
       if (!hasAppliedFilter) return { agentStats: [], summary: null };
 
@@ -78,6 +128,9 @@ export const AgentPerformanceList: React.FC = () => {
       } else if (appliedMode === 'range' && appliedStartDate && appliedEndDate) {
         queryStart = startOfDay(appliedStartDate);
         queryEnd = endOfDay(appliedEndDate);
+      } else if ((appliedMode === 'week' || appliedMode === 'month') && appliedStartDate && appliedEndDate) {
+        queryStart = startOfDay(appliedStartDate);
+        queryEnd = endOfDay(appliedEndDate);
       } else {
         return { agentStats: [], summary: null };
       }
@@ -87,21 +140,30 @@ export const AgentPerformanceList: React.FC = () => {
 
       // Get list of agent IDs in user's team
       let agentIds: string[] | null = null;
-      if (effectiveTeamId) {
-        const { data: teamProfiles } = await supabase
-          .from('profiles_public')
-          .select('id')
-          .eq('team_id', effectiveTeamId)
-          .eq('is_active', true);
-        agentIds = teamProfiles?.map(p => p.id) || [];
-      } else if (user?.id) {
-        // Fallback to supervised agents if no team
-        const { data: supervisedProfiles } = await supabase
-          .from('profiles_public')
-          .select('id')
-          .eq('supervisor_id', user.id)
-          .eq('is_active', true);
-        agentIds = supervisedProfiles?.map(p => p.id) || [];
+
+      if (!canSeeAllData) {
+        if (appliedAgentId !== 'all') {
+          agentIds = [appliedAgentId];
+        } else if (effectiveTeamId) {
+          const { data: teamProfiles } = await supabase
+            .from('profiles_public')
+            .select('id')
+            .eq('team_id', effectiveTeamId)
+            .eq('is_active', true);
+          agentIds = teamProfiles?.map(p => p.id) || [];
+        } else if (user?.id) {
+          const { data: supervisedProfiles } = await supabase
+            .from('profiles_public')
+            .select('id')
+            .eq('supervisor_id', user.id)
+            .eq('is_active', true);
+          agentIds = supervisedProfiles?.map(p => p.id) || [];
+        } else {
+          agentIds = [];
+        }
+      } else if (appliedAgentId !== 'all') {
+        // Global access but specific agent selected
+        agentIds = [appliedAgentId];
       }
 
       // Build the query for call feedback
@@ -213,52 +275,68 @@ export const AgentPerformanceList: React.FC = () => {
   const summary = data?.summary;
 
   // Validation for apply button
-  const canApplyFilter = () => {
-    if (filterMode === 'single') {
-      return singleDate !== null;
-    }
-    if (filterMode === 'range') {
-      return startDate !== null && endDate !== null;
-    }
+  const canApplyFilter = useCallback(() => {
+    if (filterMode === 'single') return singleDate !== null;
+    if (filterMode === 'range') return startDate !== null && endDate !== null;
+    if (filterMode === 'week') return true;
+    if (filterMode === 'month') return true;
     return false;
-  };
+  }, [filterMode, singleDate, startDate, endDate]);
 
   // Apply filter handler
-  const handleApplyFilter = () => {
+  const handleApplyFilter = useCallback(() => {
+    if (!canApplyFilter() || !filterMode) return;
+
+    setAppliedMode(filterMode);
+
     if (filterMode === 'single' && singleDate) {
-      setAppliedMode('single');
       setAppliedSingleDate(singleDate);
       setAppliedStartDate(null);
       setAppliedEndDate(null);
-      toast.success('Filter applied successfully');
     } else if (filterMode === 'range' && startDate && endDate) {
-      setAppliedMode('range');
       setAppliedSingleDate(null);
       setAppliedStartDate(startDate);
       setAppliedEndDate(endDate);
-      toast.success('Filter applied successfully');
+    } else if (filterMode === 'week') {
+      const { weekStart, weekEnd } = getWeekDates(selectedWeekOffset);
+      setAppliedSingleDate(null);
+      setAppliedStartDate(weekStart);
+      setAppliedEndDate(weekEnd);
+    } else if (filterMode === 'month') {
+      const { monthStart, monthEnd } = getMonthDates(selectedMonthOffset);
+      setAppliedSingleDate(null);
+      setAppliedStartDate(monthStart);
+      setAppliedEndDate(monthEnd);
     }
-  };
+    setAppliedAgentId(selectedAgentId);
+    toast.success('Filter applied successfully');
+  }, [canApplyFilter, filterMode, singleDate, startDate, endDate, selectedWeekOffset, selectedMonthOffset, selectedAgentId]);
 
   // Clear all filters
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     setFilterMode(null);
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
+    setSelectedWeekOffset(0);
+    setSelectedMonthOffset(0);
+    setSelectedAgentId('all');
     setAppliedMode(null);
     setAppliedSingleDate(null);
     setAppliedStartDate(null);
     setAppliedEndDate(null);
-  };
+    setAppliedAgentId('all');
+  }, []);
 
   // Change filter type (go back)
-  const handleChangeFilterType = () => {
+  const handleChangeFilterType = useCallback(() => {
     setFilterMode(null);
     setSingleDate(null);
     setStartDate(null);
     setEndDate(null);
-  };
+    setSelectedWeekOffset(0);
+    setSelectedMonthOffset(0);
+  }, []);
 
   // Handle start date change
   const handleStartDateChange = (date: Date | null) => {
@@ -268,15 +346,21 @@ export const AgentPerformanceList: React.FC = () => {
     }
   };
 
-  const getAppliedDateRangeText = () => {
+  const getAppliedDateRangeText = useCallback(() => {
     if (appliedMode === 'single' && appliedSingleDate) {
       return format(appliedSingleDate, 'MMM d, yyyy');
     }
     if (appliedMode === 'range' && appliedStartDate && appliedEndDate) {
       return `${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
     }
+    if (appliedMode === 'week' && appliedStartDate && appliedEndDate) {
+      return `Week: ${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
+    }
+    if (appliedMode === 'month' && appliedStartDate && appliedEndDate) {
+      return `${format(appliedStartDate, 'MMMM yyyy')}`;
+    }
     return 'No filter applied';
-  };
+  }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
 
   const dateRangeLabel = getAppliedDateRangeText();
 
@@ -419,15 +503,35 @@ export const AgentPerformanceList: React.FC = () => {
         {/* Step 1: Filter Mode Selection */}
         {filterMode === null && (
           <div className="space-y-4">
+            {/* Agent Filter - Always visible */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h3 className="text-sm font-semibold">Select Date Filter Type</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent:</span>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agentOptions.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.full_name || agent.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="text-center py-4">
-              <h3 className="text-lg font-medium mb-2">Select Date Filter Type</h3>
               <p className="text-sm text-muted-foreground mb-6">Choose how you want to filter the performance data</p>
               
-              <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
                 <Button
                   variant="outline"
                   onClick={() => setFilterMode('single')}
-                  className="flex-1 h-auto py-4 px-6 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                  className="h-auto py-4 px-4 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
                 >
                   <CalendarDays className="w-8 h-8 text-primary" />
                   <span className="font-medium">Single Day</span>
@@ -437,11 +541,31 @@ export const AgentPerformanceList: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={() => setFilterMode('range')}
-                  className="flex-1 h-auto py-4 px-6 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                  className="h-auto py-4 px-4 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
                 >
                   <CalendarRange className="w-8 h-8 text-primary" />
                   <span className="font-medium">Date Range</span>
                   <span className="text-xs text-muted-foreground">From date to date</span>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setFilterMode('week')}
+                  className="h-auto py-4 px-4 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                >
+                  <CalendarIcon className="w-8 h-8 text-primary" />
+                  <span className="font-medium">Weekly</span>
+                  <span className="text-xs text-muted-foreground">Select a week</span>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setFilterMode('month')}
+                  className="h-auto py-4 px-4 flex flex-col items-center gap-2 hover:border-primary hover:bg-primary/5"
+                >
+                  <Calendar className="w-8 h-8 text-primary" />
+                  <span className="font-medium">Monthly</span>
+                  <span className="text-xs text-muted-foreground">Select a month</span>
                 </Button>
               </div>
             </div>
@@ -459,15 +583,34 @@ export const AgentPerformanceList: React.FC = () => {
         {/* Step 2: Single Date Selection */}
         {filterMode === 'single' && (
           <div className="space-y-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleChangeFilterType}
-              className="gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Change Filter Type
-            </Button>
+            {/* Agent Filter */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChangeFilterType}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Change Filter Type
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent:</span>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agentOptions.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.full_name || agent.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             
             <div className="max-w-sm mx-auto">
               <label className="block text-sm font-medium mb-2">Select a Date:</label>
@@ -517,15 +660,34 @@ export const AgentPerformanceList: React.FC = () => {
         {/* Step 3: Date Range Selection */}
         {filterMode === 'range' && (
           <div className="space-y-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleChangeFilterType}
-              className="gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Change Filter Type
-            </Button>
+            {/* Agent Filter */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChangeFilterType}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Change Filter Type
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent:</span>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agentOptions.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.full_name || agent.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto">
               <div>
@@ -589,6 +751,176 @@ export const AgentPerformanceList: React.FC = () => {
               <Button
                 onClick={handleApplyFilter}
                 disabled={!canApplyFilter()}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Apply Filter
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear All
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Week Selection */}
+        {filterMode === 'week' && (
+          <div className="space-y-4">
+            {/* Agent Filter */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChangeFilterType}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Change Filter Type
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent:</span>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agentOptions.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.full_name || agent.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm font-medium mb-2">Select Week:</label>
+              <Select
+                value={selectedWeekOffset.toString()}
+                onValueChange={(v) => setSelectedWeekOffset(Number(v))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a week" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const { weekStart, weekEnd } = getWeekDates(i);
+                    const label = i === 0 
+                      ? `This Week (${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')})`
+                      : i === 1
+                        ? `Last Week (${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')})`
+                        : `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
+                    return (
+                      <SelectItem key={i} value={i.toString()}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              
+              <div className="mt-3 p-3 bg-primary/10 rounded-lg">
+                <p className="text-sm font-medium">
+                  Selected: {format(getWeekDates(selectedWeekOffset).weekStart, 'MMM d')} - {format(getWeekDates(selectedWeekOffset).weekEnd, 'MMM d, yyyy')}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 justify-center pt-4">
+              <Button
+                onClick={handleApplyFilter}
+                className="gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Apply Filter
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear All
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Month Selection */}
+        {filterMode === 'month' && (
+          <div className="space-y-4">
+            {/* Agent Filter */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChangeFilterType}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Change Filter Type
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent:</span>
+                <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agentOptions.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.full_name || agent.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="max-w-sm mx-auto">
+              <label className="block text-sm font-medium mb-2">Select Month:</label>
+              <Select
+                value={selectedMonthOffset.toString()}
+                onValueChange={(v) => setSelectedMonthOffset(Number(v))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const { monthStart } = getMonthDates(i);
+                    const label = i === 0 
+                      ? `This Month (${format(monthStart, 'MMMM yyyy')})`
+                      : i === 1
+                        ? `Last Month (${format(monthStart, 'MMMM yyyy')})`
+                        : format(monthStart, 'MMMM yyyy');
+                    return (
+                      <SelectItem key={i} value={i.toString()}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              
+              <div className="mt-3 p-3 bg-primary/10 rounded-lg">
+                <p className="text-sm font-medium">
+                  Selected: {format(getMonthDates(selectedMonthOffset).monthStart, 'MMMM yyyy')}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 justify-center pt-4">
+              <Button
+                onClick={handleApplyFilter}
                 className="gap-2"
               >
                 <Filter className="w-4 h-4" />

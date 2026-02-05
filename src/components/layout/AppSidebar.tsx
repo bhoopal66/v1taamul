@@ -338,7 +338,9 @@ export const AppSidebar: React.FC = () => {
       {/* User Section */}
       <div className="p-4 border-t border-sidebar-border space-y-3">
         {/* Level Badge */}
-        <CompactLevelBadge />
+        {!['super_admin', 'admin', 'operations_head'].includes(userRole || '') && (
+          <CompactLevelBadge />
+        )}
         
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">

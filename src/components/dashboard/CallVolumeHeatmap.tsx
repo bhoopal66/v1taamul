@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
+import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks, eachDayOfInterval } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -294,6 +294,40 @@ export const CallVolumeHeatmap = () => {
   const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
   const appliedDateLabel = getAppliedDateLabel();
 
+  // Generate day labels with dates based on applied filter
+  const dayLabels = useMemo(() => {
+    if (!hasAppliedFilter || !appliedStartDate || !appliedEndDate) {
+      return days.map((day, i) => ({ dayIndex: i, dayName: day, dateLabel: '' }));
+    }
+
+    if (appliedMode === 'single' && appliedSingleDate) {
+      const dayIndex = getDay(appliedSingleDate);
+      return days.map((day, i) => ({
+        dayIndex: i,
+        dayName: day,
+        dateLabel: i === dayIndex ? format(appliedSingleDate, 'dd MMM') : '',
+      }));
+    }
+
+    // For week or range: show dates for each day
+    const daysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
+    const dateMap = new Map<number, string[]>();
+    
+    daysInRange.forEach(date => {
+      const dayIdx = getDay(date);
+      if (!dateMap.has(dayIdx)) {
+        dateMap.set(dayIdx, []);
+      }
+      dateMap.get(dayIdx)!.push(format(date, 'dd'));
+    });
+
+    return days.map((day, i) => ({
+      dayIndex: i,
+      dayName: day,
+      dateLabel: dateMap.get(i)?.join(', ') || '',
+    }));
+  }, [hasAppliedFilter, appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
+
   // Export to Excel handler
   const exportToExcel = useCallback(() => {
     if (heatmapData.length === 0) {
@@ -305,10 +339,11 @@ export const CallVolumeHeatmap = () => {
     const headerRow = ['Day', ...hours.map(h => h > 12 ? `${h - 12} PM` : `${h} AM`), 'Total'];
 
     // Create data rows for each day
-    const dataRows = days.map((day, dayIndex) => {
-      const dayValues = hours.map(hour => getValue(dayIndex, hour));
+    const dataRows = dayLabels.map((dl) => {
+      const dayValues = hours.map(hour => getValue(dl.dayIndex, hour));
       const dayTotal = dayValues.reduce((sum, v) => sum + v, 0);
-      return [day, ...dayValues, dayTotal];
+      const label = dl.dateLabel ? `${dl.dayName} (${dl.dateLabel})` : dl.dayName;
+      return [label, ...dayValues, dayTotal];
     });
 
     // Create totals row
@@ -324,7 +359,7 @@ export const CallVolumeHeatmap = () => {
 
     // Set column widths
     ws['!cols'] = [
-      { wch: 8 }, // Day column
+      { wch: 16 }, // Day column (wider for dates)
       ...hours.map(() => ({ wch: 6 })), // Hour columns
       { wch: 8 }, // Total column
     ];
@@ -337,7 +372,7 @@ export const CallVolumeHeatmap = () => {
 
     XLSX.writeFile(wb, filename);
     toast.success('Heatmap exported to Excel');
-  }, [heatmapData, appliedDateLabel, grandTotal]);
+  }, [heatmapData, appliedDateLabel, grandTotal, dayLabels]);
 
   return (
     <Card>
@@ -635,31 +670,34 @@ export const CallVolumeHeatmap = () => {
           <div className="min-w-[500px]">
             {/* Hour labels */}
             <div className="flex mb-1">
-              <div className="w-12" />
+              <div className="w-24" />
               {hours.map(hour => (
                 <div key={hour} className="flex-1 text-center text-xs text-muted-foreground font-medium">
                   {hour > 12 ? `${hour - 12}p` : `${hour}a`}
                 </div>
               ))}
-              <div className="w-12 text-center text-xs text-muted-foreground font-semibold">Total</div>
+              <div className="w-14 text-center text-xs text-muted-foreground font-semibold">Total</div>
             </div>
             
             {/* Heatmap grid */}
-            {days.map((day, dayIndex) => {
-              const dayTotal = getDayTotal(dayIndex);
-              const isToday = dayIndex === todayIndex;
+            {dayLabels.map((dl) => {
+              const dayTotal = getDayTotal(dl.dayIndex);
+              const isToday = dl.dayIndex === todayIndex;
               return (
-                <div key={day} className={cn("flex items-center gap-1 mb-1", isToday && "bg-accent/30 rounded-md -mx-1 px-1")}>
-                  <div className={cn("w-12 text-xs font-medium", isToday ? "text-primary font-semibold" : "text-muted-foreground")}>
-                    {day}{isToday && " •"}
+                <div key={dl.dayIndex} className={cn("flex items-center gap-1 mb-1", isToday && "bg-accent/30 rounded-md -mx-1 px-1")}>
+                  <div className={cn("w-24 text-xs font-medium", isToday ? "text-primary font-semibold" : "text-muted-foreground")}>
+                    <span>{dl.dayName}{isToday && " •"}</span>
+                    {dl.dateLabel && (
+                      <span className="ml-1 text-[10px] text-muted-foreground/70">({dl.dateLabel})</span>
+                    )}
                   </div>
                   {hours.map(hour => {
-                    const value = getValue(dayIndex, hour);
+                    const value = getValue(dl.dayIndex, hour);
                     return (
                       <div
-                        key={`${dayIndex}-${hour}`}
+                        key={`${dl.dayIndex}-${hour}`}
                         className={`flex-1 h-7 rounded-sm ${getColor(value)} transition-colors cursor-default flex items-center justify-center`}
-                        title={`${day} ${hour}:00 - ${value} calls`}
+                        title={`${dl.dayName}${dl.dateLabel ? ` (${dl.dateLabel})` : ''} ${hour}:00 - ${value} calls`}
                       >
                         <span className="text-[10px] font-medium">
                           {value > 0 ? value : ''}
@@ -667,7 +705,7 @@ export const CallVolumeHeatmap = () => {
                       </div>
                     );
                   })}
-                  <div className="w-12 h-7 rounded-sm bg-accent/50 flex items-center justify-center">
+                  <div className="w-14 h-7 rounded-sm bg-accent/50 flex items-center justify-center">
                     <span className="text-xs font-semibold text-foreground">{dayTotal}</span>
                   </div>
                 </div>
@@ -676,7 +714,7 @@ export const CallVolumeHeatmap = () => {
 
             {/* Hour totals row */}
             <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border">
-              <div className="w-12 text-xs text-muted-foreground font-semibold">Total</div>
+              <div className="w-24 text-xs text-muted-foreground font-semibold">Total</div>
               {hours.map(hour => {
                 const hourTotal = getHourTotal(hour);
                 return (
@@ -688,7 +726,7 @@ export const CallVolumeHeatmap = () => {
                   </div>
                 );
               })}
-              <div className="w-12 h-7 rounded-sm bg-primary/20 flex items-center justify-center">
+              <div className="w-14 h-7 rounded-sm bg-primary/20 flex items-center justify-center">
                 <span className="text-xs font-bold text-foreground">{grandTotal}</span>
               </div>
             </div>

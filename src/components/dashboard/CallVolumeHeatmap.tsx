@@ -6,9 +6,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getDay, getHours, format, startOfDay, endOfDay } from 'date-fns';
+import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { CalendarIcon, ChevronLeft, CalendarRange } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HeatmapData {
@@ -21,7 +21,7 @@ const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 const todayIndex = getDay(new Date()); // Get today's day index (0-6)
 
-type FilterMode = 'single' | 'range';
+type FilterMode = 'single' | 'range' | 'week';
 
 export const CallVolumeHeatmap = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
@@ -31,6 +31,7 @@ export const CallVolumeHeatmap = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0); // 0 = this week, 1 = last week, etc.
 
   // Applied filter state (data fetch)
   const [appliedMode, setAppliedMode] = useState<FilterMode | null>(null);
@@ -38,12 +39,21 @@ export const CallVolumeHeatmap = () => {
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
 
+  // Calculate week dates based on offset
+  const getWeekDates = (offset: number) => {
+    const now = new Date();
+    const weekStart = startOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
+    return { weekStart, weekEnd };
+  };
+
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
 
   const canApplyFilter = useCallback(() => {
     if (filterMode === 'single') return !!selectedDate;
     if (filterMode === 'range') return !!startDate && !!endDate;
+    if (filterMode === 'week') return true; // Week is always valid
     return false;
   }, [filterMode, selectedDate, startDate, endDate]);
 
@@ -60,6 +70,9 @@ export const CallVolumeHeatmap = () => {
     if (appliedMode === 'range' && appliedStartDate && appliedEndDate) {
       return `${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
     }
+    if (appliedMode === 'week' && appliedStartDate && appliedEndDate) {
+      return `Week: ${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
+    }
     return null;
   }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
 
@@ -72,18 +85,24 @@ export const CallVolumeHeatmap = () => {
       setAppliedSingleDate(selectedDate);
       setAppliedStartDate(null);
       setAppliedEndDate(null);
-    } else {
+    } else if (filterMode === 'range') {
       setAppliedSingleDate(null);
       setAppliedStartDate(startDate);
       setAppliedEndDate(endDate);
+    } else if (filterMode === 'week') {
+      const { weekStart, weekEnd } = getWeekDates(selectedWeekOffset);
+      setAppliedSingleDate(null);
+      setAppliedStartDate(weekStart);
+      setAppliedEndDate(weekEnd);
     }
-  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate]);
+  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate, selectedWeekOffset]);
 
   const handleClearAll = useCallback(() => {
     setFilterMode(null);
     setSelectedDate(null);
     setStartDate(null);
     setEndDate(null);
+    setSelectedWeekOffset(0);
 
     setAppliedMode(null);
     setAppliedSingleDate(null);
@@ -96,6 +115,7 @@ export const CallVolumeHeatmap = () => {
     setSelectedDate(null);
     setStartDate(null);
     setEndDate(null);
+    setSelectedWeekOffset(0);
   }, []);
 
   const { data: heatmapData = [], isLoading } = useQuery({
@@ -263,6 +283,17 @@ export const CallVolumeHeatmap = () => {
                 <CalendarRange className="mr-2 h-4 w-4" />
                 Select Date Range (From - To)
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => setFilterMode('week')}
+                className={cn(
+                  'h-auto px-8 py-5 text-sm font-medium border-2 transition-all',
+                  'hover:bg-primary hover:text-primary-foreground hover:-translate-y-0.5'
+                )}
+              >
+                <CalendarWeekIcon className="mr-2 h-4 w-4" />
+                Filter by Week
+              </Button>
             </div>
           )}
 
@@ -405,6 +436,53 @@ export const CallVolumeHeatmap = () => {
                   Selected Range: {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Step 2c: Week filter */}
+          {filterMode === 'week' && (
+            <div className="space-y-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleChangeFilterType}
+                className="w-fit gap-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Change Filter Type
+              </Button>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Select a Week:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((offset) => {
+                    const { weekStart, weekEnd } = getWeekDates(offset);
+                    const label = offset === 0 
+                      ? 'This Week' 
+                      : offset === 1 
+                        ? 'Last Week' 
+                        : `${offset} Weeks Ago`;
+                    return (
+                      <Button
+                        key={offset}
+                        variant={selectedWeekOffset === offset ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedWeekOffset(offset)}
+                        className="text-xs"
+                      >
+                        {label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border bg-accent/30 p-3 text-sm text-foreground">
+                {(() => {
+                  const { weekStart, weekEnd } = getWeekDates(selectedWeekOffset);
+                  return `Selected: ${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
+                })()}
+              </div>
             </div>
           )}
 

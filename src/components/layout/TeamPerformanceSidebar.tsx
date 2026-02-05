@@ -4,7 +4,7 @@ import { useTeamPerformanceSidebar } from '@/hooks/useTeamPerformanceSidebar';
 import { cn } from '@/lib/utils';
 
 export const TeamPerformanceSidebar: React.FC = () => {
-  const { stats, isLoading, isTeamViewer } = useTeamPerformanceSidebar();
+  const { stats, isLoading, isTeamViewer, hasGlobalAccess } = useTeamPerformanceSidebar();
 
   if (!isTeamViewer) return null;
 
@@ -38,7 +38,7 @@ export const TeamPerformanceSidebar: React.FC = () => {
   return (
     <div className="px-4 py-3 border-b border-sidebar-border">
       <p className="text-xs font-bold text-sidebar-muted uppercase tracking-wider mb-2">
-        Team Today
+        {hasGlobalAccess ? 'All Teams Today' : 'Team Today'}
       </p>
       <div className="grid grid-cols-4 gap-1">
         {items.map((item) => {

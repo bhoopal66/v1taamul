@@ -43,6 +43,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const metricConfig: Record<GoalMetric, { label: string; icon: React.ReactNode; unit: string; color: string }> = {
   calls: { label: 'Calls', icon: <Phone className="w-4 h-4" />, unit: 'calls', color: 'text-blue-500' },
@@ -172,6 +173,7 @@ const SetGoalDialog: React.FC<SetGoalDialogProps> = ({ teamMembers, onSubmit, is
 export const TeamMemberGoalsManager: React.FC = () => {
   const { teamMembers, isLoading: membersLoading } = useTeamLeaderData();
   const { teamGoals, isLoading: goalsLoading, createGoal, deleteGoal, isCreating } = useTeamMemberGoals();
+  const { canDeleteRecords } = usePermissions();
 
   const getInitials = (name: string) => {
     return name
@@ -280,14 +282,16 @@ export const TeamMemberGoalsManager: React.FC = () => {
                             <Badge variant="outline" className="text-xs">
                               {goal.goal_type}
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => deleteGoal(goal.id)}
-                            >
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
+                            {canDeleteRecords && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => deleteGoal(goal.id)}
+                              >
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         );
                       })}

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Target, Plus, Trash2, Users, User, Phone, TrendingUp, Percent, Calendar, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const METRICS = [
   { value: 'calls', label: 'Total Calls', icon: Phone },
@@ -30,6 +31,7 @@ const PERIODS = [
 export const PerformanceTargetsManager: React.FC = () => {
   const { targets, isLoading, isAdmin, createTarget, deleteTarget, updateTarget } = usePerformanceAlerts();
   const { teams, agents } = useTeamManagement();
+  const { canDeleteRecords } = usePermissions();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [targetType, setTargetType] = useState<'team' | 'agent'>('team');
@@ -308,30 +310,32 @@ export const PerformanceTargetsManager: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell className="text-right">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Target?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will remove the target and all associated alerts. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteTarget.mutate(target.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {canDeleteRecords && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Target?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove the target and all associated alerts. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => deleteTarget.mutate(target.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

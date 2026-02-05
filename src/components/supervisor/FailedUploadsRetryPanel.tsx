@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { RefreshCw, Trash2, AlertTriangle, FileWarning, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRetryUpload, FailedUpload, RetryProgress } from '@/hooks/useRetryUpload';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ export const FailedUploadsRetryPanel: React.FC = () => {
     deleteFailedUpload,
     isDeleting,
   } = useRetryUpload();
+  const { canDeleteRecords } = usePermissions();
 
   if (isLoading) {
     return (
@@ -112,6 +114,7 @@ export const FailedUploadsRetryPanel: React.FC = () => {
                   onDelete={deleteFailedUpload}
                   isRetrying={isRetrying}
                   isDeleting={isDeleting}
+                    canDelete={canDeleteRecords}
                 />
               ))}
             </TableBody>
@@ -128,6 +131,7 @@ interface FailedUploadRowProps {
   onDelete: (id: string) => void;
   isRetrying: boolean;
   isDeleting: boolean;
+  canDelete: boolean;
 }
 
 const FailedUploadRow: React.FC<FailedUploadRowProps> = ({
@@ -136,6 +140,7 @@ const FailedUploadRow: React.FC<FailedUploadRowProps> = ({
   onDelete,
   isRetrying,
   isDeleting,
+  canDelete,
 }) => {
   const missingCount = upload.approvedCount - upload.actualEntries;
 
@@ -188,36 +193,38 @@ const FailedUploadRow: React.FC<FailedUploadRowProps> = ({
             Retry
           </Button>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
-                disabled={isRetrying || isDeleting}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Upload Record?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will delete the upload record for {upload.agentName}. 
-                  They will need to re-upload their call sheet file.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => onDelete(upload.id)}
-                  className="bg-destructive hover:bg-destructive/90"
+          {canDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  disabled={isRetrying || isDeleting}
                 >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Upload Record?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will delete the upload record for {upload.agentName}. 
+                    They will need to re-upload their call sheet file.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(upload.id)}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </TableCell>
     </TableRow>

@@ -12,10 +12,11 @@
  import { useAgentActivityTimeline, TimelinePeriod, getActivityLabel } from '@/hooks/useAgentActivityTimeline';
  import { useQuery } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
- import { CalendarDays, ChevronLeft, ChevronRight, Clock, Activity, Download, User, ChevronDown, ChevronUp, LogIn, LogOut } from 'lucide-react';
+ import { CalendarDays, ChevronLeft, ChevronRight, Clock, Activity, Download, User, ChevronDown, ChevronUp, LogIn, LogOut, Users } from 'lucide-react';
  import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
  import { cn } from '@/lib/utils';
  import { toast } from 'sonner';
+ import { useAuth } from '@/contexts/AuthContext';
  
  interface AgentActivityTimelineProps {
    teamId?: string;
@@ -42,23 +43,47 @@
  };
  
  export const AgentActivityTimeline: React.FC<AgentActivityTimelineProps> = ({ teamId }) => {
+   const { userRole } = useAuth();
    const [period, setPeriod] = useState<TimelinePeriod>('day');
    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
    const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
+   const [selectedTeamId, setSelectedTeamId] = useState<string>(teamId || 'all');
    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+ 
+   // Check if user has global access (can see all teams)
+   const hasGlobalAccess = ['super_admin', 'admin', 'operations_head'].includes(userRole || '');
+ 
+   // Effective team filter - use selected team for global users, otherwise use prop
+   const effectiveTeamId = hasGlobalAccess
+     ? (selectedTeamId === 'all' ? undefined : selectedTeamId)
+     : teamId;
+ 
+   // Fetch all teams for the team selector (only for global access users)
+   const { data: teams } = useQuery({
+     queryKey: ['timeline-teams'],
+     queryFn: async () => {
+       const { data, error } = await supabase
+         .from('teams')
+         .select('id, name, team_type')
+         .order('name');
+       if (error) throw error;
+       return data;
+     },
+     enabled: hasGlobalAccess,
+   });
  
    // Fetch team members for agent selector
    const { data: agents } = useQuery({
-     queryKey: ['timeline-agents', teamId],
+     queryKey: ['timeline-agents', effectiveTeamId],
      queryFn: async () => {
        let query = supabase
          .from('profiles_public')
-         .select('id, full_name, username')
+         .select('id, full_name, username, team_id')
          .eq('is_active', true)
          .order('full_name');
  
-       if (teamId) {
-         query = query.eq('team_id', teamId);
+       if (effectiveTeamId) {
+         query = query.eq('team_id', effectiveTeamId);
        }
  
        const { data, error } = await query;
@@ -68,11 +93,17 @@
    });
  
    const { data: timelineData, isLoading } = useAgentActivityTimeline({
-     teamId,
+     teamId: effectiveTeamId,
      period,
      selectedDate,
      selectedAgentId,
    });
+ 
+   // Reset agent selection when team changes
+   const handleTeamChange = (newTeamId: string) => {
+     setSelectedTeamId(newTeamId);
+     setSelectedAgentId('all'); // Reset agent filter when team changes
+   };
  
    const formatTime = (isoString: string | null) => {
      if (!isoString) return '—';
@@ -213,14 +244,15 @@
        'break_lunch', 'break_short', 'break_prayer', 'idle', 'others'
      ];
  
-     const headers = [
-       'Agent Name', 'Date', 'Day', 'First Login', 'Last Logout', 'Total Work Time',
-       'Is Late', ...activityTypes.map(t => getActivityLabel(t))
-     ];
+       // Include Team column for global access users viewing all teams
+       const includeTeam = hasGlobalAccess && selectedTeamId === 'all';
+       const headers = includeTeam
+         ? ['Team', 'Agent Name', 'Date', 'Day', 'First Login', 'Last Logout', 'Total Work Time', 'Is Late', ...activityTypes.map(t => getActivityLabel(t))]
+         : ['Agent Name', 'Date', 'Day', 'First Login', 'Last Logout', 'Total Work Time', 'Is Late', ...activityTypes.map(t => getActivityLabel(t))];
  
      const rows = timelineData.map(record => {
        const date = new Date(record.date);
-       return [
+         const baseRow = [
          `"${record.agentName}"`,
          format(date, 'yyyy-MM-dd'),
          format(date, 'EEEE'),
@@ -233,16 +265,19 @@
            return mins > 0 ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m` : '0';
          }),
        ];
+         return includeTeam ? [`"${record.teamName || 'Unknown'}"`, ...baseRow] : baseRow;
      });
  
      // Add summary section for monthly export
      if (period === 'month' && groupedByAgent) {
        rows.push([]);
        rows.push(['--- AGENT SUMMARY ---']);
-       rows.push(['Agent', 'Days Present', 'Late Days', 'Total Work Time', ...activityTypes.map(t => getActivityLabel(t))]);
+         rows.push(includeTeam
+           ? ['Team', 'Agent', 'Days Present', 'Late Days', 'Total Work Time', ...activityTypes.map(t => getActivityLabel(t))]
+           : ['Agent', 'Days Present', 'Late Days', 'Total Work Time', ...activityTypes.map(t => getActivityLabel(t))]);
        
        groupedByAgent.forEach(agent => {
-         rows.push([
+           const summaryRow = [
            `"${agent.agentName}"`,
            agent.totalDays.toString(),
            agent.lateDays.toString(),
@@ -251,7 +286,10 @@
              const mins = agent.activitySummary[t] || 0;
              return mins > 0 ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m` : '0';
            }),
-         ]);
+           ];
+           // Get team name from first record
+           const teamName = agent.records[0]?.teamName || 'Unknown';
+           rows.push(includeTeam ? [`"${teamName}"`, ...summaryRow] : summaryRow);
        });
      }
  
@@ -301,6 +339,26 @@
            </div>
  
            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+             {/* Team Selector (only for global access users) */}
+             {hasGlobalAccess && (
+               <div className="flex items-center gap-2">
+                 <Users className="w-4 h-4 text-muted-foreground" />
+                 <Select value={selectedTeamId} onValueChange={handleTeamChange}>
+                   <SelectTrigger className="w-[180px]">
+                     <SelectValue placeholder="Select team" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="all">All Teams</SelectItem>
+                     {teams?.map(team => (
+                       <SelectItem key={team.id} value={team.id}>
+                         {team.name}
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
+             )}
+ 
              {/* Agent Selector */}
              <div className="flex items-center gap-2">
                <User className="w-4 h-4 text-muted-foreground" />
@@ -386,7 +444,12 @@
                          <div className="flex items-center justify-between p-4 bg-card hover:bg-muted/50 cursor-pointer transition-colors">
                            <div className="flex items-center gap-4">
                              <div>
-                               <p className="font-medium">{record.agentName}</p>
+                                 <div className="flex items-center gap-2">
+                                   <p className="font-medium">{record.agentName}</p>
+                                   {hasGlobalAccess && selectedTeamId === 'all' && record.teamName && (
+                                     <Badge variant="outline" className="text-xs">{record.teamName}</Badge>
+                                   )}
+                                 </div>
                                <p className="text-sm text-muted-foreground">
                                  {format(new Date(record.date), 'EEEE, MMM d')}
                                </p>
@@ -470,7 +533,12 @@
                          <div className="flex items-center justify-between p-4 bg-card hover:bg-muted/50 cursor-pointer transition-colors">
                            <div className="flex items-center gap-4">
                              <div>
-                               <p className="font-medium">{agent.agentName}</p>
+                                 <div className="flex items-center gap-2">
+                                   <p className="font-medium">{agent.agentName}</p>
+                                   {hasGlobalAccess && selectedTeamId === 'all' && agent.records[0]?.teamName && (
+                                     <Badge variant="outline" className="text-xs">{agent.records[0].teamName}</Badge>
+                                   )}
+                                 </div>
                                <p className="text-sm text-muted-foreground">
                                  {agent.totalDays} days present
                                  {agent.lateDays > 0 && <span className="text-destructive ml-2">({agent.lateDays} late)</span>}

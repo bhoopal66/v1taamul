@@ -34,6 +34,7 @@
  export interface AgentDailyTimeline {
    agentId: string;
    agentName: string;
+   teamName?: string;
    date: string;
    firstLogin: string | null;
    lastLogout: string | null;
@@ -97,7 +98,7 @@
        // Get team members
        let profilesQuery = supabase
          .from('profiles_public')
-         .select('id, full_name, username')
+         .select('id, full_name, username, team_id')
          .eq('is_active', true);
  
        if (teamId) {
@@ -119,6 +120,12 @@
        if (memberIds.length === 0) {
          return [];
        }
+ 
+       // Fetch teams for team name lookup
+       const { data: teamsData } = await supabase
+         .from('teams')
+         .select('id, name');
+       const teamMap = new Map((teamsData || []).map(t => [t.id, t.name]));
  
        // Fetch attendance records
        const { data: attendanceData, error: attendanceError } = await supabase
@@ -191,7 +198,7 @@
        });
  
        // Build timeline records
-       const profileMap = new Map(profiles.map(p => [p.id, p]));
+       const profileMap = new Map(profiles.map(p => [p.id, { ...p, teamName: teamMap.get(p.team_id) }]));
        const records: AgentDailyTimeline[] = [];
  
        // Create records from attendance data
@@ -217,6 +224,7 @@
          records.push({
            agentId: record.user_id,
            agentName: agent?.full_name || agent?.username || 'Unknown',
+           teamName: agent?.teamName || undefined,
            date: record.date,
            firstLogin: times?.first || record.first_login,
            lastLogout: times?.last || record.last_logout,

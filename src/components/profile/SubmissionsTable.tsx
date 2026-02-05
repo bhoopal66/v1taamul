@@ -10,10 +10,21 @@ import { useAgentSubmissions, SubmissionPeriod, SubmissionStatus, BANK_GROUPS } 
 import { Calendar, ClipboardList, Trash2, AlertTriangle, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, parseISO } from 'date-fns';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const SubmissionsTable: React.FC = () => {
   const [period, setPeriod] = useState<SubmissionPeriod>('weekly');
   const { submissions, isLoading, deleteSubmission, isMissingToday } = useAgentSubmissions(period);
+  const { canDeleteRecords } = usePermissions();
+  const { userRole } = useAuth();
+  
+  // Agents can delete their own pending submissions, super_admin can delete any
+  const canDeleteSubmission = (status: string) => {
+    if (canDeleteRecords) return true; // super_admin
+    if (userRole === 'agent' && status === 'pending') return true; // agents can delete their own pending
+    return false;
+  };
 
   const getGroupLabel = (group: string) => {
     if (group === 'group1') return 'Group 1';
@@ -138,7 +149,7 @@ export const SubmissionsTable: React.FC = () => {
                       {submission.notes || '-'}
                     </TableCell>
                     <TableCell>
-                      {submission.status === 'pending' && (
+                      {canDeleteSubmission(submission.status) && submission.status === 'pending' && (
                         <Button
                           variant="ghost"
                           size="icon"

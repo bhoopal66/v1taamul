@@ -8,9 +8,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 interface HeatmapData {
   day: number;
@@ -292,10 +294,68 @@ export const CallVolumeHeatmap = () => {
   const grandTotal = heatmapData.reduce((sum, d) => sum + d.value, 0);
   const appliedDateLabel = getAppliedDateLabel();
 
+  // Export to Excel handler
+  const exportToExcel = useCallback(() => {
+    if (heatmapData.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+
+    // Create header row with hours
+    const headerRow = ['Day', ...hours.map(h => h > 12 ? `${h - 12} PM` : `${h} AM`), 'Total'];
+
+    // Create data rows for each day
+    const dataRows = days.map((day, dayIndex) => {
+      const dayValues = hours.map(hour => getValue(dayIndex, hour));
+      const dayTotal = dayValues.reduce((sum, v) => sum + v, 0);
+      return [day, ...dayValues, dayTotal];
+    });
+
+    // Create totals row
+    const hourTotals = hours.map(hour => getHourTotal(hour));
+    const totalsRow = ['Total', ...hourTotals, grandTotal];
+
+    // Combine all rows
+    const exportData = [headerRow, ...dataRows, totalsRow];
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 8 }, // Day column
+      ...hours.map(() => ({ wch: 6 })), // Hour columns
+      { wch: 8 }, // Total column
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Call Heatmap');
+
+    // Generate filename with date range
+    const dateLabel = appliedDateLabel?.replace(/[,\s]+/g, '_') || new Date().toISOString().split('T')[0];
+    const filename = `call_heatmap_${dateLabel}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
+    toast.success('Heatmap exported to Excel');
+  }, [heatmapData, appliedDateLabel, grandTotal]);
+
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">Call Volume Heatmap</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-medium">Call Volume Heatmap</CardTitle>
+          {hasAppliedFilter && heatmapData.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToExcel}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export Excel
+            </Button>
+          )}
+        </div>
         <CardDescription>
           Calls by day and hour • Total: {grandTotal}
           {appliedDateLabel ? ` • ${appliedDateLabel}` : ''}

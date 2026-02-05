@@ -274,12 +274,14 @@ export const useDashboardWidgets = () => {
   const { data: timelineData, isLoading: timelineLoading } = useQuery({
     queryKey: ['team-timeline', user?.id, effectiveTeamId, canSeeAllData, userRole],
     queryFn: async (): Promise<TimelineActivity[]> => {
+      const todayStart = startOfDay(new Date());
       const agentIds = await getTeamAgentIds();
 
       console.log('[Timeline] Fetching data:', {
         canSeeAllData,
         userRole,
-        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length
+        agentIds: agentIds === null ? 'ALL (no filter)' : agentIds?.length,
+        todayStart: todayStart.toISOString()
       });
 
       let query = supabase
@@ -291,6 +293,7 @@ export const useDashboardWidgets = () => {
           agent_id,
           master_contacts!call_feedback_contact_id_fkey(company_name)
         `)
+        .gte('call_timestamp', todayStart.toISOString())
         .order('call_timestamp', { ascending: false })
         .limit(20);
 
@@ -325,6 +328,7 @@ export const useDashboardWidgets = () => {
       return activities.slice(0, 15);
     },
     enabled: !!user?.id,
+    refetchInterval: 10000, // Refresh every 10 seconds for live updates
   });
 
   return {

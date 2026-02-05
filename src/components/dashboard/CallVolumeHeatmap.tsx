@@ -7,8 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks, eachDayOfInterval } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon, Download } from 'lucide-react';
+import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon, CalendarDays, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
@@ -24,7 +25,7 @@ const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
 const todayIndex = getDay(new Date()); // Get today's day index (0-6)
 
-type FilterMode = 'single' | 'range' | 'week';
+type FilterMode = 'single' | 'range' | 'week' | 'month';
 
 export const CallVolumeHeatmap = () => {
   const { user, userRole, ledTeamId, profile } = useAuth();
@@ -35,6 +36,7 @@ export const CallVolumeHeatmap = () => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0); // 0 = this week, 1 = last week, etc.
+  const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // 0 = this month, 1 = last month, etc.
 
   // Agent filter state
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
@@ -52,6 +54,14 @@ export const CallVolumeHeatmap = () => {
     const weekStart = startOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
     const weekEnd = endOfWeek(subWeeks(now, offset), { weekStartsOn: 0 });
     return { weekStart, weekEnd };
+  };
+
+  // Calculate month dates based on offset
+  const getMonthDates = (offset: number) => {
+    const now = new Date();
+    const monthStart = startOfMonth(subMonths(now, offset));
+    const monthEnd = endOfMonth(subMonths(now, offset));
+    return { monthStart, monthEnd };
   };
 
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
@@ -86,6 +96,7 @@ export const CallVolumeHeatmap = () => {
     if (filterMode === 'single') return !!selectedDate;
     if (filterMode === 'range') return !!startDate && !!endDate;
     if (filterMode === 'week') return true; // Week is always valid
+    if (filterMode === 'month') return true; // Month is always valid
     return false;
   }, [filterMode, selectedDate, startDate, endDate]);
 
@@ -93,6 +104,7 @@ export const CallVolumeHeatmap = () => {
     if (appliedMode === 'single') return !!appliedSingleDate;
     if (appliedMode === 'range') return !!appliedStartDate && !!appliedEndDate;
     if (appliedMode === 'week') return !!appliedStartDate && !!appliedEndDate;
+    if (appliedMode === 'month') return !!appliedStartDate && !!appliedEndDate;
     return false;
   }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
 
@@ -105,6 +117,9 @@ export const CallVolumeHeatmap = () => {
     }
     if (appliedMode === 'week' && appliedStartDate && appliedEndDate) {
       return `Week: ${format(appliedStartDate, 'MMM d')} - ${format(appliedEndDate, 'MMM d, yyyy')}`;
+    }
+    if (appliedMode === 'month' && appliedStartDate && appliedEndDate) {
+      return format(appliedStartDate, 'MMMM yyyy');
     }
     return null;
   }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
@@ -127,9 +142,14 @@ export const CallVolumeHeatmap = () => {
       setAppliedSingleDate(null);
       setAppliedStartDate(weekStart);
       setAppliedEndDate(weekEnd);
+    } else if (filterMode === 'month') {
+      const { monthStart, monthEnd } = getMonthDates(selectedMonthOffset);
+      setAppliedSingleDate(null);
+      setAppliedStartDate(monthStart);
+      setAppliedEndDate(monthEnd);
     }
     setAppliedAgentId(selectedAgentId);
-  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate, selectedWeekOffset, selectedAgentId]);
+  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate, selectedWeekOffset, selectedMonthOffset, selectedAgentId]);
 
   const handleClearAll = useCallback(() => {
     setFilterMode(null);
@@ -137,6 +157,7 @@ export const CallVolumeHeatmap = () => {
     setStartDate(null);
     setEndDate(null);
     setSelectedWeekOffset(0);
+    setSelectedMonthOffset(0);
     setSelectedAgentId('all');
 
     setAppliedMode(null);
@@ -152,6 +173,7 @@ export const CallVolumeHeatmap = () => {
     setStartDate(null);
     setEndDate(null);
     setSelectedWeekOffset(0);
+    setSelectedMonthOffset(0);
   }, []);
 
   const { data: heatmapData = [], isLoading } = useQuery({
@@ -172,13 +194,13 @@ export const CallVolumeHeatmap = () => {
       const rangeStart =
         appliedMode === 'single' && appliedSingleDate
           ? appliedSingleDate
-          : (appliedMode === 'range' || appliedMode === 'week') && appliedStartDate
+          : (appliedMode === 'range' || appliedMode === 'week' || appliedMode === 'month') && appliedStartDate
             ? appliedStartDate
             : null;
       const rangeEnd =
         appliedMode === 'single' && appliedSingleDate
           ? appliedSingleDate
-          : (appliedMode === 'range' || appliedMode === 'week') && appliedEndDate
+          : (appliedMode === 'range' || appliedMode === 'week' || appliedMode === 'month') && appliedEndDate
             ? appliedEndDate
             : null;
 
@@ -456,6 +478,17 @@ export const CallVolumeHeatmap = () => {
                 <CalendarWeekIcon className="mr-2 h-4 w-4" />
                 Filter by Week
               </Button>
+            <Button
+              variant="outline"
+              onClick={() => setFilterMode('month')}
+              className={cn(
+                'h-auto px-8 py-5 text-sm font-medium border-2 transition-all',
+                'hover:bg-primary hover:text-primary-foreground hover:-translate-y-0.5'
+              )}
+            >
+              <CalendarDays className="mr-2 h-4 w-4" />
+              Filter by Month
+            </Button>
             </div>
           )}
 
@@ -647,6 +680,49 @@ export const CallVolumeHeatmap = () => {
               </div>
             </div>
           )}
+
+        {/* Step 2d: Month filter */}
+        {filterMode === 'month' && (
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleChangeFilterType}
+              className="w-fit gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Change Filter Type
+            </Button>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Select a Month:</p>
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((offset) => {
+                  const { monthStart } = getMonthDates(offset);
+                  const label = format(monthStart, 'MMM yyyy');
+                  return (
+                    <Button
+                      key={offset}
+                      variant={selectedMonthOffset === offset ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedMonthOffset(offset)}
+                      className="text-xs"
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-accent/30 p-3 text-sm text-foreground">
+              {(() => {
+                const { monthStart, monthEnd } = getMonthDates(selectedMonthOffset);
+                return `Selected: ${format(monthStart, 'MMMM d')} - ${format(monthEnd, 'MMMM d, yyyy')}`;
+              })()}
+            </div>
+          </div>
+        )}
 
           {/* Step 3: Apply / Clear */}
           {filterMode !== null && (

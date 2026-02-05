@@ -38,7 +38,7 @@ export const LeadPipelineFunnel = ({ data, isLoading }: LeadPipelineFunnelProps)
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Lead Pipeline</CardTitle>
-        <CardDescription>This week's conversion funnel</CardDescription>
+        <CardDescription>This month's conversion funnel</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">

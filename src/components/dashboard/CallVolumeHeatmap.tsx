@@ -10,6 +10,7 @@ import { getDay, getHours, format, startOfDay, endOfDay, startOfWeek, endOfWeek,
 import { useAuth } from '@/contexts/AuthContext';
 import { CalendarIcon, ChevronLeft, CalendarRange, Calendar as CalendarWeekIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface HeatmapData {
   day: number;
@@ -33,11 +34,15 @@ export const CallVolumeHeatmap = () => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0); // 0 = this week, 1 = last week, etc.
 
+  // Agent filter state
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
+
   // Applied filter state (data fetch)
   const [appliedMode, setAppliedMode] = useState<FilterMode | null>(null);
   const [appliedSingleDate, setAppliedSingleDate] = useState<Date | null>(null);
   const [appliedStartDate, setAppliedStartDate] = useState<Date | null>(null);
   const [appliedEndDate, setAppliedEndDate] = useState<Date | null>(null);
+  const [appliedAgentId, setAppliedAgentId] = useState<string>('all');
 
   // Calculate week dates based on offset
   const getWeekDates = (offset: number) => {
@@ -49,6 +54,31 @@ export const CallVolumeHeatmap = () => {
 
   const canSeeAllData = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
   const effectiveTeamId = ledTeamId || (userRole === 'supervisor' ? profile?.team_id : null);
+
+  // Fetch agents for dropdown
+  const { data: agents = [] } = useQuery({
+    queryKey: ['heatmap-agents', effectiveTeamId, canSeeAllData, user?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('profiles_public')
+        .select('id, full_name, username')
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (!canSeeAllData) {
+        if (effectiveTeamId) {
+          query = query.eq('team_id', effectiveTeamId);
+        } else if (user?.id) {
+          query = query.eq('supervisor_id', user.id);
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
 
   const canApplyFilter = useCallback(() => {
     if (filterMode === 'single') return !!selectedDate;
@@ -95,7 +125,8 @@ export const CallVolumeHeatmap = () => {
       setAppliedStartDate(weekStart);
       setAppliedEndDate(weekEnd);
     }
-  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate, selectedWeekOffset]);
+    setAppliedAgentId(selectedAgentId);
+  }, [canApplyFilter, endDate, filterMode, selectedDate, startDate, selectedWeekOffset, selectedAgentId]);
 
   const handleClearAll = useCallback(() => {
     setFilterMode(null);
@@ -103,11 +134,13 @@ export const CallVolumeHeatmap = () => {
     setStartDate(null);
     setEndDate(null);
     setSelectedWeekOffset(0);
+    setSelectedAgentId('all');
 
     setAppliedMode(null);
     setAppliedSingleDate(null);
     setAppliedStartDate(null);
     setAppliedEndDate(null);
+    setAppliedAgentId('all');
   }, []);
 
   const handleChangeFilterType = useCallback(() => {
@@ -128,6 +161,7 @@ export const CallVolumeHeatmap = () => {
       appliedSingleDate?.toISOString(),
       appliedStartDate?.toISOString(),
       appliedEndDate?.toISOString(),
+      appliedAgentId,
     ],
     queryFn: async (): Promise<HeatmapData[]> => {
       if (!hasAppliedFilter) return [];
@@ -154,7 +188,9 @@ export const CallVolumeHeatmap = () => {
       let agentIds: string[] | null = null;
 
       if (!canSeeAllData) {
-        if (effectiveTeamId) {
+        if (appliedAgentId !== 'all') {
+          agentIds = [appliedAgentId];
+        } else if (effectiveTeamId) {
           const { data } = await supabase
             .from('profiles_public')
             .select('id')
@@ -171,6 +207,9 @@ export const CallVolumeHeatmap = () => {
         } else {
           agentIds = [];
         }
+      } else if (appliedAgentId !== 'all') {
+        // Global access but specific agent selected
+        agentIds = [appliedAgentId];
       }
 
       let query = supabase
@@ -257,7 +296,27 @@ export const CallVolumeHeatmap = () => {
       <CardContent className="space-y-6">
         {/* Step 1: Choose filter mode (NO CALENDAR on initial load) */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Select Date Filter Type</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h3 className="text-sm font-semibold">Select Date Filter Type</h3>
+            
+            {/* Agent Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Agent:</span>
+              <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Agents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.full_name || agent.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {filterMode === null && (
             <div className="flex flex-col sm:flex-row gap-4 sm:justify-center py-6">

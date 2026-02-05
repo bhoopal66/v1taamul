@@ -22,6 +22,7 @@ import { SupervisorCallVolumeHeatmap } from '@/components/supervisor/SupervisorC
 import { SupervisorLeadsOverview } from '@/components/supervisor/SupervisorLeadsOverview';
 import { FailedUploadsRetryPanel } from '@/components/supervisor/FailedUploadsRetryPanel';
 import { AgentAttendanceOverview } from '@/components/supervisor/AgentAttendanceOverview';
+ import { AgentActivityTimeline } from '@/components/supervisor/AgentActivityTimeline';
 import { useSupervisorData } from '@/hooks/useSupervisorData';
 import { useTeamPerformanceTrends } from '@/hooks/useTeamPerformanceTrends';
 import { useTeamActivityMonitor } from '@/hooks/useTeamActivityMonitor';
@@ -222,6 +223,10 @@ export const SupervisorDashboard: React.FC = () => {
                   <CalendarClock className="w-3.5 h-3.5" />
                   Attendance
                 </TabsTrigger>
+                 <TabsTrigger value="timeline" className="gap-1.5 text-xs sm:text-sm px-3 py-2">
+                   <Activity className="w-3.5 h-3.5" />
+                   Timeline
+                 </TabsTrigger>
               </div>
             </TabsList>
             
@@ -329,6 +334,10 @@ export const SupervisorDashboard: React.FC = () => {
         <TabsContent value="attendance" className="space-y-6">
           <AgentAttendanceOverview teamId={effectiveTeamId} />
         </TabsContent>
+
+         <TabsContent value="timeline" className="space-y-6">
+           <AgentActivityTimeline teamId={effectiveTeamId} />
+         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">
           <TeamSubmissionsView />

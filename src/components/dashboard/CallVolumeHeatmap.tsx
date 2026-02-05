@@ -685,11 +685,11 @@ export const CallVolumeHeatmap = () => {
               const isToday = dl.dayIndex === todayIndex;
               return (
                 <div key={dl.dayIndex} className={cn("flex items-center gap-1 mb-1", isToday && "bg-accent/30 rounded-md -mx-1 px-1")}>
-                  <div className={cn("w-24 text-xs font-medium", isToday ? "text-primary font-semibold" : "text-muted-foreground")}>
+                  <div className={cn("w-24 text-xs font-medium flex flex-col", isToday ? "text-primary font-semibold" : "text-muted-foreground")}>
                     <span>{dl.dayName}{isToday && " •"}</span>
-                    {dl.dateLabel && (
-                      <span className="ml-1 text-[10px] text-muted-foreground/70">({dl.dateLabel})</span>
-                    )}
+                    {dl.dateLabel && dl.dateLabel.split(', ').map((date, idx) => (
+                      <span key={idx} className="text-[10px] text-muted-foreground/70">{date}</span>
+                    ))}
                   </div>
                   {hours.map(hour => {
                     const value = getValue(dl.dayIndex, hour);

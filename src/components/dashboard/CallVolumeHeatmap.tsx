@@ -318,7 +318,7 @@ export const CallVolumeHeatmap = () => {
       if (!dateMap.has(dayIdx)) {
         dateMap.set(dayIdx, []);
       }
-      dateMap.get(dayIdx)!.push(format(date, 'dd'));
+      dateMap.get(dayIdx)!.push(format(date, 'd MMM'));
     });
 
     return days.map((day, i) => ({

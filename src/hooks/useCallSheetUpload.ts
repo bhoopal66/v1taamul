@@ -1057,7 +1057,50 @@ export const useCallSheetUpload = () => {
           });
           
           if (contactsNeedingCallList.length > 0) {
-            setUploadProgress({ stage: 'creating_list', percentage: 85, message: `Adding ${contactsNeedingCallList.length} contacts to call list...` });
+            // IMPORTANT: Filter out contacts that have been marked as "not_interested"
+            // to prevent them from reappearing on call lists
+            const { data: notInterestedContacts, error: niError } = await supabase
+              .from('call_feedback')
+              .select('contact_id')
+              .in('contact_id', contactsNeedingCallList)
+              .eq('feedback_status', 'not_interested');
+            
+            if (niError) {
+              uploadLogger.warn('call_list_not_interested_check', 'Failed to check not_interested contacts', {
+                error: niError.message,
+              });
+            }
+            
+            const notInterestedSet = new Set(
+              (notInterestedContacts || []).map(c => c.contact_id)
+            );
+            
+            // Filter out not_interested contacts
+            const finalContactsForCallList = contactsNeedingCallList.filter(
+              id => !notInterestedSet.has(id)
+            );
+            
+            if (notInterestedSet.size > 0) {
+              uploadLogger.info('call_list_filtered', `Filtered out ${notInterestedSet.size} not_interested contacts`, {
+                filteredCount: notInterestedSet.size,
+                remainingCount: finalContactsForCallList.length,
+              });
+              
+              toast.info(`Filtered out ${notInterestedSet.size} contacts marked as "Not Interested"`, {
+                description: 'These contacts will not be added to your call list.',
+                duration: 4000,
+              });
+            }
+            
+            if (finalContactsForCallList.length === 0) {
+              uploadLogger.info('call_list_empty', 'No contacts remaining after filtering not_interested');
+              // Update upload to reflect 0 new entries added
+              await supabase
+                .from('call_sheet_uploads')
+                .update({ approved_count: 0 })
+                .eq('id', upload.id);
+            } else {
+            setUploadProgress({ stage: 'creating_list', percentage: 85, message: `Adding ${finalContactsForCallList.length} contacts to call list...` });
             
             const { data: maxOrderData, error: maxOrderError } = await supabase
               .from('approved_call_list')
@@ -1077,7 +1120,7 @@ export const useCallSheetUpload = () => {
             const startOrder = (maxOrderData?.call_order || 0) + 1;
             uploadLogger.info('call_list_order', `Starting call order at ${startOrder}`);
             
-            const callListEntries = contactsNeedingCallList.map((contactId, index) => ({
+            const callListEntries = finalContactsForCallList.map((contactId, index) => ({
               agent_id: user.id,
               contact_id: contactId,
               upload_id: upload.id,
@@ -1130,6 +1173,7 @@ export const useCallSheetUpload = () => {
               });
             } else {
               uploadLogger.info('upload_update', `Updated upload record approved_count to ${actualInserted}`);
+            }
             }
           } else {
             uploadLogger.info('call_list_skip', 'All contacts already in today\'s call list - no new entries needed');

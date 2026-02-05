@@ -33,7 +33,7 @@ export const useTeamPerformance = (options: UseTeamPerformanceOptions = {}) => {
   const { user, userRole } = useAuth();
   const { days = 30 } = options;
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const hasGlobalAccess = ['admin', 'super_admin', 'operations_head'].includes(userRole || '');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['team-performance-comparison', days],
@@ -186,7 +186,7 @@ export const useTeamPerformance = (options: UseTeamPerformanceOptions = {}) => {
         summary,
       };
     },
-    enabled: !!user?.id && isAdmin,
+    enabled: !!user?.id && hasGlobalAccess,
     refetchInterval: 60000, // Refresh every minute
   });
 

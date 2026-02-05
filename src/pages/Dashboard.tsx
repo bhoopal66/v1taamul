@@ -64,10 +64,13 @@ const filterPresets: FilterPreset[] = [
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, userRole } = useAuth();
   
   // Use centralized permissions
   const { hasPageAccess, isTeamLeader, canViewAllAgentsData } = usePermissions();
+  
+  // Check if user has global access (super_admin, admin, operations_head)
+  const hasGlobalAccess = ['super_admin', 'admin', 'operations_head'].includes(userRole || '');
   
   // Team view filters
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -366,10 +369,12 @@ export const Dashboard: React.FC = () => {
               <span>{format(new Date(), 'EEEE, MMMM d, yyyy')}</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-              {isTeamLeader ? 'My Team Dashboard' : 'Team Dashboard'}
+              {hasGlobalAccess ? 'All Teams Dashboard' : isTeamLeader ? 'My Team Dashboard' : 'Team Dashboard'}
             </h1>
             <p className="text-muted-foreground mt-2 max-w-lg">
-              {isTeamLeader 
+              {hasGlobalAccess
+                ? 'Global performance overview across all teams and agents.'
+                : isTeamLeader 
                 ? 'Performance overview for your team members.' 
                 : 'Overview of all agents performance. Filter by agent and date range.'}
             </p>

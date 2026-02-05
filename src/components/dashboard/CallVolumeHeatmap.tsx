@@ -90,6 +90,7 @@ export const CallVolumeHeatmap = () => {
   const hasAppliedFilter = useMemo(() => {
     if (appliedMode === 'single') return !!appliedSingleDate;
     if (appliedMode === 'range') return !!appliedStartDate && !!appliedEndDate;
+    if (appliedMode === 'week') return !!appliedStartDate && !!appliedEndDate;
     return false;
   }, [appliedMode, appliedSingleDate, appliedStartDate, appliedEndDate]);
 
@@ -169,20 +170,27 @@ export const CallVolumeHeatmap = () => {
       const rangeStart =
         appliedMode === 'single' && appliedSingleDate
           ? appliedSingleDate
-          : appliedMode === 'range' && appliedStartDate
+          : (appliedMode === 'range' || appliedMode === 'week') && appliedStartDate
             ? appliedStartDate
             : null;
       const rangeEnd =
         appliedMode === 'single' && appliedSingleDate
           ? appliedSingleDate
-          : appliedMode === 'range' && appliedEndDate
+          : (appliedMode === 'range' || appliedMode === 'week') && appliedEndDate
             ? appliedEndDate
             : null;
 
       if (!rangeStart || !rangeEnd) return [];
-
-      const startDate = startOfDay(rangeStart);
-      const endDate = endOfDay(rangeEnd);
+      
+      // For week mode, use the already calculated week dates
+      const queryStartDate = startOfDay(rangeStart);
+      const queryEndDate = endOfDay(rangeEnd);
+      
+      console.log('[Heatmap] Query range:', {
+        mode: appliedMode,
+        start: queryStartDate.toISOString(),
+        end: queryEndDate.toISOString(),
+      });
 
       // Get agent IDs for team filtering
       let agentIds: string[] | null = null;
@@ -215,8 +223,8 @@ export const CallVolumeHeatmap = () => {
       let query = supabase
         .from('call_feedback')
         .select('call_timestamp')
-        .gte('call_timestamp', startDate.toISOString())
-        .lte('call_timestamp', endDate.toISOString());
+        .gte('call_timestamp', queryStartDate.toISOString())
+        .lte('call_timestamp', queryEndDate.toISOString());
 
       if (agentIds !== null && agentIds.length > 0) {
         query = query.in('agent_id', agentIds);

@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split('T')[0];
     const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Find unanswered calls from 15+ days ago that are not marked as not_interested
+    // Find unanswered calls from 15+ days ago
     const { data: unansweredCalls, error: fetchError } = await supabase
       .from('call_feedback')
       .select('agent_id, contact_id')
@@ -38,19 +38,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Filter out contacts that are marked as not_interested
+    // Get unique contact IDs
     const contactIds = [...new Set(unansweredCalls.map(c => c.contact_id))];
-    
-    const { data: notInterestedContacts } = await supabase
+
+    // Filter out contacts that have ANY newer feedback (not just not_interested)
+    // If a contact was later called and got interested/not_interested/callback/wrong_number,
+    // it should NOT be recycled
+    const { data: contactsWithNewerFeedback } = await supabase
       .from('call_feedback')
       .select('contact_id')
       .in('contact_id', contactIds)
-      .eq('feedback_status', 'not_interested');
+      .gte('call_timestamp', fifteenDaysAgo);
 
-    const notInterestedSet = new Set(notInterestedContacts?.map(c => c.contact_id) || []);
+    const hasNewerFeedbackSet = new Set(contactsWithNewerFeedback?.map(c => c.contact_id) || []);
 
-    // Filter out not_interested and get unique agent-contact pairs
-    const validCalls = unansweredCalls.filter(c => !notInterestedSet.has(c.contact_id));
+    // Also exclude contacts permanently marked as not_interested or wrong_number (any time)
+    const { data: permanentlyExcluded } = await supabase
+      .from('call_feedback')
+      .select('contact_id')
+      .in('contact_id', contactIds)
+      .in('feedback_status', ['not_interested', 'wrong_number']);
+
+    const permanentlyExcludedSet = new Set(permanentlyExcluded?.map(c => c.contact_id) || []);
+
+    // Filter: only recycle contacts with NO newer feedback AND not permanently excluded
+    const validCalls = unansweredCalls.filter(c => 
+      !hasNewerFeedbackSet.has(c.contact_id) && !permanentlyExcludedSet.has(c.contact_id)
+    );
     
     // Group by agent
     const callsByAgent = new Map<string, string[]>();
@@ -66,17 +80,17 @@ Deno.serve(async (req) => {
 
     let totalRecycled = 0;
 
-    for (const [agentId, contactIds] of callsByAgent) {
+    for (const [agentId, agentContactIds] of callsByAgent) {
       // Check which contacts are already in today's call list for this agent
       const { data: existingInList } = await supabase
         .from('approved_call_list')
         .select('contact_id')
         .eq('agent_id', agentId)
         .eq('list_date', today)
-        .in('contact_id', contactIds);
+        .in('contact_id', agentContactIds);
 
       const existingSet = new Set(existingInList?.map(c => c.contact_id) || []);
-      const contactsToAdd = contactIds.filter(id => !existingSet.has(id));
+      const contactsToAdd = agentContactIds.filter(id => !existingSet.has(id));
 
       if (contactsToAdd.length === 0) continue;
 
@@ -112,7 +126,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Recycled ${totalRecycled} unanswered calls`);
+    console.log(`Recycled ${totalRecycled} unanswered calls (excluded ${permanentlyExcludedSet.size} permanent, ${hasNewerFeedbackSet.size} with newer feedback)`);
 
     return new Response(
       JSON.stringify({ 

@@ -1071,25 +1071,55 @@ export const useCallSheetUpload = () => {
               });
             }
             
+            // Also filter out contacts marked as "not_answered" within the last 15 days
+            // They should only be recycled after 15 days (handled by the recycle edge function)
+            const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: recentUnansweredContacts, error: uaError } = await supabase
+              .from('call_feedback')
+              .select('contact_id')
+              .in('contact_id', contactsNeedingCallList)
+              .eq('feedback_status', 'not_answered')
+              .gte('call_timestamp', fifteenDaysAgo);
+            
+            if (uaError) {
+              uploadLogger.warn('call_list_unanswered_check', 'Failed to check recent unanswered contacts', {
+                error: uaError.message,
+              });
+            }
+            
             const notInterestedSet = new Set(
               (notInterestedContacts || []).map(c => c.contact_id)
             );
             
-            // Filter out not_interested contacts
-            const finalContactsForCallList = contactsNeedingCallList.filter(
-              id => !notInterestedSet.has(id)
+            const recentUnansweredSet = new Set(
+              (recentUnansweredContacts || []).map(c => c.contact_id)
             );
             
-            if (notInterestedSet.size > 0) {
-              uploadLogger.info('call_list_filtered', `Filtered out ${notInterestedSet.size} not_interested contacts`, {
-                filteredCount: notInterestedSet.size,
+            // Filter out not_interested AND recently unanswered contacts
+            const finalContactsForCallList = contactsNeedingCallList.filter(
+              id => !notInterestedSet.has(id) && !recentUnansweredSet.has(id)
+            );
+            
+            const totalFiltered = notInterestedSet.size + recentUnansweredSet.size;
+            if (totalFiltered > 0) {
+              uploadLogger.info('call_list_filtered', `Filtered out ${totalFiltered} contacts (${notInterestedSet.size} not_interested, ${recentUnansweredSet.size} recent unanswered)`, {
+                notInterestedCount: notInterestedSet.size,
+                recentUnansweredCount: recentUnansweredSet.size,
                 remainingCount: finalContactsForCallList.length,
               });
               
-              toast.info(`Filtered out ${notInterestedSet.size} contacts marked as "Not Interested"`, {
-                description: 'These contacts will not be added to your call list.',
-                duration: 4000,
-              });
+              if (notInterestedSet.size > 0) {
+                toast.info(`Filtered out ${notInterestedSet.size} contacts marked as "Not Interested"`, {
+                  description: 'These contacts will not be added to your call list.',
+                  duration: 4000,
+                });
+              }
+              if (recentUnansweredSet.size > 0) {
+                toast.info(`Filtered out ${recentUnansweredSet.size} unanswered contacts (within 15 days)`, {
+                  description: 'These will be auto-recycled after 15 days.',
+                  duration: 4000,
+                });
+              }
             }
             
             if (finalContactsForCallList.length === 0) {

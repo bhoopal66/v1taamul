@@ -1057,13 +1057,13 @@ export const useCallSheetUpload = () => {
           });
           
           if (contactsNeedingCallList.length > 0) {
-            // IMPORTANT: Filter out contacts that have been marked as "not_interested"
+            // IMPORTANT: Filter out contacts that have been marked as "not_interested" or "wrong_number"
             // to prevent them from reappearing on call lists
-            const { data: notInterestedContacts, error: niError } = await supabase
+            const { data: permanentlyExcludedContacts, error: niError } = await supabase
               .from('call_feedback')
               .select('contact_id')
               .in('contact_id', contactsNeedingCallList)
-              .eq('feedback_status', 'not_interested');
+              .in('feedback_status', ['not_interested', 'wrong_number']);
             
             if (niError) {
               uploadLogger.warn('call_list_not_interested_check', 'Failed to check not_interested contacts', {
@@ -1087,29 +1087,29 @@ export const useCallSheetUpload = () => {
               });
             }
             
-            const notInterestedSet = new Set(
-              (notInterestedContacts || []).map(c => c.contact_id)
+            const permanentlyExcludedSet = new Set(
+              (permanentlyExcludedContacts || []).map(c => c.contact_id)
             );
             
             const recentUnansweredSet = new Set(
               (recentUnansweredContacts || []).map(c => c.contact_id)
             );
             
-            // Filter out not_interested AND recently unanswered contacts
+            // Filter out permanently excluded AND recently unanswered contacts
             const finalContactsForCallList = contactsNeedingCallList.filter(
-              id => !notInterestedSet.has(id) && !recentUnansweredSet.has(id)
+              id => !permanentlyExcludedSet.has(id) && !recentUnansweredSet.has(id)
             );
             
-            const totalFiltered = notInterestedSet.size + recentUnansweredSet.size;
+            const totalFiltered = permanentlyExcludedSet.size + recentUnansweredSet.size;
             if (totalFiltered > 0) {
-              uploadLogger.info('call_list_filtered', `Filtered out ${totalFiltered} contacts (${notInterestedSet.size} not_interested, ${recentUnansweredSet.size} recent unanswered)`, {
-                notInterestedCount: notInterestedSet.size,
+              uploadLogger.info('call_list_filtered', `Filtered out ${totalFiltered} contacts (${permanentlyExcludedSet.size} not_interested/wrong_number, ${recentUnansweredSet.size} recent unanswered)`, {
+                permanentlyExcludedCount: permanentlyExcludedSet.size,
                 recentUnansweredCount: recentUnansweredSet.size,
                 remainingCount: finalContactsForCallList.length,
               });
               
-              if (notInterestedSet.size > 0) {
-                toast.info(`Filtered out ${notInterestedSet.size} contacts marked as "Not Interested"`, {
+              if (permanentlyExcludedSet.size > 0) {
+                toast.info(`Filtered out ${permanentlyExcludedSet.size} contacts (Not Interested / Wrong Number)`, {
                   description: 'These contacts will not be added to your call list.',
                   duration: 4000,
                 });

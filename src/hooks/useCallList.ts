@@ -218,15 +218,24 @@ export const useCallList = (selectedDate?: Date) => {
           .update(contactUpdateData)
           .eq('id', contactId);
 
-        // Create lead
-        await supabase
+        // Check if lead already exists for this contact
+        const { data: existingLead } = await supabase
           .from('leads')
-          .insert({
-            agent_id: user?.id,
-            contact_id: contactId,
-            lead_status: 'new',
-            notes: notes || null,
-          });
+          .select('id')
+          .eq('contact_id', contactId)
+          .maybeSingle();
+
+        if (!existingLead) {
+          // Create lead only if one doesn't already exist
+          await supabase
+            .from('leads')
+            .insert({
+              agent_id: user?.id,
+              contact_id: contactId,
+              lead_status: 'new',
+              notes: notes || null,
+            });
+        }
       }
     },
     onSuccess: (_, variables) => {

@@ -102,11 +102,12 @@ const reportMenuItems: ReportMenuItem[] = [
 ];
 
 const ReportsPage: React.FC = () => {
-  const { ledTeamId } = useAuth();
+  const { ledTeamId, userRole } = useAuth();
   const isTeamLeader = !!ledTeamId;
+  const hasGlobalAccess = userRole === 'admin' || userRole === 'super_admin' || userRole === 'operations_head';
   
   const availableItems = reportMenuItems.filter(
-    item => !item.requiresTeamLeader || isTeamLeader
+    item => !item.requiresTeamLeader || isTeamLeader || hasGlobalAccess
   );
   
   const [activeReport, setActiveReport] = useState(availableItems[0]?.id || 'generate');

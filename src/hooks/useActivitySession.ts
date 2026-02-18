@@ -240,10 +240,13 @@ export function useActivitySession() {
           .update({
             start_time: now,
             is_active: true,
+            current_activity: null,
+            current_activity_started_at: null,
             last_confirmation_at: now,
             missed_confirmations: 0,
             end_time: null,
             end_reason: null,
+            total_others_minutes: 0,
             updated_at: now,
           })
           .eq('id', existingSession.id);

@@ -31,23 +31,24 @@ export function DatabaseExport() {
         return;
       }
 
-      const response = await supabase.functions.invoke("export-database", {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/export-database`, {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || "Export failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Export failed" }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const { sql, exportDate } = response.data;
-
-      // Create and download the SQL file
-      const blob = new Blob([sql], { type: "text/sql" });
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const dateStr = new Date(exportDate).toISOString().split("T")[0];
+      const dateStr = new Date().toISOString().split("T")[0];
       link.href = url;
       link.download = `database_export_${dateStr}.sql`;
       document.body.appendChild(link);

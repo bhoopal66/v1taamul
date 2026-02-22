@@ -16,7 +16,7 @@ const ALL_TABLES = [
   'approved_call_list','call_feedback','contact_history','leads','lead_stage_transitions','cases','case_audit_trail',
   'case_documents','follow_ups','banker_contacts','document_templates','do_not_call_list','performance_targets',
   'performance_alerts','performance_cache','scheduled_reports','supervisor_alerts','idle_alerts','coach_conversations',
-  'coach_messages','upload_processing_logs','upload_rejections','followup_logs','meeting_logs','whatsapp_templates',
+  'coach_messages','upload_processing_logs','upload_rejections','followup_logs','meeting_logs','whatsapp_templates','whatsapp_messages',
 ];
 
 async function verifyAdmin(req: Request, supabase: ReturnType<typeof createClient>) {
